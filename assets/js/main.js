@@ -6,7 +6,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initReveal();
   initNewsFilters();
   markActiveNavLink();
+  initPlaceholderLinks();
 });
+
+function initPlaceholderLinks() {
+  // Les liens sans destination réelle (ex: "Lire la suite" en attendant de vraies pages d'articles)
+  // utilisent href="#" : on evite qu'un clic remonte la page en haut sans rien faire d'autre.
+  document.querySelectorAll('a[href="#"]').forEach((link) => {
+    link.addEventListener('click', (e) => e.preventDefault());
+  });
+}
 
 function initHeader() {
   const header = document.querySelector('.site-header');
