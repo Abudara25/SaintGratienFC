@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNewsFilters();
   markActiveNavLink();
   initPlaceholderLinks();
+  initArticleLightbox();
 });
 
 function initPlaceholderLinks() {
@@ -89,6 +90,51 @@ function initNewsFilters() {
         card.style.display = match ? '' : 'none';
       });
     });
+  });
+}
+
+function initArticleLightbox() {
+  const lightbox = document.getElementById('article-lightbox');
+  const cards = document.querySelectorAll('article.card');
+  if (!lightbox || !cards.length) return;
+
+  const media = lightbox.querySelector('.lightbox-media');
+  const dateEl = lightbox.querySelector('.lightbox-date');
+  const titleEl = lightbox.querySelector('.lightbox-title');
+  const textEl = lightbox.querySelector('.lightbox-text');
+
+  const open = (card) => {
+    const cardMedia = card.querySelector('.card-media');
+    media.innerHTML = cardMedia ? cardMedia.innerHTML : '';
+    dateEl.textContent = card.querySelector('.card-date')?.textContent || '';
+    titleEl.textContent = card.querySelector('h3')?.textContent || '';
+    textEl.textContent = card.querySelector('.card-body p')?.textContent || '';
+    lightbox.classList.add('is-open');
+    lightbox.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  };
+
+  const close = () => {
+    lightbox.classList.remove('is-open');
+    lightbox.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  };
+
+  cards.forEach((card) => {
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+    card.addEventListener('click', () => open(card));
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open(card);
+      }
+    });
+  });
+
+  lightbox.querySelectorAll('[data-lightbox-close]').forEach((el) => el.addEventListener('click', close));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') close();
   });
 }
 
