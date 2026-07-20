@@ -79,6 +79,7 @@ h1, h2, h3, h4 {
   line-height: 1.15;
   margin: 0 0 .5em;
   color: var(--color-primary);
+  text-wrap: pretty;
 }
 p { margin: 0 0 1em; }
 button { font-family: inherit; }
@@ -319,6 +320,7 @@ section { padding: 88px 0; }
   font-size: 1.15rem;
   color: rgba(251,247,238,.85);
   max-width: 520px;
+  text-wrap: pretty;
 }
 .hero-actions { display: flex; gap: 16px; margin-top: 32px; flex-wrap: wrap; }
 @media (max-width: 900px) {
