@@ -18,7 +18,7 @@ Then open `http://localhost:8000/index.html`.
 
 ## Architecture
 
-- **5 standalone HTML pages**, no templating engine: `index.html`, `actualites.html`, `equipe.html`, `entrainements.html`, `contact.html`. Each page duplicates the same `<header>` and `<footer>` markup verbatim — when changing nav links, social links, or footer contact info, apply the edit to **all 5 files**.
+- **6 standalone HTML pages**, no templating engine: `index.html`, `actualites.html`, `equipe.html`, `entrainements.html`, `partenaires.html`, `contact.html`. Each page duplicates the same `<header>` and `<footer>` markup verbatim — when changing nav links, social links, or footer contact info, apply the edit to **all 6 files**.
 - **`assets/css/styles.css`**: single stylesheet. Design tokens (colors, fonts, spacing) are CSS custom properties in `:root`, with the color palette sampled directly from the club crest (maroon/gold/cream/red). Reusable component classes: `.card`, `.info-list`/`.info-item`, `.cta-banner`, `.eyebrow`, `.filters`/`.filter-btn`.
 - **`assets/js/main.js`**: vanilla JS, no dependencies. Key behaviors: sticky header shrink-on-scroll, mobile nav toggle, scroll-reveal via `IntersectionObserver` (elements with `[data-reveal]`), news category filters on `actualites.html` (`data-filter` buttons vs. `data-category` cards — keep both in sync when adding a category), neutralizing placeholder `href="#"` links, and an article "lightbox" (clicking a news `article.card` opens it enlarged in a modal — `#article-lightbox`, present on `index.html` and `actualites.html` only).
 - **`assets/images/`**: `logo.png` (club crest, optimized down from a ~4MB original) and `favicon.ico` generated from it.
@@ -28,9 +28,11 @@ Then open `http://localhost:8000/index.html`.
 
 - The club was **founded in 2020** — no multi-decade history, no senior/veteran/women's teams, no competitive fixtures, results, or league standings exist. Only two categories: **U6-U7** and **U8-U9**, "loisir" (fun-focused, not competitive), run 100% by volunteers.
 - Address: **Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise**.
-- Training: **Thursdays 17h–18h** — the only slot this season, shared by both categories. A Saturday slot is not confirmed; opening one would require requesting it from the town hall (mairie), only if family demand justifies it — don't describe a second slot as already secured.
+- Training: **Thursdays 17h–18h** — the only slot this season, shared by both categories. A second slot is only being considered **for next season**, not this one, and **no day is fixed for it yet** (don't say "Saturday" or any specific day) — it would only be requested from the town hall (mairie) if the club has enough registered members (adhérents) by then. Don't describe a second slot as already secured or scheduled for this year.
 - On the field, coaches alone manage sessions — parents are asked not to intervene, however well-intentioned.
-- Contact: **contact.sgfc@yahoo.com**. No phone number is published on the site (removed intentionally at the user's request).
+- Contact: **contact.sgfc@yahoo.com**. No phone number is published on the site **except** on `partenaires.html`, where `06 60 23 49 55` appears as a dedicated sponsor/business contact (per the user's explicit choice) — every other page stays email-only.
+- The club is an **association loi 1901**, no confirmed "intérêt général"/mécénat status — never claim a tax deduction on donations (e.g. no "60% déductible des impôts") unless the user confirms that status exists.
+- A real sponsoring dossier (`Sponsoring.pdf`, provided by the user) is the source for `partenaires.html`: club needs (maillots, matériel sportif, location de terrain incl. **Atletica** — a real rented facility, distinct from the municipal Stade Robert Lemoine — and vie du club) and sponsor perks (logo maillots, réseaux sociaux, logo supports, événements/tournois).
 - Social links: Instagram `https://www.instagram.com/sgfc95`, Facebook `https://www.facebook.com/SGFootballClub`. No YouTube — the icon was removed since no real profile exists.
 - The site is **not deployed anywhere yet** (no GitHub Pages, no custom domain). Code lives at `https://github.com/Abudara25/SaintGratienFC` (public repo) only.
 
