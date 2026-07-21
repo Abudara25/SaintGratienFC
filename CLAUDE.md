@@ -37,6 +37,12 @@ Then open `http://localhost:8000/index.html`.
 - Social links: Instagram `https://www.instagram.com/sgfc95`, Facebook `https://www.facebook.com/SGFootballClub`. No YouTube — the icon was removed since no real profile exists.
 - The site is **not deployed anywhere yet** (no GitHub Pages, no custom domain). Code lives at `https://github.com/Abudara25/SaintGratienFC` (public repo) only.
 
+## Responsive
+
+- `.grid-2` collapses to 1 column at **760px** (not 620px like `.grid-3`/`.grid-4`) — deliberately split in the `@media` rules so 2-column text+content sections (mission/encadrement, catégories, contreparties, etc.) don't get squeezed into narrow columns on tablets before stacking. Don't recombine that rule with `.grid-3`/`.grid-4` without re-checking nested-grid sections like index.html's "Un club, des valeurs".
+- All `.btn` use `white-space: nowrap` — keep button labels short (≲25 chars); a longer label can overflow its column on narrow screens instead of wrapping. Fixed one real instance on 2026-07-21 (index.html partners CTA, was "Découvrir le dossier de sponsoring" → "Découvrir le dossier").
+- **Tooling note**: `mcp__claude-in-chrome__resize_window` does not actually resize the browser viewport in this dev environment (confirmed via `window.innerWidth` staying at the real window size regardless of the requested width) — don't rely on it for visual mobile QA here; audit responsive behavior by reading the CSS media queries against each page's markup instead.
+
 ## Project-specific conventions
 
 - Only add a "Lire la suite" / read-more link to a news card if there is genuinely more content behind it (a real detail page). None currently exist, so none are used — clicking a card opens the lightbox modal instead, which just shows the same teaser text enlarged.
