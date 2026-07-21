@@ -27,6 +27,7 @@ Then open `http://localhost:8000/index.html`.
 ## Real club facts — do not contradict these with invented content
 
 - The club was **founded in 2020** — no multi-decade history, no senior/veteran/women's teams, no competitive fixtures, results, or league standings exist. Only two categories: **U6-U7** and **U8-U9**, "loisir" (fun-focused, not competitive), run 100% by volunteers.
+- The club has **no players yet** — registrations for the first season just opened. Never say it "already has players/teams" (present tense); phrase player/team content prospectively ("nos futurs joueurs", "nos catégories"). The sponsoring PDF source claims otherwise in places — don't trust it on this point.
 - Address: **Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise**.
 - Training: **Thursdays 17h–18h** — the only slot this season, shared by both categories. A second slot is only being considered **for next season**, not this one, and **no day is fixed for it yet** (don't say "Saturday" or any specific day) — it would only be requested from the town hall (mairie) if the club has enough registered members (adhérents) by then. Don't describe a second slot as already secured or scheduled for this year.
 - On the field, coaches alone manage sessions — parents are asked not to intervene, however well-intentioned.
