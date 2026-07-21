@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Static marketing website for **Saint-Gratien FC**, a football club for kids in Saint-Gratien (Val-d'Oise, France), founded in 2026 — this is its first season. Plain HTML/CSS/JS, no build tools, no framework, no package manager. Files are served as-is; edit them directly and refresh the browser.
+Static marketing website for **Saint-Gratien FC**, a football club for kids in Saint-Gratien (Val-d'Oise, France), founded in 2020 — this is its first structured season. Plain HTML/CSS/JS, no build tools, no framework, no package manager. Files are served as-is; edit them directly and refresh the browser.
 
 ## Running locally
 
@@ -26,9 +26,10 @@ Then open `http://localhost:8000/index.html`.
 
 ## Real club facts — do not contradict these with invented content
 
-- The club **just launched in 2026** — no multi-decade history, no senior/veteran/women's teams, no competitive fixtures, results, or league standings exist. Only two categories: **U6-U7** and **U8-U9**, "loisir" (fun-focused, not competitive), run 100% by volunteers.
+- The club was **founded in 2020** — no multi-decade history, no senior/veteran/women's teams, no competitive fixtures, results, or league standings exist. Only two categories: **U6-U7** and **U8-U9**, "loisir" (fun-focused, not competitive), run 100% by volunteers.
 - Address: **Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise**.
-- Training: **Thursdays 17h–18h** (a Saturday slot is "under consideration", not confirmed).
+- Training: **Thursdays 17h–18h** — the only slot this season, shared by both categories. A Saturday slot is not confirmed; opening one would require requesting it from the town hall (mairie), only if family demand justifies it — don't describe a second slot as already secured.
+- On the field, coaches alone manage sessions — parents are asked not to intervene, however well-intentioned.
 - Contact: **contact.sgfc@yahoo.com**. No phone number is published on the site (removed intentionally at the user's request).
 - Social links: Instagram `https://www.instagram.com/sgfc95`, Facebook `https://www.facebook.com/SGFootballClub`. No YouTube — the icon was removed since no real profile exists.
 - The site is **not deployed anywhere yet** (no GitHub Pages, no custom domain). Code lives at `https://github.com/Abudara25/SaintGratienFC` (public repo) only.
