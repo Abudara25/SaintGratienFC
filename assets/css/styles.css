@@ -313,7 +313,7 @@ section { padding: 88px 0; }
   content: '';
   position: absolute; inset: 0;
   background-image:
-    repeating-linear-gradient(45deg, rgba(240,160,48,.05) 0 2px, transparent 2px 40px);
+    repeating-linear-gradient(45deg, rgba(240,160,48,.05) 0 5px, transparent 5px 40px);
   pointer-events: none;
 }
 .hero::after {
