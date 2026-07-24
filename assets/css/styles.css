@@ -162,8 +162,24 @@ section { padding: 88px 0; }
   background: linear-gradient(160deg, var(--maroon-800), var(--maroon-950));
   color: var(--cream-100);
 }
-.bg-maroon h2, .bg-maroon h3 { color: var(--gold-400); }
-.bg-maroon .section-sub { color: rgba(251, 247, 238, 0.78); }
+.bg-maroon h2, .bg-maroon h3, .photo-section h2, .photo-section h3 { color: var(--gold-400); }
+.bg-maroon .section-sub, .photo-section .section-sub { color: rgba(251, 247, 238, 0.78); }
+
+/* ---------- Photo section (background photograph + overlay content) ---------- */
+.photo-section {
+  position: relative;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  color: var(--cream-100);
+}
+.photo-section::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(160deg, rgba(58,15,16,.93), rgba(79,20,20,.86) 55%, rgba(58,15,16,.93));
+}
+.photo-section .container { position: relative; z-index: 2; }
+.photo-section p { color: rgba(251, 247, 238, 0.85); }
 
 .grid { display: grid; gap: 28px; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
@@ -419,6 +435,14 @@ section { padding: 88px 0; }
 .card-body p { color: var(--color-text-muted); font-size: .95rem; margin-bottom: 0; flex: 1; }
 .card-link { margin-top: 10px; font-family: var(--font-display); font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; color: var(--color-primary); }
 .card-link::after { content: ' →'; }
+
+/* ---------- Photo frame (illustrative photography) ---------- */
+.photo-frame {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.photo-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* ---------- Match card ---------- */
 .match-card {
