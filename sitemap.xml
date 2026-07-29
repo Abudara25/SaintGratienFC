@@ -21,7 +21,19 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://votre-domaine.fr/inscription.html</loc>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://votre-domaine.fr/contact.html</loc>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://votre-domaine.fr/mentions-legales.html</loc>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://votre-domaine.fr/confidentialite.html</loc>
+    <priority>0.3</priority>
   </url>
 </urlset>

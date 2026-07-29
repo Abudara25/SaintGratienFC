@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Contact — Saint-Gratien FC (École de foot U6-U9)</title>
-<meta name="description" content="Contactez le Saint-Gratien FC pour devenir bénévole, partenaire, ou toute autre question.">
+<title>Inscription — Saint-Gratien FC (École de foot U6-U9)</title>
+<meta name="description" content="Inscrivez votre enfant au Saint-Gratien FC (U6-U9) : générez votre dossier d'inscription et réglez l'adhésion en ligne.">
 <meta name="robots" content="index, follow">
-<link rel="canonical" href="https://votre-domaine.fr/contact.html">
+<link rel="canonical" href="https://votre-domaine.fr/inscription.html">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Contact — Saint-Gratien FC">
-<meta property="og:description" content="Contactez le Saint-Gratien FC pour devenir bénévole, partenaire, ou toute autre question.">
+<meta property="og:title" content="Inscription — Saint-Gratien FC">
+<meta property="og:description" content="Inscrivez votre enfant au Saint-Gratien FC (U6-U9) : générez votre dossier d'inscription et réglez l'adhésion en ligne.">
 <meta property="og:image" content="https://votre-domaine.fr/assets/images/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="fr_FR">
-<meta property="og:url" content="https://votre-domaine.fr/contact.html">
+<meta property="og:url" content="https://votre-domaine.fr/inscription.html">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://votre-domaine.fr/assets/images/og-image.jpg">
 <link rel="icon" href="assets/images/favicon.ico">
@@ -53,47 +53,119 @@
 
   <div class="page-header">
     <div class="container">
-      <span class="eyebrow">On vous répond vite</span>
-      <h1>Contact</h1>
-      <p>Une question, une envie de devenir bénévole ou partenaire ? Écrivez-nous. Pour inscrire votre enfant, direction la <a href="inscription.html" style="color:inherit;text-decoration:underline;">page Inscription</a>.</p>
+      <span class="eyebrow">Rejoignez le club</span>
+      <h1>Inscrire mon enfant</h1>
+      <p>Générez votre dossier d'inscription pour la saison 2026-2027, puis finalisez-le en 2 étapes.</p>
     </div>
   </div>
 
-  <section class="bg-surface">
+  <section class="bg-surface" id="adhesion">
     <div class="container grid grid-2" style="align-items:start;">
 
       <div data-reveal>
-        <span class="eyebrow">Écrivez-nous</span>
-        <h2 class="section-title">Envoyer un message</h2>
-        <p class="section-sub">Bénévolat, partenariat ou simple question : dites-nous en plus.</p>
-        <form action="https://formsubmit.co/contact.sgfc@yahoo.com" method="POST">
-          <input type="hidden" name="_subject" value="Nouveau message — Saint-Gratien FC">
-          <input type="hidden" name="_captcha" value="false">
-          <input type="text" name="_honey" style="display:none" tabindex="-1" autocomplete="off">
+        <span class="eyebrow">Inscription</span>
+        <h2 class="section-title">Inscrire mon enfant</h2>
+        <p class="section-sub">Remplissez le formulaire pour générer votre dossier d'inscription, puis suivez les 2 étapes pour le finaliser. Places limitées cette saison : inscrivez votre enfant dès maintenant pour lui garantir une place.</p>
+
+        <div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold-500);box-shadow:none;">
+          <div class="card-body">
+            <span class="eyebrow" style="margin-bottom:4px;">Offre Saison 2026-2027</span>
+            <h3 style="margin-bottom:4px;">180 €</h3>
+            <p style="margin-bottom:0;color:var(--color-text-muted);">Licence + tenue complète Patrick incluse (maillot, short, survêtement, sac).</p>
+          </div>
+        </div>
+
+        <form id="inscription-form" novalidate>
           <div class="form-row">
             <div class="form-field">
-              <label for="contact-nom">Votre nom</label>
-              <input type="text" id="contact-nom" name="nom" placeholder="Sophie Martin" required>
+              <label for="enfant-prenom">Prénom de l'enfant</label>
+              <input type="text" id="enfant-prenom" name="enfantPrenom" placeholder="Léo" required>
             </div>
             <div class="form-field">
-              <label for="contact-email">E-mail</label>
-              <input type="email" id="contact-email" name="email" placeholder="vous@exemple.fr" required>
+              <label for="enfant-nom">Nom de l'enfant</label>
+              <input type="text" id="enfant-nom" name="enfantNom" placeholder="Martin" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="naissance">Date de naissance</label>
+              <input type="date" id="naissance" name="naissance" required>
+            </div>
+            <div class="form-field">
+              <label for="categorie">Catégorie</label>
+              <select id="categorie" name="categorie" required>
+                <option value="U6 - U7">U6 - U7</option>
+                <option value="U8 - U9">U8 - U9</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="parent-prenom">Prénom du parent</label>
+              <input type="text" id="parent-prenom" name="parentPrenom" placeholder="Sophie" required>
+            </div>
+            <div class="form-field">
+              <label for="parent-nom">Nom du parent</label>
+              <input type="text" id="parent-nom" name="parentNom" placeholder="Martin" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="email">E-mail (parent)</label>
+              <input type="email" id="email" name="email" placeholder="vous@exemple.fr" required>
+            </div>
+            <div class="form-field">
+              <label for="telephone">Téléphone (parent)</label>
+              <input type="tel" id="telephone" name="telephone" placeholder="06 12 34 56 78">
             </div>
           </div>
           <div class="form-field">
-            <label for="sujet">Sujet</label>
-            <select id="sujet" name="sujet">
-              <option>Je souhaite devenir bénévole</option>
-              <option>Devenir partenaire / sponsor</option>
-              <option>Autre demande</option>
-            </select>
+            <label for="adresse">Adresse</label>
+            <input type="text" id="adresse" name="adresse" placeholder="12 rue d'Orgemont">
           </div>
-          <div class="form-field">
-            <label for="message">Message</label>
-            <textarea id="message" name="message" rows="4" placeholder="Une question, une précision..." required></textarea>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="code-postal">Code postal</label>
+              <input type="text" id="code-postal" name="codePostal" placeholder="95210">
+            </div>
+            <div class="form-field">
+              <label for="ville">Ville</label>
+              <input type="text" id="ville" name="ville" placeholder="Saint-Gratien">
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Envoyer mon message</button>
+
+          <div class="form-field" style="gap:12px;">
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+              <input type="checkbox" id="autorisation" name="autorisation" required style="margin-top:3px;">
+              <span>J'autorise mon enfant à participer aux entraînements et activités du Saint-Gratien FC.</span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+              <input type="checkbox" id="droit-image" name="droitImage" style="margin-top:3px;">
+              <span>J'autorise le club à utiliser des photos/vidéos de mon enfant prises lors des activités du club, à des fins de communication (site, réseaux sociaux).</span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+              <input type="checkbox" id="rgpd" name="rgpd" required style="margin-top:3px;">
+              <span>J'accepte que ces informations soient utilisées uniquement pour traiter l'inscription de mon enfant au club (voir notre <a href="confidentialite.html" target="_blank">politique de confidentialité</a>).</span>
+            </label>
+          </div>
+
+          <p style="font-size:.85rem;color:var(--color-text-muted);">Un questionnaire de santé (ou certificat médical) pourra vous être demandé avant le début de la saison.</p>
+
+          <button type="submit" class="btn btn-primary btn-block">Télécharger mon dossier</button>
         </form>
+
+        <div id="inscription-next-steps" hidden style="margin-top:28px;">
+          <div class="card" style="background:var(--gold-100);box-shadow:none;">
+            <div class="card-body" style="gap:14px;">
+              <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
+              <p style="margin-bottom:0;color:var(--color-text-muted);">1. Envoyez le PDF téléchargé au club, puis 2. réglez l'adhésion pour la confirmer.</p>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <a id="mailto-btn" href="#" class="btn btn-dark">1. Envoyer par e-mail</a>
+                <a id="helloasso-btn" href="https://www.helloasso.com/associations/saint-gratien-football-club" target="_blank" rel="noopener" class="btn btn-primary">2. Régler sur HelloAsso</a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div data-reveal>
@@ -121,6 +193,10 @@
               <p><a href="mailto:contact.sgfc@yahoo.com">contact.sgfc@yahoo.com</a> — Réponse sous 48h</p>
             </div>
           </div>
+        </div>
+
+        <div style="margin-top:24px;background:var(--gold-100);border-radius:var(--radius-sm);padding:16px 18px;font-size:.92rem;color:var(--color-text-muted);line-height:1.6;">
+          <strong style="color:var(--maroon-950);">Plus nous serons nombreux, plus vite nous pourrons ouvrir de nouveaux créneaux les prochaines années.</strong><br>Chaque inscription compte pour montrer à la ville la demande des familles.
         </div>
 
         <div style="margin-top:24px;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);aspect-ratio:16/10;">
@@ -184,5 +260,7 @@
 </footer>
 
 <script src="assets/js/main.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="assets/js/inscription.js"></script>
 </body>
 </html>
