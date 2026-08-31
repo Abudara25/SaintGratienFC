@@ -96,8 +96,9 @@
         <h2 class="section-title">Stade Robert Lemoine</h2>
         <p class="section-sub">75 rue d'Orgemont, Saint-Gratien, Val-d'Oise</p>
       </div>
-      <div style="max-width:640px;margin-inline:auto;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);aspect-ratio:16/9;" data-reveal>
-        <iframe src="https://www.google.com/maps?q=Stade+Robert+Lemoine,+75+rue+d'Orgemont,+95210+Saint-Gratien&output=embed" width="100%" height="100%" style="border:0;display:block;" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Carte — Stade Robert Lemoine, Saint-Gratien"></iframe>
+      <div class="map-embed" data-map-src="https://www.google.com/maps?q=Stade+Robert+Lemoine,+75+rue+d'Orgemont,+95210+Saint-Gratien&output=embed" data-map-title="Carte — Stade Robert Lemoine, Saint-Gratien" style="max-width:640px;margin-inline:auto;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);aspect-ratio:16/9;background:var(--gold-100);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;" data-reveal>
+        <button type="button" class="btn btn-dark map-embed-btn">Afficher la carte (Google Maps)</button>
+        <p style="margin:0;font-size:.8rem;color:var(--color-text-muted);">Le chargement de la carte dépose des cookies Google.</p>
       </div>
     </div>
   </section>
@@ -183,7 +184,7 @@
       <div>
         <h3>Newsletter</h3>
         <p>Recevez les actus et les infos du club chaque mois.</p>
-        <form class="newsletter" onsubmit="event.preventDefault()">
+        <form class="newsletter">
           <label for="footer-email" class="visually-hidden">Adresse e-mail</label>
           <input type="email" id="footer-email" placeholder="Votre e-mail" required>
           <button type="submit" class="btn btn-primary btn-sm">OK</button>

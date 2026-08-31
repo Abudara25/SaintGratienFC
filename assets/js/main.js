@@ -8,7 +8,37 @@ document.addEventListener('DOMContentLoaded', () => {
   markActiveNavLink();
   initPlaceholderLinks();
   initArticleLightbox();
+  initNewsletterForms();
+  initMapsConsent();
 });
+
+function initNewsletterForms() {
+  // Formulaire newsletter sans backend (placeholder) : on bloque juste le submit natif.
+  document.querySelectorAll('form.newsletter').forEach((form) => {
+    form.addEventListener('submit', (e) => e.preventDefault());
+  });
+}
+
+function initMapsConsent() {
+  // La carte Google Maps n'est chargée qu'après un clic explicite (Google peut déposer
+  // des cookies dès le chargement de l'iframe, donc pas de chargement automatique).
+  document.querySelectorAll('.map-embed').forEach((container) => {
+    const btn = container.querySelector('.map-embed-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const iframe = document.createElement('iframe');
+      iframe.src = container.dataset.mapSrc;
+      iframe.width = '100%';
+      iframe.height = '100%';
+      iframe.style.border = '0';
+      iframe.style.display = 'block';
+      iframe.loading = 'lazy';
+      iframe.referrerPolicy = 'no-referrer-when-downgrade';
+      iframe.title = container.dataset.mapTitle || 'Carte';
+      container.replaceChildren(iframe);
+    });
+  });
+}
 
 function initPlaceholderLinks() {
   // Les liens sans destination réelle (ex: "Lire la suite" en attendant de vraies pages d'articles)
