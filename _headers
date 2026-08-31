@@ -9,8 +9,11 @@
 # Le cache par défaut de Cloudflare Pages (4h) sur les .js/.css a caché une version cassée
 # de main.js le temps que le correctif se propage (2026-08-31). On force la revalidation
 # systématique (ETag) pour que chaque modification soit visible immédiatement.
-/assets/js/*
+/assets/js/main.js
   Cache-Control: no-cache
 
-/assets/css/*
+/assets/js/inscription.js
+  Cache-Control: no-cache
+
+/assets/css/styles.css
   Cache-Control: no-cache
