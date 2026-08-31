@@ -3,8 +3,6 @@
    Palette extraite du blason du club (bordeaux / or / crème / rouge croix)
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-
 :root {
   /* Couleurs de marque (issues du logo) */
   --maroon-950: #3a0f10;
@@ -126,9 +124,8 @@ button { font-family: inherit; }
   animation: eyebrow-pulse 2.4s ease-out infinite;
 }
 @keyframes eyebrow-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(192, 40, 40, .45); }
-  70% { box-shadow: 0 0 0 6px rgba(192, 40, 40, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(192, 40, 40, 0); }
+  0%, 100% { transform: scale(1); opacity: 1; }
+  70% { transform: scale(1.8); opacity: 0; }
 }
 
 /* ---------- Focus (accessibility + polish) ---------- */
