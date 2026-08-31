@@ -66,8 +66,8 @@
         <span class="eyebrow">Inscription</span>
         <h2 class="section-title">Inscrire mon enfant</h2>
 
-        <!-- Pour fermer les inscriptions : remplacer data-status="open" par data-status="closed" ci-dessous. Pour les rouvrir : remettre "open". -->
-        <div class="inscription-status" data-status="open">
+        <!-- data-status par défaut ("open") tant que le JS n'a pas répondu ; ensuite mis à jour automatiquement depuis /api/inscription-status (piloté par le KV Cloudflare "saintgratienfc_config" — voir le dashboard). -->
+        <div class="inscription-status" data-status="open" id="inscription-status">
 
           <div class="inscription-open">
             <p class="section-sub">Remplissez le formulaire pour générer votre dossier d'inscription, puis suivez les 2 étapes pour le finaliser. Places limitées cette saison : inscrivez votre enfant dès maintenant pour lui garantir une place.</p>

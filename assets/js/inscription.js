@@ -6,6 +6,18 @@ const HELLOASSO_URLS = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  const statusEl = document.getElementById('inscription-status');
+  if (statusEl) {
+    fetch('/api/inscription-status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && (data.status === 'open' || data.status === 'closed')) {
+          statusEl.dataset.status = data.status;
+        }
+      })
+      .catch(() => {}); // en cas d'échec, on garde le data-status par défaut ("open")
+  }
+
   const form = document.getElementById('inscription-form');
   if (!form) return;
 
