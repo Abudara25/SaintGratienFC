@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (!window.jspdf) {
-      alert("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou contactez-nous directement à contact.sgfc@yahoo.com.");
+      alert("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou contactez-nous directement à contact@saintgratienfc.fr.");
       return;
     }
     generatePdf(data);
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'Cordialement,',
       `${data.parentPrenom} ${data.parentNom}`,
     ].join('\n');
-    mailtoBtn.href = `mailto:contact.sgfc@yahoo.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    mailtoBtn.href = `mailto:contact@saintgratienfc.fr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
     helloassoBtn.href = HELLOASSO_URLS[data.categorie] || HELLOASSO_URLS['U6 - U7'];
 
@@ -136,7 +136,7 @@ function generatePdf(data) {
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    "À apporter signé au club (premier entraînement) ou à envoyer à contact.sgfc@yahoo.com. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
+    "À apporter signé au club (premier entraînement) ou à envoyer à contact@saintgratienfc.fr. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
     14,
     285
   );
