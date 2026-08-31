@@ -1,4 +1,9 @@
-// Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose l'envoi par e-mail et le paiement HelloAsso.
+// Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose l'envoi par e-mail et le paiement HelloAsso (lien adapté à la catégorie choisie).
+
+const HELLOASSO_URLS = {
+  'U6 - U7': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
+  'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('inscription-form');
@@ -6,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const nextSteps = document.getElementById('inscription-next-steps');
   const mailtoBtn = document.getElementById('mailto-btn');
+  const helloassoBtn = document.getElementById('helloasso-btn');
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -46,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
       `${data.parentPrenom} ${data.parentNom}`,
     ].join('\n');
     mailtoBtn.href = `mailto:contact.sgfc@yahoo.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    helloassoBtn.href = HELLOASSO_URLS[data.categorie] || HELLOASSO_URLS['U6 - U7'];
 
     nextSteps.hidden = false;
     nextSteps.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -116,7 +124,7 @@ function generatePdf(data) {
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    "À envoyer à contact.sgfc@yahoo.com ou à apporter le jour du premier entraînement (jeudi 10 septembre 2026).",
+    "À apporter signé au club (premier entraînement) ou à envoyer à contact.sgfc@yahoo.com. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
     14,
     285
   );

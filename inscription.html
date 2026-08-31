@@ -65,106 +65,122 @@
       <div data-reveal>
         <span class="eyebrow">Inscription</span>
         <h2 class="section-title">Inscrire mon enfant</h2>
-        <p class="section-sub">Remplissez le formulaire pour générer votre dossier d'inscription, puis suivez les 2 étapes pour le finaliser. Places limitées cette saison : inscrivez votre enfant dès maintenant pour lui garantir une place.</p>
 
-        <div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold-500);box-shadow:none;">
-          <div class="card-body">
-            <span class="eyebrow" style="margin-bottom:4px;">Offre Saison 2026-2027</span>
-            <h3 style="margin-bottom:4px;">180 €</h3>
-            <p style="margin-bottom:0;color:var(--color-text-muted);">Licence + tenue complète Patrick incluse (maillot, short, survêtement, sac).</p>
-          </div>
-        </div>
+        <!-- Pour fermer les inscriptions : remplacer data-status="open" par data-status="closed" ci-dessous. Pour les rouvrir : remettre "open". -->
+        <div class="inscription-status" data-status="open">
 
-        <form id="inscription-form" novalidate>
-          <div class="form-row">
-            <div class="form-field">
-              <label for="enfant-prenom">Prénom de l'enfant</label>
-              <input type="text" id="enfant-prenom" name="enfantPrenom" placeholder="Léo" required>
-            </div>
-            <div class="form-field">
-              <label for="enfant-nom">Nom de l'enfant</label>
-              <input type="text" id="enfant-nom" name="enfantNom" placeholder="Martin" required>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-field">
-              <label for="naissance">Date de naissance</label>
-              <input type="date" id="naissance" name="naissance" required>
-            </div>
-            <div class="form-field">
-              <label for="categorie">Catégorie</label>
-              <select id="categorie" name="categorie" required>
-                <option value="U6 - U7">U6 - U7</option>
-                <option value="U8 - U9">U8 - U9</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-field">
-              <label for="parent-prenom">Prénom du parent</label>
-              <input type="text" id="parent-prenom" name="parentPrenom" placeholder="Sophie" required>
-            </div>
-            <div class="form-field">
-              <label for="parent-nom">Nom du parent</label>
-              <input type="text" id="parent-nom" name="parentNom" placeholder="Martin" required>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-field">
-              <label for="email">E-mail (parent)</label>
-              <input type="email" id="email" name="email" placeholder="vous@exemple.fr" required>
-            </div>
-            <div class="form-field">
-              <label for="telephone">Téléphone (parent)</label>
-              <input type="tel" id="telephone" name="telephone" placeholder="06 12 34 56 78">
-            </div>
-          </div>
-          <div class="form-field">
-            <label for="adresse">Adresse</label>
-            <input type="text" id="adresse" name="adresse" placeholder="12 rue d'Orgemont">
-          </div>
-          <div class="form-row">
-            <div class="form-field">
-              <label for="code-postal">Code postal</label>
-              <input type="text" id="code-postal" name="codePostal" placeholder="95210">
-            </div>
-            <div class="form-field">
-              <label for="ville">Ville</label>
-              <input type="text" id="ville" name="ville" placeholder="Saint-Gratien">
-            </div>
-          </div>
+          <div class="inscription-open">
+            <p class="section-sub">Remplissez le formulaire pour générer votre dossier d'inscription, puis suivez les 2 étapes pour le finaliser. Places limitées cette saison : inscrivez votre enfant dès maintenant pour lui garantir une place.</p>
 
-          <div class="form-field" style="gap:12px;">
-            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
-              <input type="checkbox" id="autorisation" name="autorisation" required style="margin-top:3px;">
-              <span>J'autorise mon enfant à participer aux entraînements et activités du Saint-Gratien FC.</span>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
-              <input type="checkbox" id="droit-image" name="droitImage" style="margin-top:3px;">
-              <span>J'autorise le club à utiliser des photos/vidéos de mon enfant prises lors des activités du club, à des fins de communication (site, réseaux sociaux).</span>
-            </label>
-            <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
-              <input type="checkbox" id="rgpd" name="rgpd" required style="margin-top:3px;">
-              <span>J'accepte que ces informations soient utilisées uniquement pour traiter l'inscription de mon enfant au club (voir notre <a href="confidentialite.html" target="_blank">politique de confidentialité</a>).</span>
-            </label>
-          </div>
+            <div class="card" style="margin-bottom:24px;border-left:4px solid var(--gold-500);box-shadow:none;">
+              <div class="card-body">
+                <span class="eyebrow" style="margin-bottom:4px;">Offre Saison 2026-2027</span>
+                <h3 style="margin-bottom:4px;">180 € <span style="font-weight:400;font-size:.85rem;color:var(--color-text-muted);">(ou 3 × 60 € sans frais sur HelloAsso)</span></h3>
+                <p style="margin-bottom:0;color:var(--color-text-muted);">Licence + tenue complète Patrick incluse (maillot, short, survêtement, sac).</p>
+              </div>
+            </div>
 
-          <p style="font-size:.85rem;color:var(--color-text-muted);">Un questionnaire de santé (ou certificat médical) pourra vous être demandé avant le début de la saison.</p>
+            <form id="inscription-form" novalidate>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="enfant-prenom">Prénom de l'enfant</label>
+                  <input type="text" id="enfant-prenom" name="enfantPrenom" placeholder="Léo" required>
+                </div>
+                <div class="form-field">
+                  <label for="enfant-nom">Nom de l'enfant</label>
+                  <input type="text" id="enfant-nom" name="enfantNom" placeholder="Martin" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="naissance">Date de naissance</label>
+                  <input type="date" id="naissance" name="naissance" required>
+                </div>
+                <div class="form-field">
+                  <label for="categorie">Catégorie</label>
+                  <select id="categorie" name="categorie" required>
+                    <option value="U6 - U7">U6 - U7</option>
+                    <option value="U8 - U9">U8 - U9</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="parent-prenom">Prénom du parent</label>
+                  <input type="text" id="parent-prenom" name="parentPrenom" placeholder="Sophie" required>
+                </div>
+                <div class="form-field">
+                  <label for="parent-nom">Nom du parent</label>
+                  <input type="text" id="parent-nom" name="parentNom" placeholder="Martin" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="email">E-mail (parent)</label>
+                  <input type="email" id="email" name="email" placeholder="vous@exemple.fr" required>
+                </div>
+                <div class="form-field">
+                  <label for="telephone">Téléphone (parent)</label>
+                  <input type="tel" id="telephone" name="telephone" placeholder="06 12 34 56 78">
+                </div>
+              </div>
+              <div class="form-field">
+                <label for="adresse">Adresse</label>
+                <input type="text" id="adresse" name="adresse" placeholder="12 rue d'Orgemont">
+              </div>
+              <div class="form-row">
+                <div class="form-field">
+                  <label for="code-postal">Code postal</label>
+                  <input type="text" id="code-postal" name="codePostal" placeholder="95210">
+                </div>
+                <div class="form-field">
+                  <label for="ville">Ville</label>
+                  <input type="text" id="ville" name="ville" placeholder="Saint-Gratien">
+                </div>
+              </div>
 
-          <button type="submit" class="btn btn-primary btn-block">Télécharger mon dossier</button>
-        </form>
+              <div class="form-field" style="gap:12px;">
+                <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+                  <input type="checkbox" id="autorisation" name="autorisation" required style="margin-top:3px;">
+                  <span>J'autorise mon enfant à participer aux entraînements et activités du Saint-Gratien FC.</span>
+                </label>
+                <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+                  <input type="checkbox" id="droit-image" name="droitImage" style="margin-top:3px;">
+                  <span>J'autorise le club à utiliser des photos/vidéos de mon enfant prises lors des activités du club, à des fins de communication (site, réseaux sociaux).</span>
+                </label>
+                <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
+                  <input type="checkbox" id="rgpd" name="rgpd" required style="margin-top:3px;">
+                  <span>J'accepte que ces informations soient utilisées uniquement pour traiter l'inscription de mon enfant au club (voir notre <a href="confidentialite.html" target="_blank">politique de confidentialité</a>).</span>
+                </label>
+              </div>
 
-        <div id="inscription-next-steps" hidden style="margin-top:28px;">
-          <div class="card" style="background:var(--gold-100);box-shadow:none;">
-            <div class="card-body" style="gap:14px;">
-              <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
-              <p style="margin-bottom:0;color:var(--color-text-muted);">1. Envoyez le PDF téléchargé au club, puis 2. réglez l'adhésion pour la confirmer.</p>
-              <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                <a id="mailto-btn" href="#" class="btn btn-dark">1. Envoyer par e-mail</a>
-                <a id="helloasso-btn" href="https://www.helloasso.com/associations/saint-gratien-football-club" target="_blank" rel="noopener" class="btn btn-primary">2. Régler sur HelloAsso</a>
+              <p style="font-size:.85rem;color:var(--color-text-muted);">Un questionnaire de santé (ou certificat médical) pourra vous être demandé avant le début de la saison.</p>
+
+              <button type="submit" class="btn btn-primary btn-block">Télécharger mon dossier</button>
+            </form>
+
+            <div id="inscription-next-steps" hidden style="margin-top:28px;">
+              <div class="card" style="background:var(--gold-100);box-shadow:none;">
+                <div class="card-body" style="gap:14px;">
+                  <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
+                  <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, et apportez-le au club (premier entraînement) — ou envoyez-le par e-mail. 2. Réglez l'adhésion en ligne sur HelloAsso, ou en espèces/chèque directement au club en apportant le dossier.</p>
+                  <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <a id="mailto-btn" href="#" class="btn btn-dark">1. Envoyer par e-mail</a>
+                    <a id="helloasso-btn" href="#" target="_blank" rel="noopener" class="btn btn-primary">2. Régler sur HelloAsso</a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          <div class="inscription-closed card" style="background:var(--gold-100);box-shadow:none;">
+            <div class="card-body">
+              <h3 style="margin-bottom:8px;">Inscriptions fermées pour le moment</h3>
+              <p style="color:var(--color-text-muted);">Les inscriptions pour la saison 2026-2027 ne sont pas ouvertes actuellement. Contactez-nous pour être informé(e) dès leur réouverture.</p>
+              <a href="contact.html" class="btn btn-primary btn-block">Nous contacter</a>
+            </div>
+          </div>
+
         </div>
       </div>
 

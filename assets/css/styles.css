@@ -410,6 +410,10 @@ section { padding: 88px 0; }
   .stat:nth-child(3) { border-left: none; }
 }
 
+/* ---------- Toggle ouverture/fermeture des inscriptions ---------- */
+.inscription-status[data-status="open"] .inscription-closed { display: none; }
+.inscription-status[data-status="closed"] .inscription-open { display: none; }
+
 /* ---------- Cards ---------- */
 .card {
   background: var(--color-surface);
