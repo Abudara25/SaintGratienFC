@@ -1,0 +1,20 @@
+# Saint-Gratien FC
+
+> Club de football loisir pour enfants à Saint-Gratien (Val-d'Oise, France), fondé en 2020. Catégories U6-U7 et U8-U9, géré par des bénévoles, première saison structurée.
+
+Le Saint-Gratien FC accueille les enfants de la ville autour du plaisir de jouer au football, dans une ambiance familiale et loisir. Le club n'a pas d'historique de compétition, pas d'équipes seniors ni féminines, et fonctionne à 100% grâce à des bénévoles. Entraînements le jeudi de 17h à 18h au Stade Robert Lemoine.
+
+## Pages
+
+- [Accueil](https://saintgratienfc.fr/): présentation du club, ses valeurs et ses catégories.
+- [Actualités](https://saintgratienfc.fr/actualites.html): actualités du club.
+- [Le Club](https://saintgratienfc.fr/equipe.html): encadrement et catégories U6-U7 / U8-U9.
+- [Entraînements](https://saintgratienfc.fr/entrainements.html): horaires et informations pratiques.
+- [Partenaires](https://saintgratienfc.fr/partenaires.html): dossier de sponsoring et contreparties.
+- [Inscription](https://saintgratienfc.fr/inscription.html): inscrire un enfant pour la saison.
+- [Contact](https://saintgratienfc.fr/contact.html): nous contacter.
+
+## Optional
+
+- [Mentions légales](https://saintgratienfc.fr/mentions-legales.html)
+- [Confidentialité](https://saintgratienfc.fr/confidentialite.html)
