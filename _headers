@@ -11,6 +11,7 @@
 # systématique (ETag) pour que chaque modification soit visible immédiatement.
 /assets/js/main.js
   Cache-Control: no-cache
+  X-Test-Debug: hello
 
 /assets/js/inscription.js
   Cache-Control: no-cache
