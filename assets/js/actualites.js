@@ -35,7 +35,7 @@ function cardHTML(article) {
     : `<svg class="icon-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
 
   return `
-    <article class="card" data-reveal data-category="${article.category}">
+    <article class="card" data-category="${article.category}">
       <div class="card-media">${media}<span class="tag">${label}</span></div>
       <div class="card-body">
         <span class="card-date">${formatDate(article.date)}</span>
