@@ -63,11 +63,22 @@
 
   <section class="bg-surface">
     <div class="container">
-      <div class="section-head center" data-reveal>
+      <div class="section-head center" data-reveal id="actualites-empty" hidden>
         <span class="eyebrow">Bientôt disponible</span>
         <h2 class="section-title">Les actualités arrivent</h2>
         <p class="section-sub">Le club vient de se lancer : les premières actus (inscriptions, entraînements, vie du club) seront publiées ici très prochainement.</p>
       </div>
+
+      <div class="filters" id="actualites-filters" hidden>
+        <button class="filter-btn is-active" data-filter="all">Toutes</button>
+        <button class="filter-btn" data-filter="club">Club</button>
+        <button class="filter-btn" data-filter="inscriptions">Inscriptions</button>
+        <button class="filter-btn" data-filter="benevolat">Bénévolat</button>
+        <button class="filter-btn" data-filter="evenement">Événements</button>
+        <button class="filter-btn" data-filter="partenariat">Partenaires</button>
+      </div>
+
+      <div class="grid grid-3" id="actualites-grid" hidden></div>
     </div>
   </section>
 
@@ -138,5 +149,6 @@
 </div>
 
 <script src="assets/js/main.js?v=20260831"></script>
+<script src="assets/js/actualites.js?v=20260903"></script>
 </body>
 </html>
