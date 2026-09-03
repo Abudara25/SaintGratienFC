@@ -1,3 +1,13 @@
 {
-  "articles": []
+  "articles": [
+    {
+      "title": "Bienvenue sur le nouveau site du Saint-Gratien FC",
+      "date": "2026-09-03",
+      "category": "club",
+      "slug": "bienvenue-nouveau-site",
+      "excerpt": "Le Saint-Gratien FC lance son tout nouveau site internet, avec un espace d'inscription en ligne pour la saison 2026-2027.",
+      "body": "Nous sommes heureux de vous présenter le nouveau site du Saint-Gratien FC.\n\nVous y trouverez toutes les informations sur le club, les entraînements, et surtout un formulaire pour inscrire votre enfant en quelques clics.\n\nÀ très bientôt au Stade Robert Lemoine !",
+      "image": ""
+    }
+  ]
 }
