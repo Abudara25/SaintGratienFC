@@ -23,7 +23,9 @@ const escapeHtml = (str = '') =>
 
 const formatDate = (iso) => {
   try {
-    return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+    // Formatage forcé en UTC : "YYYY-MM-DD" est parsé comme minuit UTC, un fuseau très négatif
+    // en heure locale ferait glisser l'affichage d'un jour.
+    return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso));
   } catch {
     return iso;
   }
@@ -41,7 +43,11 @@ export async function onRequestGet({ request, params, env }) {
 
   const article = data?.articles?.find((a) => a.slug === params.slug);
   if (!article) {
-    return Response.redirect(new URL('/actualites.html', siteUrl), 302);
+    // Vrai 404 (pas une redirection vers actualites.html) : Google déconseille de rediriger une
+    // URL sans contenu réel vers une page qui répond 200 ("soft 404"). On réutilise le 404.html
+    // du site pour garder le même rendu que les autres pages introuvables.
+    const notFound = await env.ASSETS.fetch(new URL('/404.html', siteUrl));
+    return new Response(notFound.body, { status: 404, headers: notFound.headers });
   }
 
   const categoryLabel = CATEGORY_LABELS[article.category] || 'Club';

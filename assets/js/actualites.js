@@ -21,17 +21,25 @@ const CATEGORY_ICONS = {
 
 function formatDate(iso) {
   try {
-    return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso));
+    // new Date("YYYY-MM-DD") est parsé comme minuit UTC : on force le formatage en UTC pour
+    // éviter qu'un fuseau très négatif (ex. UTC-8) ne fasse glisser l'affichage d'un jour.
+    return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso));
   } catch {
     return iso;
   }
 }
 
+const escapeHtml = (str = '') =>
+  str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 function cardHTML(article) {
   const label = CATEGORY_LABELS[article.category] || 'Club';
   const icon = CATEGORY_ICONS[article.category] || CATEGORY_ICONS.club;
+  const slug = encodeURIComponent(article.slug);
+  const title = escapeHtml(article.title);
+  const excerpt = escapeHtml(article.excerpt || '');
   const media = article.image
-    ? `<img src="${article.image}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
+    ? `<img src="${escapeHtml(article.image)}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
     : `<svg class="icon-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
 
   return `
@@ -39,9 +47,9 @@ function cardHTML(article) {
       <div class="card-media">${media}<span class="tag">${label}</span></div>
       <div class="card-body">
         <span class="card-date">${formatDate(article.date)}</span>
-        <h3><a href="actualites/${article.slug}" style="color:inherit;text-decoration:none;">${article.title}</a></h3>
-        <p>${article.excerpt || ''}</p>
-        <a href="actualites/${article.slug}" class="card-link">Lire la suite</a>
+        <h3><a href="actualites/${slug}" style="color:inherit;text-decoration:none;">${title}</a></h3>
+        <p>${excerpt}</p>
+        <a href="actualites/${slug}" class="card-link">Lire la suite</a>
       </div>
     </article>
   `;

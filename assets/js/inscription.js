@@ -37,7 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const categorieSelect = form.categorie;
   if (naissanceInput && categorieSelect) {
     naissanceInput.addEventListener('change', () => {
-      const annee = new Date(naissanceInput.value).getFullYear();
+      // getUTCFullYear (pas getFullYear) : "YYYY-MM-DD" est parsé comme minuit UTC, et lire
+      // l'année en heure locale décalerait d'un an pour un fuseau très négatif (ex. UTC-8)
+      // sur une naissance au 1er janvier.
+      const annee = new Date(naissanceInput.value).getUTCFullYear();
       const categorie = CATEGORIE_PAR_ANNEE[annee];
       if (categorie) categorieSelect.value = categorie;
     });
