@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
       enfantNom: form.enfantNom.value.trim(),
       naissance: form.naissance.value,
       categorie: form.categorie.value,
+      tailleMaillot: form.tailleMaillot.value,
       parentPrenom: form.parentPrenom.value.trim(),
       parentNom: form.parentNom.value.trim(),
       email: form.email.value.trim(),
@@ -65,7 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
       adresse: form.adresse.value.trim(),
       codePostal: form.codePostal.value.trim(),
       ville: form.ville.value.trim(),
-      droitImage: form.droitImage.checked ? 'Oui' : 'Non',
+      autorisation: form.autorisation.checked,
+      droitImage: form.droitImage.checked,
+      rgpd: form.rgpd.checked,
     };
 
     if (!window.jspdf) {
@@ -73,6 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     generatePdf(data);
+
+    // Enregistrement côté serveur (base D1) en filet de sécurité pour le club : ne bloque jamais
+    // le parcours du parent (PDF + mailto déjà générés ci-dessus) si la requête échoue.
+    fetch('/api/inscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).catch(() => {});
 
     const subject = `Inscription ${data.enfantPrenom} ${data.enfantNom} — Saint-Gratien FC`;
     const body = [
@@ -128,6 +139,7 @@ function generatePdf(data) {
   line(`Prénom : ${data.enfantPrenom}`);
   line(`Date de naissance : ${data.naissance || '—'}`);
   line(`Catégorie : ${data.categorie}`);
+  line(`Taille de maillot : ${data.tailleMaillot || '—'}`);
   y += 4;
 
   heading('Parent / responsable légal');
@@ -145,7 +157,7 @@ function generatePdf(data) {
 
   heading('Autorisations');
   line("J'autorise mon enfant à participer aux entraînements et activités du Saint-Gratien FC.");
-  line(`Droit à l'image (photos/vidéos du club) : ${data.droitImage}`);
+  line(`Droit à l'image (photos/vidéos du club) : ${data.droitImage ? 'Oui' : 'Non'}`);
   y += 8;
 
   doc.text('Fait à _______________________, le _______________', 14, y);
