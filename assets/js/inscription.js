@@ -5,6 +5,14 @@ const HELLOASSO_URLS = {
   'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
 };
 
+// Saison 2026-2027 : U6-U7 = nés en 2020 ou 2021, U8-U9 = nés en 2018 ou 2019.
+const CATEGORIE_PAR_ANNEE = {
+  2020: 'U6 - U7',
+  2021: 'U6 - U7',
+  2018: 'U8 - U9',
+  2019: 'U8 - U9',
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   const statusEl = document.getElementById('inscription-status');
   if (statusEl) {
@@ -24,6 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextSteps = document.getElementById('inscription-next-steps');
   const mailtoBtn = document.getElementById('mailto-btn');
   const helloassoBtn = document.getElementById('helloasso-btn');
+
+  const naissanceInput = form.naissance;
+  const categorieSelect = form.categorie;
+  if (naissanceInput && categorieSelect) {
+    naissanceInput.addEventListener('change', () => {
+      const annee = new Date(naissanceInput.value).getFullYear();
+      const categorie = CATEGORIE_PAR_ANNEE[annee];
+      if (categorie) categorieSelect.value = categorie;
+    });
+  }
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
