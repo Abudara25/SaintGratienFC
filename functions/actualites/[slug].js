@@ -64,7 +64,7 @@ export async function onRequestGet({ request, params, env }) {
     .join('\n            ');
 
   const media = article.image
-    ? `<img src="${article.image}" alt="" width="800" height="500" style="width:100%;height:100%;object-fit:cover;">`
+    ? `<img src="${escapeHtml(article.image)}" alt="" loading="lazy">`
     : `<svg class="icon-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
 
   const html = `<!DOCTYPE html>
@@ -87,7 +87,7 @@ export async function onRequestGet({ request, params, env }) {
 <link rel="icon" href="/assets/images/favicon.ico">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260831">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>

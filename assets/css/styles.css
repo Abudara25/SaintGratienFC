@@ -438,6 +438,13 @@ section { padding: 88px 0; }
   color: var(--gold-300); opacity: .9;
   transition: transform .4s var(--ease);
 }
+.card-media img {
+  /* z-index requis : sans lui, cette image (flex item non positionné) se peint *sous* le
+     ::before décoratif ci-dessus (position: absolute, donc dans une "couche" de peinture CSS
+     ultérieure), même si elle vient après lui dans le DOM. */
+  position: absolute; inset: 0; z-index: 1;
+  width: 100%; height: 100%; object-fit: cover;
+}
 .card:hover .card-media .icon-illustration { transform: scale(1.08); }
 .card-media .tag, .lightbox-media .tag {
   position: absolute; top: 14px; left: 14px;

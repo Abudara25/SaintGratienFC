@@ -18,7 +18,7 @@ function loginPage({ error } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connexion — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260831">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
 <form method="POST" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
@@ -80,7 +80,7 @@ function tablePage(rows) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inscriptions — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260831">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
 <style>
   body{padding:24px;max-width:100%;}
   table{border-collapse:collapse;width:100%;font-size:.85rem;background:var(--white);}

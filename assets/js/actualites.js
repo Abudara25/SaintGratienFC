@@ -39,7 +39,7 @@ function cardHTML(article) {
   const title = escapeHtml(article.title);
   const excerpt = escapeHtml(article.excerpt || '');
   const media = article.image
-    ? `<img src="${escapeHtml(article.image)}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`
+    ? `<img src="${escapeHtml(article.image)}" alt="" loading="lazy">`
     : `<svg class="icon-illustration" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>`;
 
   return `
