@@ -1,4 +1,4 @@
-// Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose l'envoi par e-mail et le paiement HelloAsso (lien adapté à la catégorie choisie).
+// Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose le dépôt du dossier signé (lien unique par famille, /depot/<token>) et le paiement HelloAsso (widget adapté à la catégorie choisie).
 
 const HELLOASSO_URLS = {
   'U6 - U7': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!form) return;
 
   const nextSteps = document.getElementById('inscription-next-steps');
+  const depotBtn = document.getElementById('depot-btn');
+  const depotFallback = document.getElementById('depot-fallback');
   const mailtoBtn = document.getElementById('mailto-btn');
   const especesChequeBox = document.getElementById('paiement-especes-cheque');
   const especesChequeMode = document.getElementById('paiement-especes-cheque-mode');
@@ -81,7 +83,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  form.addEventListener('submit', (e) => {
+  const submitBtn = form.querySelector('button[type=submit]');
+  const submitBtnDefaultLabel = submitBtn.textContent;
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!form.checkValidity()) {
       form.reportValidity();
@@ -111,27 +116,49 @@ document.addEventListener('DOMContentLoaded', () => {
       alert("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou contactez-nous directement à contact@saintgratienfc.fr.");
       return;
     }
-    generatePdf(data);
 
-    // Enregistrement côté serveur (base D1) en filet de sécurité pour le club : ne bloque jamais
-    // le parcours du parent (PDF + mailto déjà générés ci-dessus) si la requête échoue.
-    fetch('/api/inscriptions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }).catch(() => {});
+    // On attend la réponse du serveur avant de générer le PDF : le lien de dépôt du dossier
+    // signé (uploadToken) est imprimé dedans, et il faut le token pour construire ce lien.
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Génération…';
+    let uploadToken = null;
+    try {
+      const res = await fetch('/api/inscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        uploadToken = json.uploadToken || null;
+      }
+    } catch {
+      // uploadToken reste null : le bouton de dépôt sera remplacé par le repli mailto ci-dessous.
+    }
+    submitBtn.disabled = false;
+    submitBtn.textContent = submitBtnDefaultLabel;
 
-    const subject = `Inscription ${data.enfantPrenom} ${data.enfantNom} — Saint-Gratien FC`;
-    const body = [
-      'Bonjour,',
-      '',
-      `Veuillez trouver en pièce jointe la fiche d'inscription de ${data.enfantPrenom} ${data.enfantNom} (${data.categorie}).`,
-      "Merci de joindre le PDF que vous venez de télécharger avant l'envoi de cet e-mail.",
-      '',
-      'Cordialement,',
-      `${data.parentPrenom} ${data.parentNom}`,
-    ].join('\n');
-    mailtoBtn.href = `mailto:contact@saintgratienfc.fr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    generatePdf(data, uploadToken ? `${location.origin}/depot/${uploadToken}` : null);
+
+    if (uploadToken) {
+      depotBtn.href = `/depot/${uploadToken}`;
+      depotBtn.hidden = false;
+      depotFallback.hidden = true;
+    } else {
+      depotBtn.hidden = true;
+      depotFallback.hidden = false;
+      const subject = `Inscription ${data.enfantPrenom} ${data.enfantNom} — Saint-Gratien FC`;
+      const body = [
+        'Bonjour,',
+        '',
+        `Veuillez trouver en pièce jointe la fiche d'inscription de ${data.enfantPrenom} ${data.enfantNom} (${data.categorie}).`,
+        "Merci de joindre le PDF que vous venez de télécharger avant l'envoi de cet e-mail.",
+        '',
+        'Cordialement,',
+        `${data.parentPrenom} ${data.parentNom}`,
+      ].join('\n');
+      mailtoBtn.href = `mailto:contact@saintgratienfc.fr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    }
 
     if (data.modePaiement === 'HelloAsso') {
       const widgetUrl = HELLOASSO_WIDGET_URLS[data.categorie] || HELLOASSO_WIDGET_URLS['U6 - U7'];
@@ -152,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-function generatePdf(data) {
+function generatePdf(data, depotUrl) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -214,11 +241,24 @@ function generatePdf(data) {
   doc.text('Signature du responsable légal :', 14, y);
   y += 20;
   doc.line(14, y, 90, y);
+  y += 14;
+
+  if (depotUrl) {
+    doc.setFontSize(10);
+    doc.setTextColor(30, 30, 30);
+    doc.text('Une fois signé, déposez ce dossier ici :', 14, y);
+    y += 6;
+    doc.setTextColor(58, 15, 16);
+    doc.textWithLink(depotUrl, 14, y, { url: depotUrl });
+    y += 4;
+  }
 
   doc.setFontSize(9);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    "À apporter signé au club (premier entraînement) ou à envoyer à contact@saintgratienfc.fr. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
+    depotUrl
+      ? 'Vous pouvez aussi apporter ce dossier signé directement au club (premier entraînement). Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.'
+      : "À apporter signé au club (premier entraînement) ou à envoyer à contact@saintgratienfc.fr. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
     14,
     285
   );

@@ -38,6 +38,11 @@ function editPage(row, { error } = {}) {
 </head><body style="padding:16px;max-width:640px;margin:0 auto;">
   <p style="margin-bottom:16px;"><a href="/admin/inscriptions">&larr; Retour à la liste</a></p>
   <h1 style="font-size:1.3rem;margin-bottom:16px;">Modifier l'inscription de ${escapeHtml(row.enfant_prenom)} ${escapeHtml(row.enfant_nom)}</h1>
+  <p style="margin-bottom:16px;">Dossier signé : ${
+    row.dossier_uploaded_at
+      ? `<a href="/admin/inscriptions/${row.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
+      : '— pas encore reçu'
+  }</p>
   ${error ? `<p style="color:var(--color-error, #b3261e);margin-bottom:16px;">${escapeHtml(error)}</p>` : ''}
   <form method="POST">
     <div class="form-row">
@@ -170,14 +175,14 @@ export async function onRequestPost({ request, env, params }) {
 
   for (const field of REQUIRED_FIELDS) {
     if (!String(data[field] ?? '').trim()) {
-      return new Response(editPage(toRow(data), { error: `Champ manquant : ${field}` }), {
+      return new Response(editPage({ ...existing, ...toRow(data) }, { error: `Champ manquant : ${field}` }), {
         status: 400,
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    return new Response(editPage(toRow(data), { error: 'E-mail invalide' }), {
+    return new Response(editPage({ ...existing, ...toRow(data) }, { error: 'E-mail invalide' }), {
       status: 400,
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     });

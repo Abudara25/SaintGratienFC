@@ -6,7 +6,7 @@ import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { COOKIE_NAME, isAuthed, loginPage, escapeHtml } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
-  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD'];
+  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
   const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = rows.map((r) =>
     [
@@ -25,6 +25,7 @@ function toCsv(rows) {
       r.autorisation ? 'Oui' : 'Non',
       r.droit_image ? 'Oui' : 'Non',
       r.rgpd ? 'Oui' : 'Non',
+      r.dossier_uploaded_at ? 'Oui' : 'Non',
     ]
       .map(escapeCsv)
       .join(',')
@@ -43,12 +44,14 @@ const SORTS = {
 
 // Filtrage/tri appliqués côté JS après le SELECT * (peu de lignes attendues pour un seul club) —
 // plus simple et plus sûr qu'une clause WHERE dynamique construite à partir des query params.
-function filterAndSort(rows, { q, categorie, annee, paiement, sort }) {
+function filterAndSort(rows, { q, categorie, annee, paiement, dossier, sort }) {
   const needle = q.trim().toLowerCase();
   const filtered = rows.filter((r) => {
     if (categorie && r.categorie !== categorie) return false;
     if (paiement && r.mode_paiement !== paiement) return false;
     if (annee && !String(r.naissance || '').startsWith(annee)) return false;
+    if (dossier === 'recu' && !r.dossier_uploaded_at) return false;
+    if (dossier === 'manquant' && r.dossier_uploaded_at) return false;
     if (needle) {
       const haystack = `${r.enfant_prenom} ${r.enfant_nom} ${r.parent_prenom} ${r.parent_nom} ${r.email}`.toLowerCase();
       if (!haystack.includes(needle)) return false;
@@ -64,6 +67,7 @@ function parseFilters(searchParams) {
     categorie: searchParams.get('categorie') || '',
     annee: searchParams.get('annee') || '',
     paiement: searchParams.get('paiement') || '',
+    dossier: searchParams.get('dossier') || '',
     sort: searchParams.get('sort') || 'date_desc',
   };
 }
@@ -86,8 +90,9 @@ function tablePage(rows, { filters, years, total }) {
   if (filters.categorie) qs.set('categorie', filters.categorie);
   if (filters.annee) qs.set('annee', filters.annee);
   if (filters.paiement) qs.set('paiement', filters.paiement);
+  if (filters.dossier) qs.set('dossier', filters.dossier);
   const csvHref = `/admin/inscriptions?format=csv${qs.toString() ? `&${qs.toString()}` : ''}`;
-  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement);
+  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement || filters.dossier);
 
   const filterBar = `<form method="GET" class="insc-filters">
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
@@ -105,6 +110,11 @@ function tablePage(rows, { filters, years, total }) {
       <option value="HelloAsso" ${sel(filters.paiement, 'HelloAsso')}>HelloAsso</option>
       <option value="Espèces" ${sel(filters.paiement, 'Espèces')}>Espèces</option>
       <option value="Chèque" ${sel(filters.paiement, 'Chèque')}>Chèque</option>
+    </select>
+    <select name="dossier" onchange="this.form.submit()">
+      <option value="">Dossier signé : tous</option>
+      <option value="recu" ${sel(filters.dossier, 'recu')}>Dossier reçu</option>
+      <option value="manquant" ${sel(filters.dossier, 'manquant')}>Dossier manquant</option>
     </select>
     <select name="sort" onchange="this.form.submit()">
       <option value="date_desc" ${sel(filters.sort, 'date_desc')}>Plus récent d'abord</option>
@@ -135,6 +145,11 @@ function tablePage(rows, { filters, years, total }) {
           <div style="grid-column:1 / -1;"><dt>E-mail</dt><dd><a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a></dd></div>
           <div style="grid-column:1 / -1;"><dt>Adresse</dt><dd>${r.adresse ? escapeHtml(r.adresse) : '—'} ${escapeHtml(r.code_postal || '')} ${escapeHtml(r.ville || '')}</dd></div>
           <div><dt>Droit image</dt><dd>${r.droit_image ? 'Oui' : 'Non'}</dd></div>
+          <div style="grid-column:1 / -1;"><dt>Dossier signé</dt><dd>${
+            r.dossier_uploaded_at
+              ? `<a href="/admin/inscriptions/${r.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
+              : '— pas encore reçu'
+          }</dd></div>
         </dl>
         <div class="insc-card-actions">${actionsHtml(r)}</div>
       </div>`

@@ -188,10 +188,11 @@
               <div class="card" style="background:var(--gold-100);box-shadow:none;">
                 <div class="card-body" style="gap:14px;">
                   <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
-                  <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, et apportez-le au club (premier entraînement) — ou envoyez-le par e-mail. 2. Réglez l'adhésion selon le mode choisi.</p>
+                  <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, puis déposez-le en ligne (photo ou scan). 2. Réglez l'adhésion selon le mode choisi.</p>
                   <div style="display:flex;gap:12px;flex-wrap:wrap;">
-                    <a id="mailto-btn" class="btn btn-dark">1. Envoyer par e-mail</a>
+                    <a id="depot-btn" target="_blank" rel="noopener" class="btn btn-dark">1. Déposer mon dossier signé</a>
                   </div>
+                  <p id="depot-fallback" hidden style="margin:0;font-size:.85rem;color:var(--color-text-muted);">Le lien de dépôt n'a pas pu être généré (connexion instable) — <a id="mailto-btn">envoyez-nous votre dossier par e-mail</a> à la place.</p>
                   <div id="paiement-especes-cheque" hidden style="background:var(--white);border-radius:var(--radius-sm);padding:14px 16px;font-size:.92rem;color:var(--color-text-muted);">
                     Merci de prévoir le règlement (<strong id="paiement-especes-cheque-mode"></strong>) lors du dépôt du dossier signé au club.
                   </div>
@@ -310,6 +311,6 @@
 
 <script src="assets/js/main.js?v=20260831"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="assets/js/inscription.js?v=20260904"></script>
+<script src="assets/js/inscription.js?v=20260904b"></script>
 </body>
 </html>

@@ -26,10 +26,24 @@ export async function ensureInscriptionsTable(db) {
     )
     .run();
 
-  // mode_paiement ajouté le 2026-09-04, après la création initiale de la table en production :
-  // ALTER TABLE ADD COLUMN plutôt que CREATE TABLE IF NOT EXISTS, pour les bases déjà existantes.
+  // Colonnes ajoutées après la création initiale de la table en production : ALTER TABLE ADD
+  // COLUMN plutôt que CREATE TABLE IF NOT EXISTS, pour que les bases déjà existantes suivent.
   // Erreur "duplicate column name" ignorée volontairement (colonne déjà présente).
-  try {
-    await db.prepare('ALTER TABLE inscriptions ADD COLUMN mode_paiement TEXT').run();
-  } catch {}
+  const addedColumns = [
+    'mode_paiement TEXT', // 2026-09-04
+    // 2026-09-04 : dépôt du dossier signé (voir functions/depot/[token].js) — upload_token est
+    // généré à l'inscription (functions/api/inscriptions.js) et sert de clé secrète pour le lien
+    // de dépôt public ; dossier_key est la clé de l'objet dans le bucket R2 "DOSSIERS".
+    'upload_token TEXT',
+    'dossier_key TEXT',
+    'dossier_content_type TEXT',
+    'dossier_uploaded_at TEXT',
+  ];
+  for (const column of addedColumns) {
+    try {
+      await db.prepare(`ALTER TABLE inscriptions ADD COLUMN ${column}`).run();
+    } catch {}
+  }
+
+  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)').run();
 }
