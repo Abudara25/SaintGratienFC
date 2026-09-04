@@ -81,9 +81,13 @@ function actionsHtml(r) {
     </form>`;
 }
 
-// options : { filters, years, total } — years = années de naissance distinctes présentes en
-// base (calculées sur l'ensemble non filtré), total = nombre total d'inscriptions non filtrées.
-function tablePage(rows, { filters, years, total }) {
+// options : { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus } —
+// years = années de naissance distinctes présentes en base (calculées sur l'ensemble non
+// filtré), total = nombre total d'inscriptions non filtrées, returnTo = chemin+query courant
+// (pour revenir ici après un dépôt de dossier, filtres compris — voir safeRedirect dans
+// [id]/dossier.js), inscriptionStatus = 'open'|'closed' (KV "saintgratienfc_config", voir
+// functions/admin/inscription-status.js et functions/api/inscription-status.js).
+function tablePage(rows, { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -130,11 +134,17 @@ function tablePage(rows, { filters, years, total }) {
 
   const cards = rows
     .map(
-      (r) => `<div class="insc-card">
-        <div class="insc-card-head">
-          <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
-          <span class="insc-card-date">${escapeHtml(r.created_at)}</span>
-        </div>
+      (r) => `<details class="insc-card">
+        <summary class="insc-card-head">
+          <span class="insc-card-head-main">
+            <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
+            <span class="insc-card-date">${escapeHtml(r.created_at)}</span>
+          </span>
+          <span class="insc-dossier-badge ${r.dossier_uploaded_at ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
+            r.dossier_uploaded_at ? '✓ Dossier' : 'Dossier manquant'
+          }</span>
+          <span class="insc-card-chevron" aria-hidden="true">▸</span>
+        </summary>
         <dl class="insc-card-fields">
           <div><dt>Naissance</dt><dd>${escapeHtml(r.naissance)}</dd></div>
           <div><dt>Catégorie</dt><dd>${escapeHtml(r.categorie)}</dd></div>
@@ -145,14 +155,21 @@ function tablePage(rows, { filters, years, total }) {
           <div style="grid-column:1 / -1;"><dt>E-mail</dt><dd><a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a></dd></div>
           <div style="grid-column:1 / -1;"><dt>Adresse</dt><dd>${r.adresse ? escapeHtml(r.adresse) : '—'} ${escapeHtml(r.code_postal || '')} ${escapeHtml(r.ville || '')}</dd></div>
           <div><dt>Droit image</dt><dd>${r.droit_image ? 'Oui' : 'Non'}</dd></div>
-          <div style="grid-column:1 / -1;"><dt>Dossier signé</dt><dd>${
-            r.dossier_uploaded_at
-              ? `<a href="/admin/inscriptions/${r.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
-              : '— pas encore reçu'
-          }</dd></div>
+          <div style="grid-column:1 / -1;">
+            <dt>Dossier signé</dt>
+            <dd>
+              ${r.dossier_uploaded_at ? `<a href="/admin/inscriptions/${r.id}/dossier" target="_blank" rel="noopener">Voir le fichier reçu</a>` : '— pas encore reçu'}
+              <form method="POST" action="/admin/inscriptions/${r.id}/dossier" enctype="multipart/form-data" class="insc-dossier-form">
+                <input type="hidden" name="redirectTo" value="${escapeHtml(returnTo)}">
+                <label for="dossier-${r.id}" class="visually-hidden">Déposer le dossier signé de ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</label>
+                <input type="file" id="dossier-${r.id}" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
+                <button type="submit" class="btn btn-dark btn-sm">${r.dossier_uploaded_at ? 'Remplacer' : 'Ajouter (reçu par e-mail)'}</button>
+              </form>
+            </dd>
+          </div>
         </dl>
         <div class="insc-card-actions">${actionsHtml(r)}</div>
-      </div>`
+      </details>`
     )
     .join('');
 
@@ -177,17 +194,46 @@ function tablePage(rows, { filters, years, total }) {
   }
   .insc-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:16px;}
   .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;}
-  .insc-card-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;font-size:1.02rem;}
+  .insc-card-head{display:flex;align-items:center;gap:10px;font-size:1.02rem;list-style:none;cursor:pointer;padding:2px 0;min-height:44px;}
+  .insc-card-head::-webkit-details-marker{display:none;}
+  .insc-card[open] .insc-card-head{margin-bottom:10px;}
+  .insc-card-head-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
   .insc-card-date{font-size:.75rem;color:var(--color-text-muted);white-space:nowrap;}
+  .insc-card-chevron{color:var(--color-text-muted);font-size:.8rem;transition:transform .15s ease;flex-shrink:0;}
+  .insc-card[open] .insc-card-chevron{transform:rotate(90deg);}
+  .insc-dossier-badge{font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
+  .insc-dossier-ok{background:var(--gold-100);color:var(--maroon-900);}
+  .insc-dossier-missing{background:var(--cream-200);color:var(--color-text-muted);}
   .insc-card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 14px;font-size:.88rem;}
   .insc-card-fields dt{font-weight:600;color:var(--color-text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
   .insc-card-fields dd{margin:0;word-break:break-word;}
+  .insc-dossier-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;}
+  .insc-dossier-form input[type=file]{flex:1 1 160px;min-width:0;font-size:.82rem;}
+  .insc-dossier-form .btn{min-height:40px;flex-shrink:0;}
   .insc-card-actions{display:flex;gap:10px;}
   .insc-card-actions form{flex:1;margin:0;}
   .insc-card-actions .btn{flex:1;width:100%;min-height:44px;}
+  .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
+  .insc-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
+  .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
+  .insc-status-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
+  .insc-status-bar form{margin:0;}
+  .insc-status-open{background:var(--gold-100);color:var(--maroon-900);}
+  .insc-status-closed{background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
   <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
+  <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
+    <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
+    <form method="POST" action="/admin/inscription-status">
+      <input type="hidden" name="status" value="${inscriptionStatus === 'closed' ? 'open' : 'closed'}">
+      <button type="submit" class="btn btn-sm ${inscriptionStatus === 'closed' ? 'btn-primary' : 'btn-dark'}">${
+        inscriptionStatus === 'closed' ? 'Rouvrir les inscriptions' : 'Fermer les inscriptions'
+      }</button>
+    </form>
+  </div>
+  ${dossierError ? `<p class="insc-banner insc-banner-error">${escapeHtml(dossierError)}</p>` : ''}
+  ${dossierOk ? '<p class="insc-banner insc-banner-ok">Dossier enregistré.</p>' : ''}
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
   <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
@@ -217,9 +263,34 @@ export async function onRequestGet({ request, env }) {
 
   const years = [...new Set(results.map((r) => String(r.naissance || '').slice(0, 4)).filter(Boolean))].sort().reverse();
 
-  return new Response(tablePage(filtered, { filters, years, total: results.length }), {
-    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-  });
+  // Chemin+query courant (sans dossierError/dossierOk, qui sont des messages ponctuels, pas des
+  // filtres à reproduire) — sert de redirectTo aux formulaires de dépôt de dossier des cartes, pour
+  // revenir exactement sur cette vue filtrée après upload. Voir safeRedirect dans [id]/dossier.js.
+  const returnParams = new URLSearchParams(searchParams);
+  returnParams.delete('dossierError');
+  returnParams.delete('dossierOk');
+  const returnTo = `/admin/inscriptions${returnParams.toString() ? `?${returnParams.toString()}` : ''}`;
+
+  let inscriptionStatus = 'open';
+  try {
+    const value = await env.INSCRIPTION_STATUS.get('inscription_status');
+    if (value === 'open' || value === 'closed') inscriptionStatus = value;
+  } catch {
+    // KV indisponible (binding non configuré) : on reste sur "open" par défaut.
+  }
+
+  return new Response(
+    tablePage(filtered, {
+      filters,
+      years,
+      total: results.length,
+      returnTo,
+      dossierError: searchParams.get('dossierError'),
+      dossierOk: searchParams.get('dossierOk'),
+      inscriptionStatus,
+    }),
+    { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+  );
 }
 
 export async function onRequestPost({ request, env }) {
