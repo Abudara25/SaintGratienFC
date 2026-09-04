@@ -3,12 +3,14 @@
 // client avant cet appel (assets/js/inscription.js) : cette requête ne bloque jamais le
 // téléchargement du PDF, mais son résultat (uploadToken) conditionne désormais l'affichage du
 // lien de dépôt du dossier signé (functions/depot/[token].js) — ce n'est plus un pur filet de
-// sécurité silencieux comme avant l'ajout du dépôt (2026-09-04).
+// sécurité silencieux comme avant l'ajout du dépôt (2026-09-04). Envoie aussi un e-mail de
+// réception (pas de confirmation définitive, voir confirmation-email.js) via Resend.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
+import { sendConfirmationEmail } from '../_shared/confirmation-email.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email'];
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
   let data;
   try {
     data = await request.json();
@@ -62,6 +64,10 @@ export async function onRequestPost({ request, env }) {
   } catch (e) {
     return new Response(JSON.stringify({ error: "Échec de l'enregistrement" }), { status: 500 });
   }
+
+  // waitUntil (pas await) : l'envoi de l'e-mail continue après la réponse HTTP, sans ajouter de
+  // latence pour le parent — sendConfirmationEmail() est déjà best-effort en interne.
+  waitUntil(sendConfirmationEmail(env, data, uploadToken, new URL(request.url).origin));
 
   return new Response(JSON.stringify({ ok: true, uploadToken }), {
     headers: { 'Content-Type': 'application/json' },
