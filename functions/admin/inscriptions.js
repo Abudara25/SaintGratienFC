@@ -32,6 +32,16 @@ function toCsv(rows) {
   return [headers.map(escapeCsv).join(','), ...lines].join('\r\n');
 }
 
+// Boutons Modifier/Supprimer, partagés par la vue tableau (desktop) et la vue cartes (mobile).
+function actionsHtml(r) {
+  return `<a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
+    <form method="POST" action="/admin/inscriptions" onsubmit="return confirm('Supprimer cette inscription ?');">
+      <input type="hidden" name="action" value="delete">
+      <input type="hidden" name="id" value="${r.id}">
+      <button type="submit" class="btn btn-sm" style="background:var(--color-error, #b3261e);color:#fff;">Supprimer</button>
+    </form>`;
+}
+
 function tablePage(rows) {
   const tableRows = rows
     .map(
@@ -47,15 +57,33 @@ function tablePage(rows) {
         <td>${escapeHtml(r.telephone)}</td>
         <td>${escapeHtml(r.adresse)} ${escapeHtml(r.code_postal)} ${escapeHtml(r.ville)}</td>
         <td>${r.droit_image ? 'Oui' : 'Non'}</td>
-        <td style="white-space:nowrap;">
-          <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
-          <form method="POST" action="/admin/inscriptions" style="display:inline;" onsubmit="return confirm('Supprimer cette inscription ?');">
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="id" value="${r.id}">
-            <button type="submit" class="btn btn-sm" style="background:var(--color-error, #b3261e);color:#fff;">Supprimer</button>
-          </form>
-        </td>
+        <td style="white-space:nowrap;">${actionsHtml(r)}</td>
       </tr>`
+    )
+    .join('');
+
+  // Vue "cartes" (< 768px) : le tableau à 12 colonnes est illisible sur téléphone même avec le
+  // scroll horizontal — une carte par inscription, une seule fois pour toutes les infos.
+  const cards = rows
+    .map(
+      (r) => `<div class="insc-card">
+        <div class="insc-card-head">
+          <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
+          <span class="insc-card-date">${escapeHtml(r.created_at)}</span>
+        </div>
+        <dl class="insc-card-fields">
+          <div><dt>Naissance</dt><dd>${escapeHtml(r.naissance)}</dd></div>
+          <div><dt>Catégorie</dt><dd>${escapeHtml(r.categorie)}</dd></div>
+          <div><dt>Taille maillot</dt><dd>${escapeHtml(r.taille_maillot)}</dd></div>
+          <div><dt>Paiement</dt><dd>${escapeHtml(r.mode_paiement)}</dd></div>
+          <div><dt>Parent</dt><dd>${escapeHtml(r.parent_prenom)} ${escapeHtml(r.parent_nom)}</dd></div>
+          <div><dt>Téléphone</dt><dd>${r.telephone ? escapeHtml(r.telephone) : '—'}</dd></div>
+          <div style="grid-column:1 / -1;"><dt>E-mail</dt><dd><a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a></dd></div>
+          <div style="grid-column:1 / -1;"><dt>Adresse</dt><dd>${r.adresse ? escapeHtml(r.adresse) : '—'} ${escapeHtml(r.code_postal || '')} ${escapeHtml(r.ville || '')}</dd></div>
+          <div><dt>Droit image</dt><dd>${r.droit_image ? 'Oui' : 'Non'}</dd></div>
+        </dl>
+        <div class="insc-card-actions">${actionsHtml(r)}</div>
+      </div>`
     )
     .join('');
 
@@ -65,11 +93,27 @@ function tablePage(rows) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
 <style>
-  body{padding:24px;max-width:100%;}
+  body{padding:16px;max-width:100%;}
+  @media (min-width:600px){ body{padding:24px;} }
   table{border-collapse:collapse;width:100%;font-size:.85rem;background:var(--white);}
   th,td{border:1px solid var(--cream-200);padding:8px 10px;text-align:left;white-space:nowrap;}
   th{background:var(--cream-100);position:sticky;top:0;}
   .wrap{overflow-x:auto;}
+  td form{display:inline;margin:0;}
+  .insc-cards{display:none;}
+  .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px;}
+  .insc-card-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;font-size:1.02rem;}
+  .insc-card-date{font-size:.75rem;color:var(--color-text-muted);white-space:nowrap;}
+  .insc-card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 14px;font-size:.88rem;}
+  .insc-card-fields dt{font-weight:600;color:var(--color-text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .insc-card-fields dd{margin:0;word-break:break-word;}
+  .insc-card-actions{display:flex;gap:10px;}
+  .insc-card-actions form{flex:1;margin:0;}
+  .insc-card-actions .btn{flex:1;width:100%;min-height:44px;}
+  @media (max-width:767px){
+    .wrap{display:none;}
+    .insc-cards{display:block;}
+  }
 </style>
 </head><body>
   <h1 style="font-size:1.3rem;">Inscriptions (${rows.length})</h1>
@@ -83,6 +127,7 @@ function tablePage(rows) {
       <tbody>${tableRows || '<tr><td colspan="12">Aucune inscription pour le moment.</td></tr>'}</tbody>
     </table>
   </div>
+  <div class="insc-cards">${cards || '<p>Aucune inscription pour le moment.</p>'}</div>
 </body></html>`;
 }
 

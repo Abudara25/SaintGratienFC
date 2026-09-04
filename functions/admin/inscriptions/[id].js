@@ -35,7 +35,7 @@ function editPage(row, { error } = {}) {
 <title>Modifier une inscription — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
-</head><body style="padding:24px;max-width:640px;margin:0 auto;">
+</head><body style="padding:16px;max-width:640px;margin:0 auto;">
   <p style="margin-bottom:16px;"><a href="/admin/inscriptions">&larr; Retour à la liste</a></p>
   <h1 style="font-size:1.3rem;margin-bottom:16px;">Modifier l'inscription de ${escapeHtml(row.enfant_prenom)} ${escapeHtml(row.enfant_nom)}</h1>
   ${error ? `<p style="color:var(--color-error, #b3261e);margin-bottom:16px;">${escapeHtml(error)}</p>` : ''}
@@ -131,9 +131,9 @@ function editPage(row, { error } = {}) {
         <span>Consentement RGPD</span>
       </label>
     </div>
-    <div style="display:flex;gap:12px;margin-top:8px;">
-      <button type="submit" class="btn btn-primary">Enregistrer</button>
-      <a href="/admin/inscriptions" class="btn btn-dark">Annuler</a>
+    <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+      <button type="submit" class="btn btn-primary" style="flex:1;min-width:140px;">Enregistrer</button>
+      <a href="/admin/inscriptions" class="btn btn-dark" style="flex:1;min-width:140px;">Annuler</a>
     </div>
   </form>
 </body></html>`;
