@@ -1,9 +1,14 @@
 // E-mail de RÉCEPTION de l'inscription (pas une confirmation de licence — voir le contenu),
-// envoyé via l'API Resend (compte gratuit, domaine saintgratienfc.fr à vérifier chez Resend,
-// clé stockée dans le secret Cloudflare Pages RESEND_API_KEY — voir CLAUDE.md). Best-effort :
-// n'importe quelle erreur ici ne doit jamais faire échouer l'inscription elle-même, c'est pour
-// ça que sendConfirmationEmail() n'est jamais `await`ée directement dans le handler — voir
-// `waitUntil()` dans functions/api/inscriptions.js.
+// envoyé via l'API Brevo (compte gratuit, français — préféré à Resend, une entreprise
+// américaine, à la demande de l'utilisateur ; clé stockée dans le secret Cloudflare Pages
+// BREVO_API_KEY — voir CLAUDE.md). Best-effort : n'importe quelle erreur ici ne doit jamais
+// faire échouer l'inscription elle-même, c'est pour ça que sendConfirmationEmail() n'est jamais
+// `await`ée directement dans le handler — voir `waitUntil()` dans functions/api/inscriptions.js.
+// Expéditeur `contact@saintgratienfc.fr` (déjà vérifié côté Brevo) plutôt que `inscription@` :
+// l'authentification complète du domaine (DKIM) est bloquée tant que les 2 enregistrements
+// CNAME fournis par Brevo n'ont pas été ajoutés côté Infomaniak (qui héberge saintgratienfc.fr
+// et détient déjà `_domainkey.saintgratienfc.fr` en délégation NS — Cloudflare ne peut pas
+// servir de sous-enregistrements sous une zone déléguée ailleurs). Voir CLAUDE.md.
 const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -51,23 +56,22 @@ Saint-Gratien FC`;
 }
 
 export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
-  if (!env.RESEND_API_KEY) return; // pas encore configuré côté Resend, voir CLAUDE.md
+  if (!env.BREVO_API_KEY) return; // pas encore configuré côté Brevo, voir CLAUDE.md
 
   const { subject, html, text } = buildEmail(data, uploadToken, siteUrl);
   try {
-    await fetch('https://api.resend.com/emails', {
+    await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        'api-key': env.BREVO_API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Saint-Gratien FC <inscription@saintgratienfc.fr>',
-        to: data.email,
-        reply_to: 'contact@saintgratienfc.fr',
+        sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+        to: [{ email: data.email, name: `${data.parentPrenom} ${data.parentNom}` }],
         subject,
-        html,
-        text,
+        htmlContent: html,
+        textContent: text,
       }),
     });
   } catch {
