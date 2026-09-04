@@ -3,7 +3,7 @@
 import { ensureInscriptionsTable } from '../../_shared/inscriptions-db.js';
 import { isAuthed, loginPage, escapeHtml } from '../../_shared/admin-auth.js';
 
-const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email'];
+const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 
 // Reconstruit un objet "row" (clés snake_case, comme en base) à partir du formData resoumis, pour
 // réafficher les valeurs saisies par l'utilisateur (et pas les anciennes valeurs) en cas d'erreur.
@@ -105,7 +105,7 @@ function editPage(row, { error } = {}) {
       </div>
       <div class="form-field">
         <label for="telephone">Téléphone (parent)</label>
-        <input type="tel" id="telephone" name="telephone" value="${escapeHtml(row.telephone || '')}">
+        <input type="tel" id="telephone" name="telephone" value="${escapeHtml(row.telephone || '')}" required>
       </div>
     </div>
     <div class="form-field">

@@ -8,7 +8,7 @@
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { sendConfirmationEmail } from '../_shared/confirmation-email.js';
 
-const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email'];
+const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 
 export async function onRequestPost({ request, env, waitUntil }) {
   let data;
