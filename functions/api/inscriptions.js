@@ -22,6 +22,11 @@ export async function onRequestPost({ request, env }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     return new Response(JSON.stringify({ error: 'E-mail invalide' }), { status: 400 });
   }
+  // Format contrôlé (pas juste "non vide") : ce champ est ensuite utilisé tel quel pour dériver
+  // la liste des années de naissance affichée dans les filtres de /admin/inscriptions.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance)) {
+    return new Response(JSON.stringify({ error: 'Date de naissance invalide' }), { status: 400 });
+  }
 
   try {
     await ensureInscriptionsTable(env.DB);

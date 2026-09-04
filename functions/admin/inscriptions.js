@@ -32,7 +32,42 @@ function toCsv(rows) {
   return [headers.map(escapeCsv).join(','), ...lines].join('\r\n');
 }
 
-// Boutons Modifier/Supprimer, partagés par la vue tableau (desktop) et la vue cartes (mobile).
+const SORTS = {
+  date_desc: (a, b) => b.created_at.localeCompare(a.created_at),
+  date_asc: (a, b) => a.created_at.localeCompare(b.created_at),
+  nom_asc: (a, b) => a.enfant_nom.localeCompare(b.enfant_nom, 'fr') || a.enfant_prenom.localeCompare(b.enfant_prenom, 'fr'),
+  nom_desc: (a, b) => b.enfant_nom.localeCompare(a.enfant_nom, 'fr') || b.enfant_prenom.localeCompare(a.enfant_prenom, 'fr'),
+  naissance_asc: (a, b) => a.naissance.localeCompare(b.naissance),
+  naissance_desc: (a, b) => b.naissance.localeCompare(a.naissance),
+};
+
+// Filtrage/tri appliqués côté JS après le SELECT * (peu de lignes attendues pour un seul club) —
+// plus simple et plus sûr qu'une clause WHERE dynamique construite à partir des query params.
+function filterAndSort(rows, { q, categorie, annee, paiement, sort }) {
+  const needle = q.trim().toLowerCase();
+  const filtered = rows.filter((r) => {
+    if (categorie && r.categorie !== categorie) return false;
+    if (paiement && r.mode_paiement !== paiement) return false;
+    if (annee && !String(r.naissance || '').startsWith(annee)) return false;
+    if (needle) {
+      const haystack = `${r.enfant_prenom} ${r.enfant_nom} ${r.parent_prenom} ${r.parent_nom} ${r.email}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+    return true;
+  });
+  return filtered.sort(SORTS[sort] || SORTS.date_desc);
+}
+
+function parseFilters(searchParams) {
+  return {
+    q: searchParams.get('q') || '',
+    categorie: searchParams.get('categorie') || '',
+    annee: searchParams.get('annee') || '',
+    paiement: searchParams.get('paiement') || '',
+    sort: searchParams.get('sort') || 'date_desc',
+  };
+}
+
 function actionsHtml(r) {
   return `<a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
     <form method="POST" action="/admin/inscriptions" onsubmit="return confirm('Supprimer cette inscription ?');">
@@ -42,28 +77,47 @@ function actionsHtml(r) {
     </form>`;
 }
 
-function tablePage(rows) {
-  const tableRows = rows
-    .map(
-      (r) => `<tr>
-        <td>${escapeHtml(r.created_at)}</td>
-        <td>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</td>
-        <td>${escapeHtml(r.naissance)}</td>
-        <td>${escapeHtml(r.categorie)}</td>
-        <td>${escapeHtml(r.taille_maillot)}</td>
-        <td>${escapeHtml(r.mode_paiement)}</td>
-        <td>${escapeHtml(r.parent_prenom)} ${escapeHtml(r.parent_nom)}</td>
-        <td><a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a></td>
-        <td>${escapeHtml(r.telephone)}</td>
-        <td>${escapeHtml(r.adresse)} ${escapeHtml(r.code_postal)} ${escapeHtml(r.ville)}</td>
-        <td>${r.droit_image ? 'Oui' : 'Non'}</td>
-        <td style="white-space:nowrap;">${actionsHtml(r)}</td>
-      </tr>`
-    )
-    .join('');
+// options : { filters, years, total } — years = années de naissance distinctes présentes en
+// base (calculées sur l'ensemble non filtré), total = nombre total d'inscriptions non filtrées.
+function tablePage(rows, { filters, years, total }) {
+  const sel = (actual, value) => (actual === value ? 'selected' : '');
+  const qs = new URLSearchParams();
+  if (filters.q) qs.set('q', filters.q);
+  if (filters.categorie) qs.set('categorie', filters.categorie);
+  if (filters.annee) qs.set('annee', filters.annee);
+  if (filters.paiement) qs.set('paiement', filters.paiement);
+  const csvHref = `/admin/inscriptions?format=csv${qs.toString() ? `&${qs.toString()}` : ''}`;
+  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement);
 
-  // Vue "cartes" (< 768px) : le tableau à 12 colonnes est illisible sur téléphone même avec le
-  // scroll horizontal — une carte par inscription, une seule fois pour toutes les infos.
+  const filterBar = `<form method="GET" class="insc-filters">
+    <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
+    <select name="categorie" onchange="this.form.submit()">
+      <option value="">Toutes catégories</option>
+      <option value="U6 - U7" ${sel(filters.categorie, 'U6 - U7')}>U6 - U7</option>
+      <option value="U8 - U9" ${sel(filters.categorie, 'U8 - U9')}>U8 - U9</option>
+    </select>
+    <select name="annee" onchange="this.form.submit()">
+      <option value="">Toutes années de naissance</option>
+      ${years.map((y) => `<option value="${escapeHtml(y)}" ${sel(filters.annee, y)}>${escapeHtml(y)}</option>`).join('')}
+    </select>
+    <select name="paiement" onchange="this.form.submit()">
+      <option value="">Tous paiements</option>
+      <option value="HelloAsso" ${sel(filters.paiement, 'HelloAsso')}>HelloAsso</option>
+      <option value="Espèces" ${sel(filters.paiement, 'Espèces')}>Espèces</option>
+      <option value="Chèque" ${sel(filters.paiement, 'Chèque')}>Chèque</option>
+    </select>
+    <select name="sort" onchange="this.form.submit()">
+      <option value="date_desc" ${sel(filters.sort, 'date_desc')}>Plus récent d'abord</option>
+      <option value="date_asc" ${sel(filters.sort, 'date_asc')}>Plus ancien d'abord</option>
+      <option value="nom_asc" ${sel(filters.sort, 'nom_asc')}>Enfant A → Z</option>
+      <option value="nom_desc" ${sel(filters.sort, 'nom_desc')}>Enfant Z → A</option>
+      <option value="naissance_asc" ${sel(filters.sort, 'naissance_asc')}>Naissance : plus âgé d'abord</option>
+      <option value="naissance_desc" ${sel(filters.sort, 'naissance_desc')}>Naissance : plus jeune d'abord</option>
+    </select>
+    <button type="submit" class="btn btn-dark btn-sm">Filtrer</button>
+    ${hasActiveFilters ? '<a href="/admin/inscriptions" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Réinitialiser</a>' : ''}
+  </form>`;
+
   const cards = rows
     .map(
       (r) => `<div class="insc-card">
@@ -93,15 +147,21 @@ function tablePage(rows) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
 <style>
-  body{padding:16px;max-width:100%;}
+  body{padding:16px;max-width:1400px;margin:0 auto;}
   @media (min-width:600px){ body{padding:24px;} }
-  table{border-collapse:collapse;width:100%;font-size:.85rem;background:var(--white);}
-  th,td{border:1px solid var(--cream-200);padding:8px 10px;text-align:left;white-space:nowrap;}
-  th{background:var(--cream-100);position:sticky;top:0;}
-  .wrap{overflow-x:auto;}
-  td form{display:inline;margin:0;}
-  .insc-cards{display:none;}
-  .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:12px;}
+  .insc-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center;}
+  .insc-filters input[type=search],
+  .insc-filters select{
+    padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);
+    font-size:.88rem;min-height:44px;background:var(--white);color:inherit;
+  }
+  .insc-search{flex:1 1 220px;}
+  @media (max-width:520px){
+    .insc-filters{flex-direction:column;align-items:stretch;}
+    .insc-filters > *{width:100%;flex:none;}
+  }
+  .insc-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:16px;}
+  .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;}
   .insc-card-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;font-size:1.02rem;}
   .insc-card-date{font-size:.75rem;color:var(--color-text-muted);white-space:nowrap;}
   .insc-card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 14px;font-size:.88rem;}
@@ -110,24 +170,12 @@ function tablePage(rows) {
   .insc-card-actions{display:flex;gap:10px;}
   .insc-card-actions form{flex:1;margin:0;}
   .insc-card-actions .btn{flex:1;width:100%;min-height:44px;}
-  @media (max-width:767px){
-    .wrap{display:none;}
-    .insc-cards{display:block;}
-  }
 </style>
 </head><body>
-  <h1 style="font-size:1.3rem;">Inscriptions (${rows.length})</h1>
-  <p style="margin-bottom:16px;"><a href="/admin/inscriptions?format=csv" class="btn btn-dark btn-sm">Exporter en CSV</a></p>
-  <div class="wrap">
-    <table>
-      <thead><tr>
-        <th>Date</th><th>Enfant</th><th>Naissance</th><th>Catégorie</th><th>Taille maillot</th><th>Mode paiement</th>
-        <th>Parent</th><th>E-mail</th><th>Téléphone</th><th>Adresse</th><th>Droit image</th><th>Actions</th>
-      </tr></thead>
-      <tbody>${tableRows || '<tr><td colspan="12">Aucune inscription pour le moment.</td></tr>'}</tbody>
-    </table>
-  </div>
-  <div class="insc-cards">${cards || '<p>Aucune inscription pour le moment.</p>'}</div>
+  <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
+  ${filterBar}
+  <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
+  <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
 </body></html>`;
 }
 
@@ -140,8 +188,11 @@ export async function onRequestGet({ request, env }) {
   const { results } = await env.DB.prepare('SELECT * FROM inscriptions ORDER BY created_at DESC').all();
 
   const { searchParams } = new URL(request.url);
+  const filters = parseFilters(searchParams);
+  const filtered = filterAndSort(results, filters);
+
   if (searchParams.get('format') === 'csv') {
-    return new Response(toCsv(results), {
+    return new Response(toCsv(filtered), {
       headers: {
         'Content-Type': 'text/csv;charset=UTF-8',
         'Content-Disposition': 'attachment; filename="inscriptions.csv"',
@@ -149,7 +200,11 @@ export async function onRequestGet({ request, env }) {
     });
   }
 
-  return new Response(tablePage(results), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  const years = [...new Set(results.map((r) => String(r.naissance || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+
+  return new Response(tablePage(filtered, { filters, years, total: results.length }), {
+    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
+  });
 }
 
 export async function onRequestPost({ request, env }) {
