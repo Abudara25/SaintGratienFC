@@ -154,6 +154,15 @@
                   <input type="text" id="ville" name="ville" placeholder="Saint-Gratien">
                 </div>
               </div>
+              <div class="form-field">
+                <label for="mode-paiement">Mode de paiement</label>
+                <select id="mode-paiement" name="modePaiement" required>
+                  <option value="" disabled selected>Choisir un mode de paiement</option>
+                  <option value="HelloAsso">HelloAsso (carte bancaire, en ligne)</option>
+                  <option value="Espèces">Espèces</option>
+                  <option value="Chèque">Chèque</option>
+                </select>
+              </div>
 
               <div class="form-field" style="gap:12px;">
                 <label style="display:flex;align-items:flex-start;gap:10px;font-weight:400;font-size:.92rem;">
@@ -179,10 +188,16 @@
               <div class="card" style="background:var(--gold-100);box-shadow:none;">
                 <div class="card-body" style="gap:14px;">
                   <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
-                  <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, et apportez-le au club (premier entraînement) — ou envoyez-le par e-mail. 2. Réglez l'adhésion en ligne sur HelloAsso, ou en espèces/chèque directement au club en apportant le dossier.</p>
+                  <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, et apportez-le au club (premier entraînement) — ou envoyez-le par e-mail. 2. Réglez l'adhésion selon le mode choisi.</p>
                   <div style="display:flex;gap:12px;flex-wrap:wrap;">
                     <a id="mailto-btn" class="btn btn-dark">1. Envoyer par e-mail</a>
-                    <a id="helloasso-btn" target="_blank" rel="noopener" class="btn btn-primary">2. Régler sur HelloAsso</a>
+                  </div>
+                  <div id="paiement-especes-cheque" hidden style="background:var(--white);border-radius:var(--radius-sm);padding:14px 16px;font-size:.92rem;color:var(--color-text-muted);">
+                    Merci de prévoir le règlement (<strong id="paiement-especes-cheque-mode"></strong>) lors du dépôt du dossier signé au club.
+                  </div>
+                  <div id="paiement-helloasso" hidden>
+                    <div id="helloasso-widget-container"></div>
+                    <p style="margin:10px 0 0;font-size:.82rem;color:var(--color-text-muted);">Le paiement ne s'affiche pas ? <a id="helloasso-fallback-link" target="_blank" rel="noopener">Ouvrez-le dans un nouvel onglet</a>.</p>
                   </div>
                 </div>
               </div>
@@ -295,6 +310,6 @@
 
 <script src="assets/js/main.js?v=20260831"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="assets/js/inscription.js?v=20260903c"></script>
+<script src="assets/js/inscription.js?v=20260904"></script>
 </body>
 </html>

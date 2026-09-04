@@ -25,4 +25,11 @@ export async function ensureInscriptionsTable(db) {
       )`
     )
     .run();
+
+  // mode_paiement ajouté le 2026-09-04, après la création initiale de la table en production :
+  // ALTER TABLE ADD COLUMN plutôt que CREATE TABLE IF NOT EXISTS, pour les bases déjà existantes.
+  // Erreur "duplicate column name" ignorée volontairement (colonne déjà présente).
+  try {
+    await db.prepare('ALTER TABLE inscriptions ADD COLUMN mode_paiement TEXT').run();
+  } catch {}
 }

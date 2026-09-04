@@ -4,7 +4,7 @@
 // filet de sécurité pour le club, pas une étape bloquante pour le parent.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 
-const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'parentPrenom', 'parentNom', 'email'];
+const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email'];
 
 export async function onRequestPost({ request, env }) {
   let data;
@@ -27,8 +27,8 @@ export async function onRequestPost({ request, env }) {
     await ensureInscriptionsTable(env.DB);
     await env.DB.prepare(
       `INSERT INTO inscriptions
-        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         data.enfantPrenom.trim(),
@@ -36,6 +36,7 @@ export async function onRequestPost({ request, env }) {
         data.naissance,
         data.categorie,
         data.tailleMaillot,
+        data.modePaiement,
         data.parentPrenom.trim(),
         data.parentNom.trim(),
         data.email.trim(),

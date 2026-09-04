@@ -5,6 +5,14 @@ const HELLOASSO_URLS = {
   'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
 };
 
+// Widgets embarqués (fournis par le club depuis HelloAsso, onglet "Diffuser") : le paiement se
+// fait dans la page au lieu de rediriger vers helloasso.com. Note l'URL sans "/beta" (le widget
+// n'est pas servi sous ce préfixe, contrairement au lien de paiement externe ci-dessus).
+const HELLOASSO_WIDGET_URLS = {
+  'U6 - U7': 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027/widget',
+  'U8 - U9': 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2/widget',
+};
+
 // Saison 2026-2027 : U6-U7 = nés en 2020 ou 2021, U8-U9 = nés en 2018 ou 2019.
 const CATEGORIE_PAR_ANNEE = {
   2020: 'U6 - U7',
@@ -12,6 +20,29 @@ const CATEGORIE_PAR_ANNEE = {
   2018: 'U8 - U9',
   2019: 'U8 - U9',
 };
+
+// Construit l'iframe widget HelloAsso (auto-agrandie via postMessage — HelloAsso poste sa hauteur
+// réelle une fois le formulaire chargé, sinon l'iframe reste tronquée à la hauteur de départ).
+function createHelloAssoWidget(url) {
+  const iframe = document.createElement('iframe');
+  iframe.id = 'haWidget';
+  iframe.allowTransparency = 'true';
+  iframe.scrolling = 'auto';
+  iframe.src = url;
+  iframe.style.width = '100%';
+  iframe.style.height = '750px';
+  iframe.style.border = 'none';
+  iframe.addEventListener('load', () => {
+    window.addEventListener('message', (e) => {
+      if (e.origin !== 'https://www.helloasso.com') return;
+      const dataHeight = e.data?.height;
+      if (dataHeight > parseFloat(iframe.style.height || 0)) {
+        iframe.style.height = `${dataHeight}px`;
+      }
+    });
+  });
+  return iframe;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const statusEl = document.getElementById('inscription-status');
@@ -31,7 +62,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const nextSteps = document.getElementById('inscription-next-steps');
   const mailtoBtn = document.getElementById('mailto-btn');
-  const helloassoBtn = document.getElementById('helloasso-btn');
+  const especesChequeBox = document.getElementById('paiement-especes-cheque');
+  const especesChequeMode = document.getElementById('paiement-especes-cheque-mode');
+  const helloassoBox = document.getElementById('paiement-helloasso');
+  const helloassoWidgetContainer = document.getElementById('helloasso-widget-container');
+  const helloassoFallbackLink = document.getElementById('helloasso-fallback-link');
 
   const naissanceInput = form.naissance;
   const categorieSelect = form.categorie;
@@ -59,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
       naissance: form.naissance.value,
       categorie: form.categorie.value,
       tailleMaillot: form.tailleMaillot.value,
+      modePaiement: form.modePaiement.value,
       parentPrenom: form.parentPrenom.value.trim(),
       parentNom: form.parentNom.value.trim(),
       email: form.email.value.trim(),
@@ -97,7 +133,19 @@ document.addEventListener('DOMContentLoaded', () => {
     ].join('\n');
     mailtoBtn.href = `mailto:contact@saintgratienfc.fr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
-    helloassoBtn.href = HELLOASSO_URLS[data.categorie] || HELLOASSO_URLS['U6 - U7'];
+    if (data.modePaiement === 'HelloAsso') {
+      const widgetUrl = HELLOASSO_WIDGET_URLS[data.categorie] || HELLOASSO_WIDGET_URLS['U6 - U7'];
+      helloassoWidgetContainer.innerHTML = '';
+      helloassoWidgetContainer.appendChild(createHelloAssoWidget(widgetUrl));
+      helloassoFallbackLink.href = HELLOASSO_URLS[data.categorie] || HELLOASSO_URLS['U6 - U7'];
+      helloassoBox.hidden = false;
+      especesChequeBox.hidden = true;
+    } else {
+      helloassoBox.hidden = true;
+      helloassoWidgetContainer.innerHTML = '';
+      especesChequeMode.textContent = data.modePaiement || 'espèces ou chèque';
+      especesChequeBox.hidden = false;
+    }
 
     nextSteps.hidden = false;
     nextSteps.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -153,6 +201,7 @@ function generatePdf(data) {
   heading('Offre choisie');
   line('Adhésion saison 2026-2027 — 180 €');
   line('Licence + tenue complète Patrick (maillot, short, survêtement, sac)');
+  line(`Mode de paiement : ${data.modePaiement || '—'}`);
   y += 4;
 
   heading('Autorisations');

@@ -1,39 +1,12 @@
 // Page de consultation des inscriptions (base D1 "DB"), protégée par un mot de passe partagé
 // (variable Cloudflare Pages ADMIN_PASSWORD, jamais commitée). Réservée aux responsables du club.
+// L'édition d'une inscription se fait sur functions/admin/inscriptions/[id].js ; la suppression
+// est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
-
-const escapeHtml = (str = '') =>
-  String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-const COOKIE_NAME = 'admin_auth';
-
-function isAuthed(request, env) {
-  const cookie = request.headers.get('Cookie') || '';
-  const match = cookie.match(/\badmin_auth=([^;]+)/);
-  return !!env.ADMIN_PASSWORD && match?.[1] === env.ADMIN_PASSWORD;
-}
-
-function loginPage({ error } = {}) {
-  return `<!doctype html><html lang="fr"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Connexion — Admin Saint-Gratien FC</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
-</head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
-<form method="POST" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
-  <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
-  ${error ? '<p style="color:var(--color-error, #b3261e);margin-bottom:12px;font-size:.9rem;">Mot de passe incorrect.</p>' : ''}
-  <div class="form-field" style="margin-bottom:16px;">
-    <label for="password">Mot de passe</label>
-    <input type="password" id="password" name="password" required autofocus>
-  </div>
-  <button type="submit" class="btn btn-primary btn-block">Se connecter</button>
-</form>
-</body></html>`;
-}
+import { COOKIE_NAME, isAuthed, loginPage, escapeHtml } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
-  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD'];
+  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD'];
   const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = rows.map((r) =>
     [
@@ -42,6 +15,7 @@ function toCsv(rows) {
       r.naissance,
       r.categorie,
       r.taille_maillot,
+      r.mode_paiement,
       `${r.parent_prenom} ${r.parent_nom}`,
       r.email,
       r.telephone,
@@ -67,11 +41,20 @@ function tablePage(rows) {
         <td>${escapeHtml(r.naissance)}</td>
         <td>${escapeHtml(r.categorie)}</td>
         <td>${escapeHtml(r.taille_maillot)}</td>
+        <td>${escapeHtml(r.mode_paiement)}</td>
         <td>${escapeHtml(r.parent_prenom)} ${escapeHtml(r.parent_nom)}</td>
         <td><a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a></td>
         <td>${escapeHtml(r.telephone)}</td>
         <td>${escapeHtml(r.adresse)} ${escapeHtml(r.code_postal)} ${escapeHtml(r.ville)}</td>
         <td>${r.droit_image ? 'Oui' : 'Non'}</td>
+        <td style="white-space:nowrap;">
+          <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
+          <form method="POST" action="/admin/inscriptions" style="display:inline;" onsubmit="return confirm('Supprimer cette inscription ?');">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="${r.id}">
+            <button type="submit" class="btn btn-sm" style="background:var(--color-error, #b3261e);color:#fff;">Supprimer</button>
+          </form>
+        </td>
       </tr>`
     )
     .join('');
@@ -94,10 +77,10 @@ function tablePage(rows) {
   <div class="wrap">
     <table>
       <thead><tr>
-        <th>Date</th><th>Enfant</th><th>Naissance</th><th>Catégorie</th><th>Taille maillot</th>
-        <th>Parent</th><th>E-mail</th><th>Téléphone</th><th>Adresse</th><th>Droit image</th>
+        <th>Date</th><th>Enfant</th><th>Naissance</th><th>Catégorie</th><th>Taille maillot</th><th>Mode paiement</th>
+        <th>Parent</th><th>E-mail</th><th>Téléphone</th><th>Adresse</th><th>Droit image</th><th>Actions</th>
       </tr></thead>
-      <tbody>${tableRows || '<tr><td colspan="10">Aucune inscription pour le moment.</td></tr>'}</tbody>
+      <tbody>${tableRows || '<tr><td colspan="12">Aucune inscription pour le moment.</td></tr>'}</tbody>
     </table>
   </div>
 </body></html>`;
@@ -126,6 +109,19 @@ export async function onRequestGet({ request, env }) {
 
 export async function onRequestPost({ request, env }) {
   const form = await request.formData();
+
+  if (form.get('action') === 'delete') {
+    if (!isAuthed(request, env)) {
+      return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    }
+    const id = Number(form.get('id'));
+    if (id) {
+      await ensureInscriptionsTable(env.DB);
+      await env.DB.prepare('DELETE FROM inscriptions WHERE id = ?').bind(id).run();
+    }
+    return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
+  }
+
   const password = form.get('password');
 
   if (!env.ADMIN_PASSWORD || password !== env.ADMIN_PASSWORD) {
