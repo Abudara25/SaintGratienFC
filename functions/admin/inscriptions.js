@@ -72,8 +72,32 @@ function parseFilters(searchParams) {
   };
 }
 
-function actionsHtml(r) {
-  return `<a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
+// pdfData reprend les champs de assets/js/pdf-inscription.js (buildInscriptionPdfDoc), en
+// camelCase — la fiche D1 est en snake_case. Le bouton "Télécharger le PDF" régénère côté client
+// (jsPDF, voir le <script> en bas de page) le même document que celui produit à l'inscription :
+// utile si la famille n'a pas reçu (ou a perdu) l'e-mail de confirmation et que le club veut le
+// lui renvoyer manuellement.
+function actionsHtml(r, siteUrl) {
+  const pdfData = {
+    enfantPrenom: r.enfant_prenom,
+    enfantNom: r.enfant_nom,
+    naissance: r.naissance,
+    categorie: r.categorie,
+    tailleMaillot: r.taille_maillot,
+    modePaiement: r.mode_paiement,
+    parentPrenom: r.parent_prenom,
+    parentNom: r.parent_nom,
+    email: r.email,
+    telephone: r.telephone,
+    adresse: r.adresse,
+    codePostal: r.code_postal,
+    ville: r.ville,
+    droitImage: r.droit_image,
+  };
+  const depotUrl = r.upload_token ? `${siteUrl}/depot/${r.upload_token}` : '';
+
+  return `<button type="button" class="btn btn-sm insc-pdf-btn" data-pdf='${escapeHtml(JSON.stringify(pdfData))}' data-depot-url="${escapeHtml(depotUrl)}">Télécharger le PDF</button>
+    <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
     <form method="POST" action="/admin/inscriptions" onsubmit="return confirm('Supprimer cette inscription ?');">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" value="${r.id}">
@@ -81,13 +105,14 @@ function actionsHtml(r) {
     </form>`;
 }
 
-// options : { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus } —
-// years = années de naissance distinctes présentes en base (calculées sur l'ensemble non
-// filtré), total = nombre total d'inscriptions non filtrées, returnTo = chemin+query courant
+// options : { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus,
+// siteUrl } — years = années de naissance distinctes présentes en base (calculées sur l'ensemble
+// non filtré), total = nombre total d'inscriptions non filtrées, returnTo = chemin+query courant
 // (pour revenir ici après un dépôt de dossier, filtres compris — voir safeRedirect dans
 // [id]/dossier.js), inscriptionStatus = 'open'|'closed' (KV "saintgratienfc_config", voir
-// functions/admin/inscription-status.js et functions/api/inscription-status.js).
-function tablePage(rows, { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus }) {
+// functions/admin/inscription-status.js et functions/api/inscription-status.js), siteUrl = origine
+// (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml).
+function tablePage(rows, { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus, siteUrl }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -163,12 +188,12 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
                 <input type="hidden" name="redirectTo" value="${escapeHtml(returnTo)}">
                 <label for="dossier-${r.id}" class="visually-hidden">Déposer le dossier signé de ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</label>
                 <input type="file" id="dossier-${r.id}" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
-                <button type="submit" class="btn btn-dark btn-sm">${r.dossier_uploaded_at ? 'Remplacer' : 'Ajouter (reçu par e-mail)'}</button>
+                <button type="submit" class="btn btn-dark btn-sm">${r.dossier_uploaded_at ? 'Remplacer le dossier' : 'Enregistrer le dossier'}</button>
               </form>
             </dd>
           </div>
         </dl>
-        <div class="insc-card-actions">${actionsHtml(r)}</div>
+        <div class="insc-card-actions">${actionsHtml(r, siteUrl)}</div>
       </details>`
     )
     .join('');
@@ -192,7 +217,10 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
     .insc-filters{flex-direction:column;align-items:stretch;}
     .insc-filters > *{width:100%;flex:none;}
   }
-  .insc-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:16px;}
+  /* align-items:start (pas le stretch par défaut d'une grille) : sinon toutes les cartes d'un
+     même rang s'étirent à la hauteur de la plus grande dès qu'une seule se déplie, laissant un
+     grand cadre blanc vide sous les cartes restées repliées. */
+  .insc-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:16px;align-items:start;}
   .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;}
   .insc-card-head{display:flex;align-items:center;gap:10px;font-size:1.02rem;list-style:none;cursor:pointer;padding:2px 0;min-height:44px;}
   .insc-card-head::-webkit-details-marker{display:none;}
@@ -210,9 +238,10 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   .insc-dossier-form{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;}
   .insc-dossier-form input[type=file]{flex:1 1 160px;min-width:0;font-size:.82rem;}
   .insc-dossier-form .btn{min-height:40px;flex-shrink:0;}
-  .insc-card-actions{display:flex;gap:10px;}
-  .insc-card-actions form{flex:1;margin:0;}
-  .insc-card-actions .btn{flex:1;width:100%;min-height:44px;}
+  .insc-card-actions{display:flex;flex-wrap:wrap;gap:10px;}
+  .insc-card-actions form{flex:1;margin:0;min-width:120px;}
+  .insc-card-actions .btn{flex:1;width:100%;min-height:44px;min-width:120px;}
+  .insc-card-actions .insc-pdf-btn{flex-basis:100%;background:var(--cream-200);color:var(--maroon-950);}
   .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
   .insc-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
   .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
@@ -237,6 +266,15 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
   <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
+  <script>
+    document.querySelectorAll('.insc-pdf-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        downloadInscriptionPdf(JSON.parse(btn.dataset.pdf), btn.dataset.depotUrl || null);
+      });
+    });
+  </script>
 </body></html>`;
 }
 
@@ -288,6 +326,7 @@ export async function onRequestGet({ request, env }) {
       dossierError: searchParams.get('dossierError'),
       dossierOk: searchParams.get('dossierOk'),
       inscriptionStatus,
+      siteUrl: new URL(request.url).origin,
     }),
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

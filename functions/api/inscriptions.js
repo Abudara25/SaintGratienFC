@@ -67,6 +67,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   // waitUntil (pas await) : l'envoi de l'e-mail continue après la réponse HTTP, sans ajouter de
   // latence pour le parent — sendConfirmationEmail() est déjà best-effort en interne.
+  // data.pdfBase64 (optionnel, généré côté client par getInscriptionPdfBase64() dans
+  // pdf-inscription.js) est joint en pièce jointe à l'e-mail — voir confirmation-email.js.
   waitUntil(sendConfirmationEmail(env, data, uploadToken, new URL(request.url).origin));
 
   return new Response(JSON.stringify({ ok: true, uploadToken }), {

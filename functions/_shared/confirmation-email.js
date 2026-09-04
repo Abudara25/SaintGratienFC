@@ -130,10 +130,37 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
   return { subject: `Inscription de ${nomEnfant} — Saint-Gratien FC (à finaliser)`, html, text };
 }
 
+// Nom de fichier pour la pièce jointe — même logique que inscriptionPdfFilename() dans
+// assets/js/pdf-inscription.js (dupliquée : celle-ci tourne côté client, celle-là côté Worker,
+// pas de module partageable entre les deux sans étape de build).
+const pdfFilename = (data) =>
+  `inscription-${data.enfantPrenom}-${data.enfantNom}.pdf`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-');
+
+// Limite large mais raisonnable pour un PDF texte d'une page (quelques dizaines de Ko attendues) —
+// évite de transmettre à Brevo un base64 aberrant si jamais le client envoie n'importe quoi.
+const MAX_PDF_BASE64_LENGTH = 8 * 1024 * 1024;
+
 export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
   if (!env.BREVO_API_KEY) return; // pas encore configuré côté Brevo, voir CLAUDE.md
 
   const { subject, html, text } = buildEmail(data, uploadToken, siteUrl);
+  const hasPdf = typeof data.pdfBase64 === 'string' && data.pdfBase64.length > 0 && data.pdfBase64.length <= MAX_PDF_BASE64_LENGTH;
+
+  const body = {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+    to: [{ email: data.email, name: `${data.parentPrenom} ${data.parentNom}` }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
+  if (hasPdf) {
+    body.attachment = [{ content: data.pdfBase64, name: pdfFilename(data) }];
+  }
+
   try {
     await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -141,13 +168,7 @@ export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
         'api-key': env.BREVO_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
-        to: [{ email: data.email, name: `${data.parentPrenom} ${data.parentNom}` }],
-        subject,
-        htmlContent: html,
-        textContent: text,
-      }),
+      body: JSON.stringify(body),
     });
   } catch {
     // best-effort : un échec d'envoi ne doit jamais faire échouer l'inscription

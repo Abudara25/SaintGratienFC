@@ -117,8 +117,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // On attend la réponse du serveur avant de générer le PDF : le lien de dépôt du dossier
-    // signé (uploadToken) est imprimé dedans, et il faut le token pour construire ce lien.
+    // Le PDF (sans lien de dépôt, pas encore connu à ce stade) est joint en base64 à la requête
+    // pour que le serveur puisse l'attacher à l'e-mail de confirmation (voir
+    // functions/_shared/confirmation-email.js) — la famille reçoit ainsi sa fiche remplie par
+    // e-mail en plus du téléchargement local ci-dessous.
+    const pdfBase64 = getInscriptionPdfBase64(data);
+
+    // On attend la réponse du serveur avant de télécharger le PDF local : le lien de dépôt du
+    // dossier signé (uploadToken) est imprimé dedans, et il faut le token pour construire ce lien.
     submitBtn.disabled = true;
     submitBtn.textContent = 'Génération…';
     let uploadToken = null;
@@ -126,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/inscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, pdfBase64 }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -138,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.disabled = false;
     submitBtn.textContent = submitBtnDefaultLabel;
 
-    generatePdf(data, uploadToken ? `${location.origin}/depot/${uploadToken}` : null);
+    downloadInscriptionPdf(data, uploadToken ? `${location.origin}/depot/${uploadToken}` : null);
 
     if (uploadToken) {
       depotBtn.href = `/depot/${uploadToken}`;
@@ -178,95 +184,3 @@ document.addEventListener('DOMContentLoaded', () => {
     nextSteps.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 });
-
-function generatePdf(data, depotUrl) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-
-  doc.setFillColor(58, 15, 16);
-  doc.rect(0, 0, 210, 28, 'F');
-  doc.setTextColor(244, 182, 88);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('Saint-Gratien FC', 14, 18);
-  doc.setFontSize(11);
-  doc.setTextColor(255, 255, 255);
-  doc.text("Fiche d'inscription — Saison 2026-2027", 14, 25);
-
-  let y = 42;
-  doc.setTextColor(30, 30, 30);
-
-  const heading = (text) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.text(text, 14, y);
-    y += 7;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-  };
-  const line = (text) => {
-    doc.text(text, 14, y);
-    y += 6;
-  };
-
-  heading('Enfant');
-  line(`Nom : ${data.enfantNom}`);
-  line(`Prénom : ${data.enfantPrenom}`);
-  line(`Date de naissance : ${data.naissance || '—'}`);
-  line(`Catégorie : ${data.categorie}`);
-  line(`Taille de maillot : ${data.tailleMaillot || '—'}`);
-  y += 4;
-
-  heading('Parent / responsable légal');
-  line(`Nom : ${data.parentNom}`);
-  line(`Prénom : ${data.parentPrenom}`);
-  line(`E-mail : ${data.email}`);
-  line(`Téléphone : ${data.telephone || '—'}`);
-  line(`Adresse : ${data.adresse || '—'}, ${data.codePostal || ''} ${data.ville || ''}`.trim());
-  y += 4;
-
-  heading('Offre choisie');
-  line('Adhésion saison 2026-2027 — 180 €');
-  line('Licence + tenue complète Patrick (maillot, short, survêtement, sac)');
-  line(`Mode de paiement : ${data.modePaiement || '—'}`);
-  y += 4;
-
-  heading('Autorisations');
-  line("J'autorise mon enfant à participer aux entraînements et activités du Saint-Gratien FC.");
-  line(`Droit à l'image (photos/vidéos du club) : ${data.droitImage ? 'Oui' : 'Non'}`);
-  y += 8;
-
-  doc.text('Fait à _______________________, le _______________', 14, y);
-  y += 10;
-  doc.text('Signature du responsable légal :', 14, y);
-  y += 20;
-  doc.line(14, y, 90, y);
-  y += 14;
-
-  if (depotUrl) {
-    doc.setFontSize(10);
-    doc.setTextColor(30, 30, 30);
-    doc.text('Une fois signé, déposez ce dossier ici :', 14, y);
-    y += 6;
-    doc.setTextColor(58, 15, 16);
-    doc.textWithLink(depotUrl, 14, y, { url: depotUrl });
-    y += 4;
-  }
-
-  doc.setFontSize(9);
-  doc.setTextColor(120, 120, 120);
-  doc.text(
-    depotUrl
-      ? 'Vous pouvez aussi apporter ce dossier signé directement au club (premier entraînement). Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.'
-      : "À apporter signé au club (premier entraînement) ou à envoyer à contact@saintgratienfc.fr. Adhésion à régler sur HelloAsso, ou en espèces/chèque en apportant ce dossier.",
-    14,
-    285
-  );
-
-  const filename = `inscription-${data.enfantPrenom}-${data.enfantNom}.pdf`
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/\s+/g, '-');
-  doc.save(filename);
-}
