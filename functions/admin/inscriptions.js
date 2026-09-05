@@ -202,7 +202,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inscriptions — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260904">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260905">
 <style>
   body{padding:16px;max-width:1400px;margin:0 auto;}
   @media (min-width:600px){ body{padding:24px;} }

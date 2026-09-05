@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initArticleLightbox();
   initNewsletterForms();
   initMapsConsent();
+  initAdhesionCtaStatus();
 });
 
 function initNewsletterForms() {
@@ -38,6 +39,29 @@ function initMapsConsent() {
       container.replaceChildren(iframe);
     });
   });
+}
+
+function initAdhesionCtaStatus() {
+  // Présent sur les 6 pages (header + le CTA du hero sur index.html) : relabellisé en "Inscriptions
+  // fermées" quand le club a fermé les inscriptions (voir /admin/inscriptions), pour ne pas laisser
+  // croire que c'est encore ouvert avant même d'avoir cliqué. Reste cliquable — la page inscription
+  // explique pourquoi et propose de nous contacter. Même endpoint que inscription.html
+  // (assets/js/inscription.js), interrogé séparément ici : ce sont deux besoins différents (bouton
+  // du header vs formulaire de la page), pas de source commune simple sans dupliquer le fetch.
+  const ctas = document.querySelectorAll('.adhesion-cta');
+  if (!ctas.length) return;
+
+  fetch('/api/inscription-status')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data?.status !== 'closed') return;
+      ctas.forEach((el) => {
+        el.textContent = 'Inscriptions fermées';
+        el.classList.remove('btn-primary');
+        el.classList.add('btn-dark');
+      });
+    })
+    .catch(() => {}); // en cas d'échec, le bouton garde son libellé par défaut ("Devenir adhérent")
 }
 
 function initPlaceholderLinks() {

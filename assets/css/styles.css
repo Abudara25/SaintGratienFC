@@ -322,7 +322,10 @@ section { padding: 88px 0; }
   .main-nav.is-open { transform: translateX(0); }
   .main-nav ul { flex-direction: column; padding: 24px; gap: 4px; }
   .main-nav a { padding: 16px; font-size: 1rem; }
-  .header-actions .btn-primary { display: none; }
+  /* .adhesion-cta (pas .btn-primary) : ce lien change de classe de couleur en JS quand les
+     inscriptions sont fermées (voir initAdhesionCtaStatus() dans main.js) — cibler la couleur
+     l'aurait laissé visible en double (header + menu mobile) une fois cette classe retirée. */
+  .header-actions .adhesion-cta { display: none; }
   .main-nav .nav-cta { display: block; margin-top: 16px; }
 }
 @media (min-width: 881px) {
