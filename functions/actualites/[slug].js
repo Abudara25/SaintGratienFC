@@ -87,7 +87,7 @@ export async function onRequestGet({ request, params, env }) {
 <link rel="icon" href="/assets/images/favicon.ico">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260905">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260905b">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -172,15 +172,6 @@ export async function onRequestGet({ request, params, env }) {
           <li><a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a></li>
         </ul>
       </div>
-      <div>
-        <h3>Newsletter</h3>
-        <p>Recevez les actus et les infos du club chaque mois.</p>
-        <form class="newsletter">
-          <label for="footer-email" class="visually-hidden">Adresse e-mail</label>
-          <input type="email" id="footer-email" placeholder="Votre e-mail" required>
-          <button type="submit" class="btn btn-primary btn-sm">OK</button>
-        </form>
-      </div>
     </div>
     <div class="footer-bottom">
       <p>© 2026 Saint-Gratien FC — Tous droits réservés.</p>
@@ -191,7 +182,7 @@ export async function onRequestGet({ request, params, env }) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260905"></script>
+<script src="/assets/js/main.js?v=20260905b"></script>
 </body>
 </html>
 `;

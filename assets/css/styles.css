@@ -618,7 +618,7 @@ tbody tr:hover { background: var(--gold-100); }
 
 /* ---------- Footer ---------- */
 .site-footer { background: var(--maroon-950); color: rgba(251,247,238,.78); padding: 64px 0 0; }
-.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 40px; padding-bottom: 48px; border-bottom: 1px solid rgba(240,160,48,.18); }
+.footer-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 40px; padding-bottom: 48px; border-bottom: 1px solid rgba(240,160,48,.18); }
 @media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
 .footer-brand { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }

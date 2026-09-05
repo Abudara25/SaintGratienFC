@@ -8,17 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
   markActiveNavLink();
   initPlaceholderLinks();
   initArticleLightbox();
-  initNewsletterForms();
   initMapsConsent();
   initAdhesionCtaStatus();
 });
-
-function initNewsletterForms() {
-  // Formulaire newsletter sans backend (placeholder) : on bloque juste le submit natif.
-  document.querySelectorAll('form.newsletter').forEach((form) => {
-    form.addEventListener('submit', (e) => e.preventDefault());
-  });
-}
 
 function initMapsConsent() {
   // La carte Google Maps n'est chargée qu'après un clic explicite (Google peut déposer

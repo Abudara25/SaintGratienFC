@@ -34,7 +34,7 @@ function editPage(row, { error } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Modifier une inscription — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260905">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260905b">
 </head><body style="padding:16px;max-width:640px;margin:0 auto;">
   <p style="margin-bottom:16px;"><a href="/admin/inscriptions">&larr; Retour à la liste</a></p>
   <h1 style="font-size:1.3rem;margin-bottom:16px;">Modifier l'inscription de ${escapeHtml(row.enfant_prenom)} ${escapeHtml(row.enfant_nom)}</h1>
