@@ -53,7 +53,7 @@ function initAdhesionCtaStatus() {
         el.classList.add('btn-dark');
       });
     })
-    .catch(() => {}); // en cas d'échec, le bouton garde son libellé par défaut ("Devenir adhérent")
+    .catch(() => {}); // en cas d'échec, le bouton garde son libellé par défaut ("Inscription")
 }
 
 function initPlaceholderLinks() {
