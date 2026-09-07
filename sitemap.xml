@@ -9,6 +9,14 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://saintgratienfc.fr/actualites/bienvenue-nouveau-site</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://saintgratienfc.fr/actualites/recherche-benevoles</loc>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://saintgratienfc.fr/equipe.html</loc>
     <priority>0.8</priority>
   </url>
