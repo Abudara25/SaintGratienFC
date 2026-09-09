@@ -27,7 +27,7 @@ const toRow = (data) => ({
   rgpd: data.rgpd ? 1 : 0,
 });
 
-function editPage(row, categories, siteUrl, { error } = {}) {
+function editPage(row, categories, { error } = {}) {
   const checked = (v) => (v ? 'checked' : '');
   const selected = (value, option) => (value === option ? 'selected' : '');
 
@@ -60,17 +60,6 @@ function editPage(row, categories, siteUrl, { error } = {}) {
       ? `<a href="/admin/inscriptions/${row.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
       : '— pas encore reçu'
   }</p>
-  <div style="margin-bottom:16px;">
-    <p style="margin-bottom:8px;">Lien de réinscription prioritaire (saison suivante) : ${row.reinscription_token ? '✓ généré' : '— pas encore généré'}</p>
-    ${
-      row.reinscription_token
-        ? `<input type="text" readonly value="${escapeHtml(`${siteUrl}/reinscription/${row.reinscription_token}`)}" style="width:100%;padding:8px 10px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.82rem;margin-bottom:6px;" aria-label="Lien de réinscription (triple-cliquer pour sélectionner)">
-           <p style="margin:0;font-size:.78rem;color:var(--color-text-muted);">Triple-cliquez pour sélectionner, à distribuer à la main si besoin (le bouton « Envoyer le lien de réinscription » de la liste l'envoie aussi par e-mail).</p>`
-        : `<form method="POST" action="/admin/inscriptions/${row.id}/reinscription-link">
-             <button type="submit" class="btn btn-dark btn-sm">Générer le lien de réinscription</button>
-           </form>`
-    }
-  </div>
   ${error ? `<p style="color:var(--color-error, #b3261e);margin-bottom:16px;">${escapeHtml(error)}</p>` : ''}
   <form method="POST">
     <div class="form-row">
@@ -191,8 +180,7 @@ export async function onRequestGet({ request, env, params }) {
   }
 
   const { categories } = await getCategoriesConfig(env);
-  const siteUrl = new URL(request.url).origin;
-  return new Response(editPage(row, categories, siteUrl), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  return new Response(editPage(row, categories), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
 export async function onRequestPost({ request, env, params }) {
@@ -210,18 +198,17 @@ export async function onRequestPost({ request, env, params }) {
   const form = await request.formData();
   const data = Object.fromEntries(form.entries());
   const { categories } = await getCategoriesConfig(env);
-  const siteUrl = new URL(request.url).origin;
 
   for (const field of REQUIRED_FIELDS) {
     if (!String(data[field] ?? '').trim()) {
-      return new Response(editPage({ ...existing, ...toRow(data) }, categories, siteUrl, { error: `Champ manquant : ${field}` }), {
+      return new Response(editPage({ ...existing, ...toRow(data) }, categories, { error: `Champ manquant : ${field}` }), {
         status: 400,
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    return new Response(editPage({ ...existing, ...toRow(data) }, categories, siteUrl, { error: 'E-mail invalide' }), {
+    return new Response(editPage({ ...existing, ...toRow(data) }, categories, { error: 'E-mail invalide' }), {
       status: 400,
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     });

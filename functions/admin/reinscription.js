@@ -4,22 +4,45 @@
 // _shared/settings-kv.js). Objectif explicite (demande utilisateur) : éviter qu'un responsable du
 // club sélectionne par erreur des familles déjà inscrites cette saison en travaillant sur la liste
 // générale, en ne lui montrant que la bonne population dès le départ.
-// L'envoi du lien réutilise l'action existante bulk-reinscription de functions/admin/inscriptions.js
-// (génère le reinscription_token si besoin + e-mail via sendReinscriptionEmail) — cette page ne fait
-// que POSTer dessus avec redirectTo=/admin/reinscription pour revenir ici après coup, et la
-// sélection multiple réutilise telle quelle assets/js/admin-inscriptions.js (mêmes id/classes :
-// #bulk-form, #bulk-select-all, #bulk-count, #bulk-ids-container, .insc-select, [data-bulk-action]).
+// L'envoi (premier lien ou rappel) réutilise les actions bulk-reinscription/bulk-reinscription-
+// rappel de functions/admin/inscriptions.js (génère le reinscription_token si besoin + e-mail via
+// sendReinscriptionEmail) — cette page ne fait que POSTer dessus avec redirectTo=/admin/reinscription
+// pour revenir ici après coup, et la sélection multiple réutilise telle quelle
+// assets/js/admin-inscriptions.js (mêmes id/classes : #bulk-form, #bulk-action, #bulk-select-all,
+// #bulk-count, #bulk-ids-container, .insc-select, [data-bulk-action]).
+// onRequestPost ci-dessous (action=generate-link) gère en plus la génération du lien pour UNE seule
+// fiche sans envoyer d'e-mail, affiché/copiable directement dans une ligne (voir linkBlock) — c'est
+// la seule page où ce lien apparaît : à la demande explicite de l'utilisateur, il n'est plus affiché
+// ni généré depuis la fiche d'édition /admin/inscriptions/<id>.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
 import { getCategoriesConfig } from '../_shared/settings-kv.js';
 
 function statusBadge(row) {
-  if (row.dejaReinscrit) return `<span class="insc-dossier-badge insc-dossier-ok">✓ Réinscrit</span>`;
-  if (row.reinscription_token) return `<span class="insc-dossier-badge" style="background:var(--cream-200);color:var(--maroon-950);">Lien envoyé, en attente</span>`;
-  return `<span class="insc-dossier-badge insc-dossier-missing">Pas encore contacté</span>`;
+  // Un retardataire archivé (voir "Fin de saison" dans /admin/categories) reste actionnable ici même
+  // après archivage — ce badge le signale, plutôt que de le faire disparaître silencieusement.
+  const archiveBadge = row.archived_at ? `<span class="insc-dossier-badge" style="background:var(--cream-200);color:var(--color-text-muted);">Archivé</span>` : '';
+  if (row.dejaReinscrit) return `${archiveBadge}<span class="insc-dossier-badge insc-dossier-ok">✓ Réinscrit</span>`;
+  if (row.reinscription_token) return `${archiveBadge}<span class="insc-dossier-badge" style="background:var(--cream-200);color:var(--maroon-950);">Lien envoyé, en attente</span>`;
+  return `${archiveBadge}<span class="insc-dossier-badge insc-dossier-missing">Pas encore contacté</span>`;
 }
 
-function row(r) {
+// Lien affiché/généré ici uniquement — pas sur la fiche d'édition /admin/inscriptions/<id>, à la
+// demande explicite de l'utilisateur ("tout ce fera dans la section réinscription").
+function linkBlock(r, siteUrl, returnTo) {
+  if (r.dejaReinscrit) return '';
+  if (r.reinscription_token) {
+    return `<input type="text" readonly value="${escapeHtml(`${siteUrl}/reinscription/${r.reinscription_token}`)}" style="width:100%;padding:6px 8px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.76rem;margin-top:6px;" aria-label="Lien de réinscription de ${escapeHtml(r.enfant_prenom)} (triple-cliquer pour sélectionner)">`;
+  }
+  return `<form method="POST" style="margin-top:6px;">
+    <input type="hidden" name="action" value="generate-link">
+    <input type="hidden" name="id" value="${r.id}">
+    <input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}">
+    <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Générer le lien (sans envoyer d'e-mail)</button>
+  </form>`;
+}
+
+function row(r, siteUrl, returnTo) {
   const name = `${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}`;
   return `<div class="reinsc-row">
     <label class="reinsc-row-check">
@@ -29,6 +52,7 @@ function row(r) {
       <strong>${name}</strong>
       <span class="reinsc-row-sub">${escapeHtml(r.categorie)} · né(e) le ${escapeHtml(r.naissance)} · saison ${escapeHtml(r.saison)}</span>
       <span class="reinsc-row-sub">${escapeHtml(r.parent_prenom)} ${escapeHtml(r.parent_nom)} · <a href="mailto:${escapeHtml(r.email)}">${escapeHtml(r.email)}</a>${r.telephone ? ` · ${escapeHtml(r.telephone)}` : ''}</span>
+      ${linkBlock(r, siteUrl, returnTo)}
     </div>
     <div class="reinsc-row-actions">
       ${statusBadge(r)}
@@ -37,7 +61,7 @@ function row(r) {
   </div>`;
 }
 
-function page({ rows, saison, q, bulkOk, total }) {
+function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteReinscription }) {
   const reinscritCount = rows.filter((r) => r.dejaReinscrit).length;
   const contacteCount = rows.filter((r) => !r.dejaReinscrit && r.reinscription_token).length;
   const nonContacteCount = rows.filter((r) => !r.dejaReinscrit && !r.reinscription_token).length;
@@ -101,8 +125,14 @@ function page({ rows, saison, q, bulkOk, total }) {
         ${q ? `<a href="/admin/reinscription" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Réinitialiser</a>` : ''}
       </form>
 
+      ${
+        dateLimiteReinscription
+          ? `<p style="margin-bottom:12px;font-size:.85rem;color:var(--color-text-muted);">Date limite de réinscription prioritaire : <strong style="color:var(--maroon-950);">${escapeHtml(dateLimiteReinscription.split('-').reverse().join('/'))}</strong> (<a href="/admin/categories">modifier</a>). Le bouton « Envoyer un rappel » ci-dessous permet de relancer les familles déjà contactées qui n'ont pas encore validé, autant de fois que nécessaire avant cette date.</p>`
+          : `<p style="margin-bottom:12px;font-size:.85rem;color:var(--color-text-muted);">Aucune date limite réglée — <a href="/admin/categories">en définir une</a> permet d'informer les familles et de savoir quand rouvrir au public.</p>`
+      }
+
       <form method="POST" action="/admin/inscriptions" id="bulk-form" class="insc-bulk-bar">
-        <input type="hidden" name="action" value="bulk-reinscription">
+        <input type="hidden" name="action" id="bulk-action" value="">
         <input type="hidden" name="redirectTo" value="/admin/reinscription${q ? `?q=${encodeURIComponent(q)}` : ''}">
         <div id="bulk-ids-container"></div>
         <label class="insc-bulk-select-all">
@@ -111,11 +141,12 @@ function page({ rows, saison, q, bulkOk, total }) {
         </label>
         <span id="bulk-count" class="insc-bulk-count">0 sélectionné(s)</span>
         <button type="button" class="btn btn-sm" data-bulk-action="bulk-reinscription" data-confirm="Envoyer aux profils sélectionnés leur lien personnel de réinscription prioritaire ?" style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer le lien de réinscription</button>
+        <button type="button" class="btn btn-sm" data-bulk-action="bulk-reinscription-rappel" data-confirm="Envoyer un rappel aux profils sélectionnés déjà contactés mais pas encore réinscrits ? (ignoré pour les profils jamais contactés)" style="background:var(--cream-200);color:var(--maroon-950);" disabled>Envoyer un rappel</button>
       </form>
 
       <div class="reinsc-rows">${
         rows.length
-          ? rows.map(row).join('')
+          ? rows.map((r) => row(r, siteUrl, returnTo)).join('')
           : `<p>${
               q
                 ? 'Aucun adhérent de la saison précédente ne correspond à cette recherche.'
@@ -138,7 +169,7 @@ export async function onRequestGet({ request, env }) {
 
   await ensureInscriptionsTable(env.DB);
   const { results } = await env.DB.prepare('SELECT * FROM inscriptions').all();
-  const { saison } = await getCategoriesConfig(env);
+  const { saison, dateLimiteReinscription } = await getCategoriesConfig(env);
 
   // Une fiche de la saison en cours partageant la même dedup_key qu'une fiche de la saison
   // précédente = cette famille s'est déjà réinscrite (voir _shared/inscriptions-db.js,
@@ -160,7 +191,37 @@ export async function onRequestGet({ request, env }) {
 
   rows.sort((a, b) => a.enfant_nom.localeCompare(b.enfant_nom, 'fr') || a.enfant_prenom.localeCompare(b.enfant_prenom, 'fr'));
 
-  return new Response(page({ rows, saison, q, bulkOk: searchParams.get('bulkOk'), total }), {
+  const siteUrl = new URL(request.url).origin;
+  const returnTo = `/admin/reinscription${q ? `?q=${encodeURIComponent(q)}` : ''}`;
+
+  return new Response(page({ rows, saison, q, bulkOk: searchParams.get('bulkOk'), total, siteUrl, returnTo, dateLimiteReinscription }), {
     headers: { 'Content-Type': 'text/html;charset=UTF-8' },
   });
+}
+
+// Génère (si besoin) le lien de réinscription d'une seule fiche, sans envoyer d'e-mail — pour le cas
+// où l'admin veut distribuer le lien à la main (SMS, message perso) plutôt que via l'e-mail
+// automatique. returnTo (posté par linkBlock ci-dessus) ramène sur la recherche/page en cours ;
+// jamais une redirection ouverte (allowlist identique à celle de bulk-reinscription dans
+// functions/admin/inscriptions.js).
+export async function onRequestPost({ request, env }) {
+  if (!(await isAuthed(request, env))) {
+    return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  const form = await request.formData();
+  const returnTo = /^\/admin\/reinscription(\?[^\s]*)?$/.test(form.get('returnTo') || '') ? form.get('returnTo') : '/admin/reinscription';
+
+  if (form.get('action') === 'generate-link') {
+    const id = Number(form.get('id'));
+    if (id) {
+      await ensureInscriptionsTable(env.DB);
+      const row = await env.DB.prepare('SELECT reinscription_token FROM inscriptions WHERE id = ?').bind(id).first();
+      if (row && !row.reinscription_token) {
+        await env.DB.prepare('UPDATE inscriptions SET reinscription_token = ? WHERE id = ?').bind(crypto.randomUUID(), id).run();
+      }
+    }
+  }
+
+  return new Response('', { status: 302, headers: { Location: returnTo } });
 }

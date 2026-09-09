@@ -154,9 +154,9 @@ function page({ config, error, ok, archivedMessage }) {
         <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
       </form>
 
-      <h2 style="font-size:1rem;margin-bottom:8px;">Réinscription prioritaire</h2>
-      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Les familles déjà inscrites peuvent recevoir un lien personnel de réinscription depuis <a href="/admin/inscriptions">/admin/inscriptions</a> (sélection multiple → « Envoyer le lien de réinscription »), avant l'ouverture au public. Tant que la date ci-dessous n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir les inscriptions » dans /admin/inscriptions, sauf pour rouvrir plus tôt.</p>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:32px;">
+      <h2 style="font-size:1rem;margin-bottom:8px;">Réinscription prioritaire — étape suivante</h2>
+      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la nouvelle saison et la date limite enregistrées ci-dessous, tout le pilotage de la campagne (liste des familles à contacter, envoi du lien, rappels) se fait sur <a href="/admin/reinscription"><strong>/admin/reinscription</strong></a> — pas ici. Tant que la date limite n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir les inscriptions » dans /admin/inscriptions, sauf pour rouvrir plus tôt.</p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
         <form method="POST">
           <input type="hidden" name="action" value="save-deadline">
           <div class="form-field" style="margin-bottom:12px;">
@@ -175,9 +175,10 @@ function page({ config, error, ok, archivedMessage }) {
             : ''
         }
       </div>
+      <p style="margin-bottom:32px;"><a href="/admin/reinscription" class="btn btn-dark btn-sm">Aller à la réinscription →</a></p>
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Fin de saison</h2>
-      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la saison ${escapeHtml(config.saison)} enregistrée ci-dessus comme saison en cours, cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
+      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Dernière étape, une fois la campagne de réinscription bien avancée sur <a href="/admin/reinscription">/admin/reinscription</a> (pas besoin d'attendre que 100% aient répondu — les retardataires restent visibles là-bas même après archivage) : cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente de « ${escapeHtml(config.saison)} » — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
       <form method="POST" class="cat-confirm-form" style="margin-bottom:32px;">
         <input type="hidden" name="action" value="archive-previous-seasons">
         <button type="submit" class="btn btn-dark btn-sm" data-confirm="Archiver toutes les inscriptions actives d'une saison autre que ${escapeHtml(config.saison)} ? Elles resteront consultables et récupérables depuis la Corbeille.">Archiver les inscriptions des saisons précédentes</button>

@@ -577,15 +577,20 @@ export async function onRequestPost({ request, env }) {
 
   // bulk-reinscription : génère (si besoin) un reinscription_token par fiche sélectionnée puis
   // envoie à chaque famille son lien personnel /reinscription/<token> (functions/reinscription/
-  // [token].js) — voir sendReinscriptionEmail. Branche séparée du bloc précédent (pas de SELECT *
-  // ni ids déjà résolus à ce stade), calquée sur son début. Lancée depuis /admin/inscriptions
-  // (sélection libre) ou /admin/reinscription (déjà scopée aux adhérents de la saison précédente) —
-  // redirectTo ramène sur la page d'où l'action a été lancée plutôt que de toujours renvoyer vers
-  // /admin/inscriptions, jamais une redirection ouverte (allowlist ci-dessous).
-  if (action === 'bulk-reinscription') {
+  // [token].js) — voir sendReinscriptionEmail. bulk-reinscription-rappel : même envoi, mais wording
+  // de relance (isRappel) et réservé aux familles déjà contactées une première fois (un rappel n'a
+  // de sens que si un lien existe déjà) — déclenché à la main autant de fois que nécessaire avant la
+  // date limite (/admin/categories) depuis /admin/reinscription, pas d'automatisation programmée
+  // (pas de Cron Trigger pour ce projet, voir la discussion avec l'utilisateur). Branche séparée du
+  // bloc précédent (pas de SELECT * ni ids déjà résolus à ce stade), calquée sur son début. Lancée
+  // depuis /admin/inscriptions (sélection libre) ou /admin/reinscription (déjà scopée aux adhérents
+  // de la saison précédente) — redirectTo ramène sur la page d'où l'action a été lancée plutôt que
+  // de toujours renvoyer vers /admin/inscriptions, jamais une redirection ouverte (allowlist ci-dessous).
+  if (action === 'bulk-reinscription' || action === 'bulk-reinscription-rappel') {
     if (!(await isAuthed(request, env))) {
       return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     }
+    const isRappel = action === 'bulk-reinscription-rappel';
     await ensureInscriptionsTable(env.DB);
     const ids = form.getAll('ids').map(Number).filter(Boolean);
     const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
@@ -616,18 +621,25 @@ export async function onRequestPost({ request, env }) {
         skipped++;
         continue;
       }
+      // Un rappel n'a de sens que pour une famille déjà contactée une première fois — sans lien
+      // existant, rien à rappeler (elle recevrait le même message qu'un premier envoi, sous un sujet
+      // "Rappel" trompeur).
+      if (isRappel && !row.reinscription_token) {
+        skipped++;
+        continue;
+      }
       if (!row.reinscription_token) {
         const token = crypto.randomUUID();
         await env.DB.prepare('UPDATE inscriptions SET reinscription_token = ? WHERE id = ?').bind(token, row.id).run();
         row = { ...row, reinscription_token: token };
       }
-      const ok = await sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription);
+      const ok = await sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription, isRappel);
       if (ok) sent++;
       else failed++;
     }
-    const parts = [`${sent} lien${sent > 1 ? 's' : ''} de réinscription envoyé${sent > 1 ? 's' : ''}`];
-    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (déjà réinscrit${skipped > 1 ? 's' : ''})`);
-    if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''} (BREVO_API_KEY manquante ou envoi refusé — le lien reste consultable sur la fiche « Modifier »)`);
+    const parts = [`${sent} ${isRappel ? 'rappel' : 'lien de réinscription'}${sent > 1 ? 's' : ''} envoyé${sent > 1 ? 's' : ''}`];
+    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (${isRappel ? 'déjà réinscrit ou jamais contacté' : 'déjà réinscrit'}${skipped > 1 ? 's' : ''})`);
+    if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''} (BREVO_API_KEY manquante ou envoi refusé — le lien reste consultable sur /admin/reinscription)`);
     const msg = encodeURIComponent(`${parts.join(', ')}.`);
     return new Response('', { status: 302, headers: { Location: withParam(redirectTo, `bulkOk=${msg}`) } });
   }

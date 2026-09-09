@@ -356,22 +356,30 @@ export async function sendReminderEmail(env, row, siteUrl) {
   }
 }
 
-// Réinscription prioritaire, envoyée depuis /admin/inscriptions (sélection multiple → "Envoyer le
-// lien de réinscription", action=bulk-reinscription) sur les fiches de la saison qui se termine —
-// donne à chaque famille déjà inscrite un lien personnel (/reinscription/<token>, voir
-// functions/reinscription/[token].js) pour réserver la place de son enfant avant l'ouverture au
-// public. Reprend la même structure visuelle que buildReminderEmail() ci-dessus (dupliquée, voir la
-// note en tête de fichier sur le choix de ne pas factoriser ces templates).
-function buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription) {
+// Réinscription prioritaire, envoyée depuis /admin/reinscription (sélection multiple → "Envoyer le
+// lien de réinscription", action=bulk-reinscription sur functions/admin/inscriptions.js) sur les
+// fiches de la saison qui se termine — donne à chaque famille déjà inscrite un lien personnel
+// (/reinscription/<token>, voir functions/reinscription/[token].js) pour réserver la place de son
+// enfant avant l'ouverture au public. Reprend la même structure visuelle que buildReminderEmail()
+// ci-dessus (dupliquée, voir la note en tête de fichier sur le choix de ne pas factoriser ces
+// templates). isRappel (bool) : même contenu, wording adapté pour une relance envoyée à une famille
+// déjà contactée mais qui n'a pas encore réservé sa place (action=bulk-reinscription-rappel,
+// déclenchée à la main par un responsable du club depuis /admin/reinscription, autant de fois que
+// nécessaire avant la date limite — pas d'automatisation programmée, voir CLAUDE.md/la discussion
+// avec l'utilisateur sur les limites d'infra Cron Trigger pour ce projet).
+function buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription, isRappel) {
   const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
   const lienUrl = `${siteUrl}/reinscription/${row.reinscription_token}`;
   const deadlinePhrase = dateLimiteReinscription
     ? ` avant le ${escapeHtml(dateLimiteReinscription.split('-').reverse().join('/'))}`
     : '';
+  const intro = isRappel
+    ? `Petit rappel : la place de ${nomEnfant} au Saint-Gratien FC est toujours réservée en priorité pour la saison prochaine, mais nous n'avons pas encore reçu votre confirmation.`
+    : `En tant que famille déjà inscrite, ${nomEnfant} bénéficie d'une place prioritaire pour la saison prochaine au Saint-Gratien FC — avant l'ouverture des inscriptions au public.`;
 
   const text = `Bonjour ${row.parent_prenom},
 
-En tant que famille déjà inscrite, ${nomEnfant} bénéficie d'une place prioritaire pour la saison prochaine au Saint-Gratien FC — avant l'ouverture des inscriptions au public.
+${intro}
 
 Pour réserver sa place${deadlinePhrase}, cliquez sur ce lien personnel (les informations de l'an dernier sont déjà pré-remplies, il ne reste qu'à les vérifier) :
 ${lienUrl}
@@ -407,7 +415,11 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
           <tr>
             <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(row.parent_prenom)},</p>
-              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">En tant que famille déjà inscrite, <strong>${escapeHtml(nomEnfant)}</strong> bénéficie d'une place prioritaire pour la saison prochaine — avant l'ouverture des inscriptions au public.</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">${
+                isRappel
+                  ? `Petit rappel : la place de <strong>${escapeHtml(nomEnfant)}</strong> est toujours réservée en priorité pour la saison prochaine, mais nous n'avons pas encore reçu votre confirmation.`
+                  : `En tant que famille déjà inscrite, <strong>${escapeHtml(nomEnfant)}</strong> bénéficie d'une place prioritaire pour la saison prochaine — avant l'ouverture des inscriptions au public.`
+              }</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;">
                 <tr>
                   <td style="padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${INK_900};">
@@ -418,7 +430,7 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 28px auto;">
                 <tr>
                   <td align="center" style="background-color:${GOLD_500};border-radius:8px;">
-                    <a href="${lienUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Réserver la place de ${escapeHtml(row.enfant_prenom)}</a>
+                    <a href="${lienUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">${isRappel ? 'Confirmer' : 'Réserver'} la place de ${escapeHtml(row.enfant_prenom)}</a>
                   </td>
                 </tr>
               </table>
@@ -439,19 +451,23 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 </body>
 </html>`;
 
-  return { subject: `Réinscription prioritaire — ${nomEnfant} — Saint-Gratien FC`, html, text };
+  return {
+    subject: isRappel ? `Rappel — réinscription prioritaire de ${nomEnfant} — Saint-Gratien FC` : `Réinscription prioritaire — ${nomEnfant} — Saint-Gratien FC`,
+    html,
+    text,
+  };
 }
 
 // Contrairement à sendConfirmationEmail/sendAdminNotification (best-effort, fire-and-forget via
-// waitUntil), l'appelant (functions/admin/inscriptions.js, action=bulk-reinscription) a besoin du
-// résultat pour compter succès/échecs et l'afficher dans la bannière — donc `await`ée, retourne
-// true/false comme sendReminderEmail. row.reinscription_token doit déjà être généré et enregistré
-// avant cet appel (voir onRequestPost dans functions/admin/inscriptions.js).
-export async function sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription) {
+// waitUntil), l'appelant (functions/admin/inscriptions.js, action=bulk-reinscription(-rappel)) a
+// besoin du résultat pour compter succès/échecs et l'afficher dans la bannière — donc `await`ée,
+// retourne true/false comme sendReminderEmail. row.reinscription_token doit déjà être généré et
+// enregistré avant cet appel (voir onRequestPost dans functions/admin/inscriptions.js).
+export async function sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription, isRappel = false) {
   if (!env.BREVO_API_KEY) return false;
   if (!row.reinscription_token) return false;
 
-  const { subject, html, text } = buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription);
+  const { subject, html, text } = buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription, isRappel);
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
     to: [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }],
