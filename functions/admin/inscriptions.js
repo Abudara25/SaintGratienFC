@@ -258,6 +258,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   .insc-status-closed{background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
+  <p style="margin-bottom:12px;"><a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a></p>
   <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
   <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
     <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
