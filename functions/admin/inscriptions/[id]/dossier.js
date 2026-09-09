@@ -44,7 +44,7 @@ export async function onRequestGet({ request, env, params }) {
   });
 }
 
-export async function onRequestPost({ request, env, params }) {
+export async function onRequestPost({ request, env, params, waitUntil }) {
   if (!isAuthed(request, env)) {
     return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
@@ -85,8 +85,12 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   const key = `dossiers/${row.upload_token || `admin-${id}`}`;
+  let buffer;
   try {
-    await env.DOSSIERS.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
+    // arrayBuffer() (pas file.stream(), lisible une seule fois) : le même buffer sert aussi à la
+    // copie de sauvegarde ci-dessous — voir functions/depot/[token].js pour le contexte complet.
+    buffer = await file.arrayBuffer();
+    await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
     await env.DB.prepare(
       "UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime('now') WHERE id = ?"
     )
@@ -94,6 +98,10 @@ export async function onRequestPost({ request, env, params }) {
       .run();
   } catch {
     return withError("Échec de l'envoi, réessayez.");
+  }
+
+  if (env.DOSSIERS_BACKUP) {
+    waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
   }
 
   return new Response('', { status: 302, headers: { Location: `${redirectTo}${redirectTo.includes('?') ? '&' : '?'}dossierOk=1` } });

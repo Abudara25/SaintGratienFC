@@ -136,7 +136,7 @@ export async function onRequestGet({ request, env, params }) {
   return new Response(page({ siteUrl, inscription, success }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
-export async function onRequestPost({ request, env, params }) {
+export async function onRequestPost({ request, env, params, waitUntil }) {
   const inscription = await loadInscription(env, params.token);
   if (!inscription) return notFound(request, env);
 
@@ -167,14 +167,25 @@ export async function onRequestPost({ request, env, params }) {
   }
 
   const key = `dossiers/${params.token}`;
+  let buffer;
   try {
-    await env.DOSSIERS.put(key, file.stream(), { httpMetadata: { contentType: file.type } });
+    // arrayBuffer() plutôt que file.stream() : un stream ne se lit qu'une fois, et ce même
+    // buffer sert aussi à la copie de sauvegarde ci-dessous (bucket R2 "DOSSIERS_BACKUP", voir
+    // CLAUDE.md — aucun mécanisme de backup natif pour R2, contrairement à D1/Time Travel).
+    buffer = await file.arrayBuffer();
+    await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
     await ensureInscriptionsTable(env.DB);
     await env.DB.prepare('UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime(\'now\') WHERE upload_token = ?')
       .bind(key, file.type, params.token)
       .run();
   } catch {
     return renderError("Échec de l'envoi, réessayez ou écrivez-nous à contact@saintgratienfc.fr.");
+  }
+
+  // Copie de sauvegarde best-effort : ne doit jamais faire échouer le dépôt principal, qui a
+  // déjà réussi à ce stade (D1 mis à jour, réponse déjà déterminée ci-dessous).
+  if (env.DOSSIERS_BACKUP) {
+    waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
   }
 
   return new Response('', { status: 302, headers: { Location: `/depot/${params.token}?ok=1` } });
