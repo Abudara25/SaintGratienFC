@@ -7,13 +7,10 @@ document.querySelectorAll('.insc-filters select').forEach((select) => {
   select.addEventListener('change', () => select.form.submit());
 });
 
-document.querySelectorAll('.insc-delete-form').forEach((form) => {
-  form.addEventListener('submit', (e) => {
-    if (!confirm('Supprimer cette inscription ?')) e.preventDefault();
-  });
-});
-
-document.querySelectorAll('.insc-toggle-paye-form').forEach((form) => {
+// Bouton "Archiver"/"Supprimer définitivement"/"Marquer payé" d'une fiche (voir actionsHtml dans
+// functions/admin/inscriptions.js) : le message vient de l'attribut data-confirm du bouton plutôt
+// que d'un texte fixe ici, chaque action ayant un libellé différent (et une gravité différente).
+document.querySelectorAll('.insc-confirm-form').forEach((form) => {
   form.addEventListener('submit', (e) => {
     const message = form.querySelector('button[type=submit]')?.dataset.confirm || 'Confirmer ?';
     if (!confirm(message)) e.preventDefault();

@@ -79,6 +79,7 @@ function parseFilters(searchParams) {
     paiement: searchParams.get('paiement') || '',
     dossier: searchParams.get('dossier') || '',
     paye: searchParams.get('paye') || '',
+    view: searchParams.get('view') === 'archive' ? 'archive' : 'active',
     sort: searchParams.get('sort') || 'date_desc',
   };
 }
@@ -106,35 +107,59 @@ function actionsHtml(r, siteUrl) {
     droitImage: r.droit_image,
   };
   const depotUrl = r.upload_token ? `${siteUrl}/depot/${r.upload_token}` : '';
+  const name = `${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}`;
 
-  return `<button type="button" class="btn btn-sm insc-pdf-btn" data-pdf='${escapeHtml(JSON.stringify(pdfData))}' data-depot-url="${escapeHtml(depotUrl)}">Télécharger le PDF</button>
-    <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
-    <form method="POST" action="/admin/inscriptions" class="insc-toggle-paye-form">
+  const pdfBtn = `<button type="button" class="btn btn-sm insc-pdf-btn" data-pdf='${escapeHtml(JSON.stringify(pdfData))}' data-depot-url="${escapeHtml(depotUrl)}">Télécharger le PDF</button>`;
+  const editLink = `<a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>`;
+
+  // Profil archivé (corbeille) : restaurer (sans confirmation, action réversible sans risque) ou
+  // supprimer définitivement (confirmation renforcée — irréversible, contrairement à "Archiver").
+  if (r.archived_at) {
+    return `${pdfBtn}
+    ${editLink}
+    <form method="POST" action="/admin/inscriptions">
+      <input type="hidden" name="action" value="restore">
+      <input type="hidden" name="id" value="${r.id}">
+      <input type="hidden" name="view" value="archive">
+      <button type="submit" class="btn btn-sm" style="background:var(--gold-500);color:var(--maroon-950);">Restaurer</button>
+    </form>
+    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form insc-full-form">
+      <input type="hidden" name="action" value="delete">
+      <input type="hidden" name="id" value="${r.id}">
+      <input type="hidden" name="view" value="archive">
+      <button type="submit" class="btn btn-sm" data-confirm="Supprimer définitivement ${name} ? Cette action est irréversible, contrairement à l'archivage." style="background:var(--color-error, #b3261e);color:#fff;">Supprimer définitivement</button>
+    </form>`;
+  }
+
+  return `${pdfBtn}
+    ${editLink}
+    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form">
       <input type="hidden" name="action" value="toggle-paye">
       <input type="hidden" name="id" value="${r.id}">
       <button type="submit" class="btn btn-sm" data-confirm="${
-        r.paye
-          ? `Marquer ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)} comme NON payé ?`
-          : `Confirmer que ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)} a payé ?`
+        r.paye ? `Marquer ${name} comme NON payé ?` : `Confirmer que ${name} a payé ?`
       }" style="background:${r.paye ? 'var(--cream-200)' : 'var(--gold-500)'};color:var(--maroon-950);">${
         r.paye ? 'Marquer non payé' : 'Marquer payé'
       }</button>
     </form>
-    <form method="POST" action="/admin/inscriptions" class="insc-delete-form">
-      <input type="hidden" name="action" value="delete">
+    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form">
+      <input type="hidden" name="action" value="archive">
       <input type="hidden" name="id" value="${r.id}">
-      <button type="submit" class="btn btn-sm" style="background:var(--color-error, #b3261e);color:#fff;">Supprimer</button>
+      <button type="submit" class="btn btn-sm" data-confirm="Archiver ${name} ? Le profil sera déplacé dans la corbeille, récupérable à tout moment." style="background:var(--cream-200);color:var(--maroon-950);">Archiver</button>
     </form>`;
 }
 
-// options : { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus,
-// siteUrl } — years = années de naissance distinctes présentes en base (calculées sur l'ensemble
-// non filtré), total = nombre total d'inscriptions non filtrées, returnTo = chemin+query courant
-// (pour revenir ici après un dépôt de dossier, filtres compris — voir safeRedirect dans
-// [id]/dossier.js), inscriptionStatus = 'open'|'closed' (KV "saintgratienfc_config", voir
-// functions/admin/inscription-status.js et functions/api/inscription-status.js), siteUrl = origine
-// (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml).
-function tablePage(rows, { filters, years, total, returnTo, dossierError, dossierOk, inscriptionStatus, siteUrl }) {
+// options : { filters, years, total, archivedCount, returnTo, dossierError, dossierOk,
+// inscriptionStatus, siteUrl } — years = années de naissance distinctes présentes en base
+// (calculées sur l'ensemble non filtré), total = nombre d'inscriptions de la vue courante
+// (active ou archivée, filters.view) avant filtres additionnels, archivedCount = nombre total de
+// profils archivés (badge du lien "Corbeille", affiché seulement en vue active), returnTo =
+// chemin+query courant (pour revenir ici après un dépôt de dossier, filtres compris — voir
+// safeRedirect dans [id]/dossier.js), inscriptionStatus = 'open'|'closed' (KV
+// "saintgratienfc_config", voir functions/admin/inscription-status.js et
+// functions/api/inscription-status.js), siteUrl = origine (pour le lien de dépôt imprimé dans le
+// PDF régénéré, voir actionsHtml).
+function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, inscriptionStatus, siteUrl }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -143,10 +168,13 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   if (filters.paiement) qs.set('paiement', filters.paiement);
   if (filters.dossier) qs.set('dossier', filters.dossier);
   if (filters.paye) qs.set('paye', filters.paye);
+  if (filters.view === 'archive') qs.set('view', 'archive');
   const csvHref = `/admin/inscriptions?format=csv${qs.toString() ? `&${qs.toString()}` : ''}`;
   const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement || filters.dossier || filters.paye);
+  const resetHref = `/admin/inscriptions${filters.view === 'archive' ? '?view=archive' : ''}`;
 
   const filterBar = `<form method="GET" class="insc-filters">
+    ${filters.view === 'archive' ? '<input type="hidden" name="view" value="archive">' : ''}
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
     <select name="categorie">
       <option value="">Toutes catégories</option>
@@ -182,24 +210,28 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
       <option value="naissance_desc" ${sel(filters.sort, 'naissance_desc')}>Naissance : plus jeune d'abord</option>
     </select>
     <button type="submit" class="btn btn-dark btn-sm">Filtrer</button>
-    ${hasActiveFilters ? '<a href="/admin/inscriptions" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Réinitialiser</a>' : ''}
+    ${hasActiveFilters ? `<a href="${resetHref}" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Réinitialiser</a>` : ''}
   </form>`;
 
   const cards = rows
     .map(
       (r) => `<details class="insc-card">
         <summary class="insc-card-head">
-          <span class="insc-card-head-main">
-            <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
-            <span class="insc-card-date">${escapeHtml(r.created_at)}</span>
+          <span class="insc-card-head-top">
+            <span class="insc-card-head-main">
+              <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
+              <span class="insc-card-date">${r.archived_at ? `Archivé le ${escapeHtml(r.archived_at)}` : escapeHtml(r.created_at)}</span>
+            </span>
+            <span class="insc-card-chevron" aria-hidden="true">▸</span>
           </span>
-          <span class="insc-dossier-badge ${r.dossier_uploaded_at ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
-            r.dossier_uploaded_at ? '✓ Dossier' : 'Dossier manquant'
-          }</span>
-          <span class="insc-dossier-badge ${r.paye ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
-            r.paye ? '✓ Payé' : 'Non payé'
-          }</span>
-          <span class="insc-card-chevron" aria-hidden="true">▸</span>
+          <span class="insc-card-badges">
+            <span class="insc-dossier-badge ${r.dossier_uploaded_at ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
+              r.dossier_uploaded_at ? '✓ Dossier' : 'Dossier manquant'
+            }</span>
+            <span class="insc-dossier-badge ${r.paye ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
+              r.paye ? '✓ Payé' : 'Non payé'
+            }</span>
+          </span>
         </summary>
         <dl class="insc-card-fields">
           <div><dt>Naissance</dt><dd>${escapeHtml(r.naissance)}</dd></div>
@@ -255,13 +287,19 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
      grand cadre blanc vide sous les cartes restées repliées. */
   .insc-cards{display:grid;grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));gap:16px;align-items:start;}
   .insc-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;}
-  .insc-card-head{display:flex;align-items:center;gap:10px;font-size:1.02rem;list-style:none;cursor:pointer;padding:2px 0;min-height:44px;}
+  /* Ligne "nom + chevron" et ligne des badges séparées (flex-direction:column) plutôt qu'une seule
+     rangée : avec 2+ badges (dossier, payé…), les mettre côte à côte avec le nom écrasait ce
+     dernier sur mobile (une seule colonne de carte dès 300px de large). Les badges wrappent
+     librement sous le nom, qui garde toute la largeur disponible sur sa propre ligne. */
+  .insc-card-head{display:flex;flex-direction:column;gap:8px;font-size:1.02rem;list-style:none;cursor:pointer;padding:2px 0;}
   .insc-card-head::-webkit-details-marker{display:none;}
   .insc-card[open] .insc-card-head{margin-bottom:10px;}
+  .insc-card-head-top{display:flex;align-items:center;gap:10px;min-height:44px;}
   .insc-card-head-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
-  .insc-card-date{font-size:.75rem;color:var(--color-text-muted);white-space:nowrap;}
+  .insc-card-date{font-size:.75rem;color:var(--color-text-muted);}
   .insc-card-chevron{color:var(--color-text-muted);font-size:.8rem;transition:transform .15s ease;flex-shrink:0;}
   .insc-card[open] .insc-card-chevron{transform:rotate(90deg);}
+  .insc-card-badges{display:flex;flex-wrap:wrap;gap:6px;}
   .insc-dossier-badge{font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
   .insc-dossier-ok{background:var(--gold-100);color:var(--maroon-900);}
   .insc-dossier-missing{background:var(--cream-200);color:var(--color-text-muted);}
@@ -275,6 +313,10 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   .insc-card-actions form{flex:1;margin:0;min-width:120px;}
   .insc-card-actions .btn{flex:1;width:100%;min-height:44px;min-width:120px;}
   .insc-card-actions .insc-pdf-btn{flex-basis:100%;background:var(--cream-200);color:var(--maroon-950);}
+  /* "Supprimer définitivement" est trop long pour partager sa rangée avec un autre bouton min-width
+     120px sans que le texte ne déborde (nowrap hérité de .btn) — pleine largeur, comme le bouton
+     PDF, ce qui lui donne aussi un peu plus de poids visuel avant un clic aussi irréversible. */
+  .insc-card-actions .insc-full-form{flex-basis:100%;}
   .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
   .insc-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
   .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
@@ -285,13 +327,20 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
 </style>
 </head><body>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-    <a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+      <a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a>
+      ${
+        filters.view === 'archive'
+          ? '<a href="/admin/inscriptions">&larr; Retour aux inscriptions actives</a>'
+          : `<a href="/admin/inscriptions?view=archive">Corbeille (${archivedCount})</a>`
+      }
+    </div>
     <div style="display:flex;gap:16px;align-items:center;">
       <a href="/admin/parametres">Paramètres</a>
       ${LOGOUT_LINK}
     </div>
   </div>
-  <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
+  <h1 style="font-size:1.3rem;">${filters.view === 'archive' ? 'Corbeille' : 'Inscriptions'} (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
   <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
     <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
     <form method="POST" action="/admin/inscription-status">
@@ -305,10 +354,19 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   ${dossierOk ? '<p class="insc-banner insc-banner-ok">Dossier enregistré.</p>' : ''}
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
-  <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
+  <div class="insc-cards">${
+    cards ||
+    `<p>${
+      hasActiveFilters
+        ? 'Aucune inscription ne correspond à ces filtres.'
+        : filters.view === 'archive'
+          ? 'La corbeille est vide.'
+          : 'Aucune inscription pour le moment.'
+    }</p>`
+  }</div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909b"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260909c"></script>
 </body></html>`;
 }
 
@@ -322,7 +380,12 @@ export async function onRequestGet({ request, env }) {
 
   const { searchParams } = new URL(request.url);
   const filters = parseFilters(searchParams);
-  const filtered = filterAndSort(results, filters);
+  // La corbeille (filters.view === 'archive') et la liste active se partagent la même requête
+  // SELECT * ; on scope sur archived_at avant d'appliquer les autres filtres (recherche,
+  // catégorie…), pour que les deux vues restent filtrables/triables indépendamment.
+  const archivedCount = results.filter((r) => r.archived_at).length;
+  const viewRows = results.filter((r) => (filters.view === 'archive' ? r.archived_at : !r.archived_at));
+  const filtered = filterAndSort(viewRows, filters);
 
   if (searchParams.get('format') === 'csv') {
     return new Response(toCsv(filtered), {
@@ -355,7 +418,8 @@ export async function onRequestGet({ request, env }) {
     tablePage(filtered, {
       filters,
       years,
-      total: results.length,
+      total: viewRows.length,
+      archivedCount,
       returnTo,
       dossierError: searchParams.get('dossierError'),
       dossierOk: searchParams.get('dossierOk'),
@@ -366,31 +430,34 @@ export async function onRequestGet({ request, env }) {
   );
 }
 
+// Actions ponctuelles par fiche (une par bouton de actionsHtml) : delete = suppression définitive
+// (réservée à la corbeille côté UI, voir actionsHtml), toggle-paye = bascule le statut de paiement,
+// archive = sort la fiche de la liste active vers la corbeille (réversible), restore = l'inverse.
+// Le champ caché "view" (présent seulement sur les formulaires rendus en corbeille) fait revenir
+// l'admin sur la vue d'où il vient plutôt que de le sortir de la corbeille malgré lui après un
+// restore/suppression définitive.
+const ROW_ACTIONS = {
+  delete: (db, id) => db.prepare('DELETE FROM inscriptions WHERE id = ?').bind(id).run(),
+  'toggle-paye': (db, id) => db.prepare('UPDATE inscriptions SET paye = 1 - paye WHERE id = ?').bind(id).run(),
+  archive: (db, id) => db.prepare("UPDATE inscriptions SET archived_at = datetime('now') WHERE id = ?").bind(id).run(),
+  restore: (db, id) => db.prepare('UPDATE inscriptions SET archived_at = NULL WHERE id = ?').bind(id).run(),
+};
+
 export async function onRequestPost({ request, env }) {
   const form = await request.formData();
+  const action = form.get('action');
 
-  if (form.get('action') === 'delete') {
+  if (action in ROW_ACTIONS) {
     if (!(await isAuthed(request, env))) {
       return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     }
     const id = Number(form.get('id'));
     if (id) {
       await ensureInscriptionsTable(env.DB);
-      await env.DB.prepare('DELETE FROM inscriptions WHERE id = ?').bind(id).run();
+      await ROW_ACTIONS[action](env.DB, id);
     }
-    return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
-  }
-
-  if (form.get('action') === 'toggle-paye') {
-    if (!(await isAuthed(request, env))) {
-      return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
-    }
-    const id = Number(form.get('id'));
-    if (id) {
-      await ensureInscriptionsTable(env.DB);
-      await env.DB.prepare('UPDATE inscriptions SET paye = 1 - paye WHERE id = ?').bind(id).run();
-    }
-    return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
+    const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
+    return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}` } });
   }
 
   const password = form.get('password');

@@ -49,6 +49,10 @@ export async function ensureInscriptionsTable(db) {
     // confirmés automatiquement comme le serait un paiement HelloAsso). 0/1, INTEGER comme
     // autorisation/droit_image/rgpd.
     'paye INTEGER NOT NULL DEFAULT 0',
+    // 2026-09-09 : archivage ("corbeille") — sortir un profil de la liste active sans le supprimer
+    // définitivement (voir functions/admin/inscriptions.js, action=archive/restore). NULL = actif ;
+    // une date = archivé, affichée telle quelle dans la corbeille (même convention que created_at).
+    'archived_at TEXT',
   ];
   for (const column of addedColumns) {
     try {
