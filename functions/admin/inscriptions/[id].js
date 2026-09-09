@@ -34,6 +34,8 @@ function editPage(row, { error } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Modifier une inscription — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
+<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
 </head><body style="padding:16px;max-width:640px;margin:0 auto;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">

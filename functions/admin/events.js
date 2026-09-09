@@ -37,6 +37,8 @@ export async function onRequestGet({ request, env }) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Événements — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
+<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
 <style>
   body{padding:16px;max-width:900px;margin:0 auto;}
