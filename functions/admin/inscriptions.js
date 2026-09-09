@@ -170,10 +170,20 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
   if (filters.paye) qs.set('paye', filters.paye);
   if (filters.view === 'archive') qs.set('view', 'archive');
   const csvHref = `/admin/inscriptions?format=csv${qs.toString() ? `&${qs.toString()}` : ''}`;
-  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement || filters.dossier || filters.paye);
+  const activeFilterCount = [filters.q, filters.categorie, filters.annee, filters.paiement, filters.dossier, filters.paye].filter(Boolean).length;
+  const hasActiveFilters = activeFilterCount > 0;
   const resetHref = `/admin/inscriptions${filters.view === 'archive' ? '?view=archive' : ''}`;
 
-  const filterBar = `<form method="GET" class="insc-filters">
+  // <details>/<summary> (comme les cartes d'inscription, voir plus bas) plutôt qu'un bouton JS : la
+  // barre de filtres (recherche + 5 select + tri) prend beaucoup de hauteur une fois tous ses
+  // champs affichés, replier/déplier au clic aide sur mobile comme sur desktop. Ouverte par défaut
+  // seulement si des filtres sont déjà actifs, pour ne pas les cacher sans prévenir.
+  const filterBar = `<details class="insc-filters-details" ${hasActiveFilters ? 'open' : ''}>
+    <summary class="insc-filters-summary">
+      <span>Filtres${activeFilterCount ? ` (${activeFilterCount})` : ''}</span>
+      <span class="insc-card-chevron" aria-hidden="true">▸</span>
+    </summary>
+    <form method="GET" class="insc-filters">
     ${filters.view === 'archive' ? '<input type="hidden" name="view" value="archive">' : ''}
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
     <select name="categorie">
@@ -211,7 +221,8 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
     </select>
     <button type="submit" class="btn btn-dark btn-sm">Filtrer</button>
     ${hasActiveFilters ? `<a href="${resetHref}" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Réinitialiser</a>` : ''}
-  </form>`;
+    </form>
+  </details>`;
 
   const cards = rows
     .map(
@@ -270,7 +281,15 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
 <style>
   .admin-main{max-width:1400px;}
-  .insc-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center;}
+  .insc-filters-details{margin-bottom:20px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);background:var(--white);}
+  .insc-filters-summary{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;
+    padding:10px 14px;cursor:pointer;list-style:none;font-weight:600;font-size:.92rem;
+  }
+  .insc-filters-summary::-webkit-details-marker{display:none;}
+  .insc-filters-details[open] .insc-filters-summary{border-bottom:1px solid var(--cream-200);}
+  .insc-filters-details[open] .insc-filters-summary .insc-card-chevron{transform:rotate(90deg);}
+  .insc-filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px;}
   .insc-filters input[type=search],
   .insc-filters select{
     padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);
