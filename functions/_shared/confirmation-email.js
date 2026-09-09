@@ -223,3 +223,33 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
     // best-effort : un échec d'envoi ne doit jamais faire échouer l'inscription
   }
 }
+
+// Code de double vérification avant un changement de mot de passe admin (voir
+// functions/admin/parametres.js et _shared/settings-kv.js). Contrairement aux e-mails ci-dessus,
+// un échec d'envoi ici DOIT bloquer le changement — sans lui, personne ne serait informé qu'un
+// mot de passe a été modifié. L'appelant vérifie donc le retour (true/false) plutôt que d'ignorer
+// l'erreur.
+export async function sendPasswordChangeCode(env, code) {
+  if (!env.BREVO_API_KEY) return false;
+
+  const to = (await getNotificationEmail(env)).split(',').map((e) => ({ email: e.trim() })).filter((r) => r.email);
+  if (!to.length) return false;
+
+  const body = {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to,
+    subject: 'Code de confirmation — changement de mot de passe admin',
+    textContent: `Un changement de mot de passe a été demandé sur l'espace admin de saintgratienfc.fr.\n\nCode de confirmation : ${code}\n\nCe code expire dans 15 minutes. Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail — le mot de passe actuel reste inchangé tant que ce code n'a pas été saisi.`,
+  };
+
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
