@@ -13,6 +13,20 @@ const HELLOASSO_WIDGET_URLS = {
   'U8 - U9': 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2/widget',
 };
 
+// `datetime('now')` (SQLite) renvoie "YYYY-MM-DD HH:MM:SS" en UTC, sans "T" ni "Z" — il faut les
+// ajouter pour que `new Date(...)` le reconnaisse de façon fiable (voir aussi la même fonction
+// côté serveur dans functions/depot/[token].js).
+function formatDuplicateDate(sqliteDatetime) {
+  if (!sqliteDatetime) return 'récemment';
+  try {
+    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(
+      new Date(`${sqliteDatetime.replace(' ', 'T')}Z`)
+    );
+  } catch {
+    return sqliteDatetime;
+  }
+}
+
 // Saison 2026-2027 : U6-U7 = nés en 2020 ou 2021, U8-U9 = nés en 2018 ou 2019.
 const CATEGORIE_PAR_ANNEE = {
   2020: 'U6 - U7',
@@ -145,13 +159,17 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Génération…';
     let uploadToken = null;
+    let duplicateCreatedAt = null;
     try {
       const res = await fetch('/api/inscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, pdfBase64 }),
       });
-      if (res.ok) {
+      if (res.status === 409) {
+        const json = await res.json().catch(() => null);
+        if (json?.duplicate) duplicateCreatedAt = json.createdAt || '';
+      } else if (res.ok) {
         const json = await res.json();
         uploadToken = json.uploadToken || null;
       }
@@ -160,6 +178,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     submitBtn.disabled = false;
     submitBtn.textContent = submitBtnDefaultLabel;
+
+    // Anti-doublon : un enfant déjà inscrit (même nom/prénom/naissance/e-mail parent) ne
+    // régénère pas de nouvelle fiche — un parent avait soumis le même dossier 4 fois de suite par
+    // clics répétés, créant autant de lignes D1 et d'e-mails de confirmation. On s'arrête ici,
+    // sans télécharger de PDF ni afficher les étapes suivantes.
+    if (duplicateCreatedAt !== null) {
+      const duplicateEl = document.getElementById('inscription-duplicate');
+      const dateEl = document.getElementById('inscription-duplicate-date');
+      if (dateEl) dateEl.textContent = formatDuplicateDate(duplicateCreatedAt);
+      if (duplicateEl) {
+        duplicateEl.hidden = false;
+        duplicateEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+
+    // Masqué au cas où un précédent essai (autre enfant) avait affiché le message de doublon.
+    const duplicateEl = document.getElementById('inscription-duplicate');
+    if (duplicateEl) duplicateEl.hidden = true;
 
     downloadInscriptionPdf(data, uploadToken ? `${location.origin}/depot/${uploadToken}` : null);
 

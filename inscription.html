@@ -181,8 +181,19 @@
 
               <p style="font-size:.85rem;color:var(--color-text-muted);">Un questionnaire de santé (ou certificat médical) pourra vous être demandé avant le début de la saison.</p>
 
+              <p style="font-size:.85rem;color:var(--color-text-muted);"><strong style="color:var(--maroon-950);">Important :</strong> cette inscription ne sera définitive qu'une fois l'adhésion réglée et la licence de votre enfant enregistrée par le club auprès de la FFF.</p>
+
               <button type="submit" class="btn btn-primary btn-block">Télécharger mon dossier</button>
             </form>
+
+            <div id="inscription-duplicate" hidden style="margin-top:28px;">
+              <div class="card" style="background:var(--gold-100);box-shadow:none;">
+                <div class="card-body">
+                  <h3 style="margin-bottom:8px;">Dossier déjà envoyé</h3>
+                  <p style="margin-bottom:0;color:var(--color-text-muted);">Une inscription pour cet enfant a déjà été envoyée le <strong id="inscription-duplicate-date"></strong>. Consultez vos e-mails (pensez aux spams) pour retrouver le lien de dépôt du dossier signé, ou contactez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a> si besoin.</p>
+                </div>
+              </div>
+            </div>
 
             <div id="inscription-next-steps" hidden style="margin-top:28px;">
               <div class="card" style="background:var(--gold-100);box-shadow:none;">
@@ -303,6 +314,6 @@
 <script src="assets/js/main.js?v=20260909b"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="assets/js/pdf-inscription.js?v=20260905"></script>
-<script src="assets/js/inscription.js?v=20260909"></script>
+<script src="assets/js/inscription.js?v=20260909b"></script>
 </body>
 </html>

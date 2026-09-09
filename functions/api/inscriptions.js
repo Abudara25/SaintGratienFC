@@ -32,10 +32,35 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return new Response(JSON.stringify({ error: 'Date de naissance invalide' }), { status: 400 });
   }
 
+  try {
+    await ensureInscriptionsTable(env.DB);
+
+    // Anti-doublon : un même enfant (nom+prénom+naissance) déjà inscrit par le même parent
+    // (e-mail) ne recrée pas une nouvelle fiche. Ajouté après qu'un parent a soumis 4 fois de
+    // suite le même dossier (clics répétés) — chaque soumission créait une ligne D1 distincte et
+    // renvoyait un nouvel e-mail de confirmation.
+    const existing = await env.DB.prepare(
+      `SELECT upload_token, created_at FROM inscriptions
+       WHERE LOWER(TRIM(enfant_prenom)) = LOWER(?) AND LOWER(TRIM(enfant_nom)) = LOWER(?)
+         AND naissance = ? AND LOWER(TRIM(email)) = LOWER(?)
+       LIMIT 1`
+    )
+      .bind(data.enfantPrenom.trim(), data.enfantNom.trim(), data.naissance, data.email.trim())
+      .first();
+
+    if (existing) {
+      return new Response(
+        JSON.stringify({ duplicate: true, uploadToken: existing.upload_token, createdAt: existing.created_at }),
+        { status: 409, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+  } catch {
+    return new Response(JSON.stringify({ error: "Échec de la vérification" }), { status: 500 });
+  }
+
   const uploadToken = crypto.randomUUID();
 
   try {
-    await ensureInscriptionsTable(env.DB);
     await env.DB.prepare(
       `INSERT INTO inscriptions
         (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token)
