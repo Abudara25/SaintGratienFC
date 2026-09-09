@@ -4,6 +4,7 @@
 // est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, adminSidebar, getAdminPassword } from '../_shared/admin-auth.js';
+import { sendReminderEmail } from '../_shared/confirmation-email.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -149,17 +150,18 @@ function actionsHtml(r, siteUrl) {
     </form>`;
 }
 
-// options : { filters, years, total, archivedCount, returnTo, dossierError, dossierOk,
+// options : { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk,
 // inscriptionStatus, siteUrl } — years = années de naissance distinctes présentes en base
 // (calculées sur l'ensemble non filtré), total = nombre d'inscriptions de la vue courante
 // (active ou archivée, filters.view) avant filtres additionnels, archivedCount = nombre total de
 // profils archivés (badge du lien "Corbeille", affiché seulement en vue active), returnTo =
 // chemin+query courant (pour revenir ici après un dépôt de dossier, filtres compris — voir
-// safeRedirect dans [id]/dossier.js), inscriptionStatus = 'open'|'closed' (KV
+// safeRedirect dans [id]/dossier.js), bulkOk = message de résultat d'une action groupée (archiver/
+// relancer la sélection, voir onRequestPost), inscriptionStatus = 'open'|'closed' (KV
 // "saintgratienfc_config", voir functions/admin/inscription-status.js et
 // functions/api/inscription-status.js), siteUrl = origine (pour le lien de dépôt imprimé dans le
 // PDF régénéré, voir actionsHtml).
-function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, inscriptionStatus, siteUrl }) {
+function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -229,6 +231,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
       (r) => `<details class="insc-card">
         <summary class="insc-card-head">
           <span class="insc-card-head-top">
+            <input type="checkbox" class="insc-select" data-id="${r.id}" aria-label="Sélectionner ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}">
             <span class="insc-card-head-main">
               <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
               <span class="insc-card-date">${r.archived_at ? `Archivé le ${escapeHtml(r.archived_at)}` : escapeHtml(r.created_at)}</span>
@@ -335,6 +338,11 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
      120px sans que le texte ne déborde (nowrap hérité de .btn) — pleine largeur, comme le bouton
      PDF, ce qui lui donne aussi un peu plus de poids visuel avant un clic aussi irréversible. */
   .insc-card-actions .insc-full-form{flex-basis:100%;}
+  .insc-select{width:20px;height:20px;flex-shrink:0;cursor:pointer;}
+  .insc-bulk-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;margin-bottom:16px;background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.85rem;}
+  .insc-bulk-select-all{display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;}
+  .insc-bulk-count{color:var(--color-text-muted);white-space:nowrap;}
+  .insc-bulk-bar .btn[disabled]{opacity:.45;cursor:not-allowed;}
   .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
   .insc-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
   .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
@@ -366,8 +374,22 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
   </div>
   ${dossierError ? `<p class="insc-banner insc-banner-error">${escapeHtml(dossierError)}</p>` : ''}
   ${dossierOk ? '<p class="insc-banner insc-banner-ok">Dossier enregistré.</p>' : ''}
+  ${bulkOk ? `<p class="insc-banner insc-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
+  <form method="POST" action="/admin/inscriptions" id="bulk-form" class="insc-bulk-bar">
+    <input type="hidden" name="action" id="bulk-action" value="">
+    ${filters.view === 'archive' ? '<input type="hidden" name="view" value="archive">' : ''}
+    <div id="bulk-ids-container"></div>
+    <label class="insc-bulk-select-all">
+      <input type="checkbox" id="bulk-select-all">
+      Tout sélectionner
+    </label>
+    <span id="bulk-count" class="insc-bulk-count">0 sélectionné(s)</span>
+    <button type="button" class="btn btn-sm" data-bulk-action="bulk-archive" data-confirm="Archiver les profils sélectionnés ? Ils seront déplacés dans la corbeille, récupérables à tout moment." style="background:var(--cream-200);color:var(--maroon-950);" disabled>Archiver la sélection</button>
+    <button type="button" class="btn btn-sm" data-bulk-action="bulk-export" style="background:var(--cream-200);color:var(--maroon-950);" disabled>Exporter la sélection (CSV)</button>
+    <button type="button" class="btn btn-sm" data-bulk-action="bulk-reminder" data-confirm="Envoyer une relance par e-mail aux profils sélectionnés qui n'ont pas encore payé ou envoyé leur dossier ? Les profils déjà complets ne recevront rien." style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer une relance</button>
+  </form>
   <div class="insc-cards">${
     cards ||
     `<p>${
@@ -383,7 +405,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909c"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260909d"></script>
 </body></html>`;
 }
 
@@ -440,6 +462,7 @@ export async function onRequestGet({ request, env }) {
       returnTo,
       dossierError: searchParams.get('dossierError'),
       dossierOk: searchParams.get('dossierOk'),
+      bulkOk: searchParams.get('bulkOk'),
       inscriptionStatus,
       siteUrl: new URL(request.url).origin,
     }),
@@ -475,6 +498,63 @@ export async function onRequestPost({ request, env }) {
     }
     const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
     return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}` } });
+  }
+
+  // Actions groupées (sélection multiple, voir la barre #bulk-form et assets/js/admin-inscriptions.js)
+  // — ids[] vient des <input type="hidden" name="ids"> injectés par ce script juste avant l'envoi.
+  if (action === 'bulk-archive' || action === 'bulk-export' || action === 'bulk-reminder') {
+    if (!(await isAuthed(request, env))) {
+      return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    }
+    await ensureInscriptionsTable(env.DB);
+    const ids = form.getAll('ids').map(Number).filter(Boolean);
+    const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
+
+    if (!ids.length) {
+      return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}` } });
+    }
+
+    if (action === 'bulk-archive') {
+      for (const id of ids) {
+        await ROW_ACTIONS.archive(env.DB, id);
+      }
+      const msg = encodeURIComponent(`${ids.length} profil${ids.length > 1 ? 's' : ''} archivé${ids.length > 1 ? 's' : ''}.`);
+      return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}${redirectView ? '&' : '?'}bulkOk=${msg}` } });
+    }
+
+    const { results } = await env.DB.prepare('SELECT * FROM inscriptions').all();
+    const selected = results.filter((r) => ids.includes(r.id));
+
+    if (action === 'bulk-export') {
+      return new Response(toCsv(selected), {
+        headers: {
+          'Content-Type': 'text/csv;charset=UTF-8',
+          'Content-Disposition': 'attachment; filename="inscriptions-selection.csv"',
+        },
+      });
+    }
+
+    // bulk-reminder : un e-mail par profil sélectionné n'ayant pas encore payé ou pas encore envoyé
+    // son dossier (sendReminderEmail ignore elle-même les profils déjà complets, renvoie alors
+    // false — compté comme "ignoré" ici plutôt que comme un échec d'envoi).
+    const siteUrl = new URL(request.url).origin;
+    let sent = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of selected) {
+      if (row.dossier_uploaded_at && row.paye) {
+        skipped++;
+        continue;
+      }
+      const ok = await sendReminderEmail(env, row, siteUrl);
+      if (ok) sent++;
+      else failed++;
+    }
+    const parts = [`${sent} relance${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''}`];
+    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (déjà complet${skipped > 1 ? 's' : ''})`);
+    if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''}`);
+    const msg = encodeURIComponent(`${parts.join(', ')}.`);
+    return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}${redirectView ? '&' : '?'}bulkOk=${msg}` } });
   }
 
   const password = form.get('password');

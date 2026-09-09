@@ -69,6 +69,7 @@ export const escapeHtml = (str = '') =>
 // CSS partagé dans assets/css/styles.css (.admin-layout/.admin-sidebar/...), pas dupliqué dans le
 // <style> inline de chaque page puisqu'elles chargent déjà ce fichier.
 const ADMIN_NAV_LINKS = [
+  { key: 'dashboard', href: '/admin/dashboard', label: 'Tableau de bord' },
   { key: 'inscriptions', href: '/admin/inscriptions', label: 'Inscriptions' },
   { key: 'archive', href: '/admin/inscriptions?view=archive', label: 'Corbeille' },
   { key: 'events', href: '/admin/events', label: 'Événements' },

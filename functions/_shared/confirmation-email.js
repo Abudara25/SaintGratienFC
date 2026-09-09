@@ -224,6 +224,132 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
   }
 }
 
+// Relance manuelle envoyée depuis /admin/inscriptions (sélection multiple → "Envoyer une relance") :
+// contrairement à sendConfirmationEmail (déclenchée automatiquement à l'inscription), celle-ci est
+// déclenchée à la main par un responsable du club pour un ou plusieurs profils encore incomplets
+// (dossier et/ou paiement manquants). Reprend la même structure visuelle que buildEmail() ci-dessus
+// (dupliquée plutôt que factorisée : un changement de palette devrait de toute façon être répercuté
+// à la main dans chaque template e-mail, voir la note en tête de fichier).
+function buildReminderEmail(row, siteUrl) {
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const categorie = CATEGORIE_LABEL[row.categorie] || row.categorie;
+  const depotUrl = row.upload_token ? `${siteUrl}/depot/${row.upload_token}` : null;
+  const missingDossier = !row.dossier_uploaded_at;
+  const missingPaiement = !row.paye;
+
+  const htmlItems = [];
+  if (missingDossier) {
+    htmlItems.push(
+      `déposer le <strong>dossier signé</strong>${depotUrl ? ` — <a href="${depotUrl}" style="color:${MAROON_900};">lien de dépôt</a>` : ' (contactez-nous si vous avez perdu le lien)'}`
+    );
+  }
+  if (missingPaiement) {
+    htmlItems.push(`régler l'adhésion (mode choisi : <strong>${escapeHtml(row.mode_paiement)}</strong>)`);
+  }
+
+  const textItems = [];
+  if (missingDossier) textItems.push(`- Déposer le dossier signé : ${depotUrl || '(contactez-nous si vous avez perdu le lien)'}`);
+  if (missingPaiement) textItems.push(`- Régler l'adhésion (mode choisi : ${row.mode_paiement})`);
+
+  const text = `Bonjour ${row.parent_prenom},
+
+Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : il reste une étape pour la finaliser.
+
+${textItems.join('\n')}
+
+Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
+
+Sportivement,
+Saint-Gratien FC
+Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
+
+  const itemsHtml = htmlItems
+    .map(
+      (item) => `
+              <tr>
+                <td style="padding:0 0 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${INK_900};" valign="top">&bull;&nbsp; ${item}</td>
+              </tr>`
+    )
+    .join('');
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rappel — Saint-Gratien FC</title>
+</head>
+<body style="margin:0;padding:0;background-color:${CREAM_100};">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
+    Petit rappel pour finaliser l'inscription de ${escapeHtml(nomEnfant)}.
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
+          <tr>
+            <td style="background-color:${MAROON_900};padding:28px 32px;text-align:center;">
+              <img src="${siteUrl}/assets/images/logo-96.webp" width="48" height="48" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:.02em;">Saint-Gratien FC</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.12em;margin-top:2px;">Val-d'Oise · École de foot U6-U9</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(row.parent_prenom)},</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Petit rappel concernant l'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) : il reste une étape pour la finaliser.</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;padding:14px 18px;">
+                ${itemsHtml}
+              </table>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:${INK_700};">Des questions ? Répondez directement à cet e-mail ou écrivez-nous à <a href="mailto:contact@saintgratienfc.fr" style="color:${MAROON_900};">contact@saintgratienfc.fr</a>.</p>
+              <p style="margin:24px 0 0 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:${CREAM_200};padding:20px 32px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:${INK_700};text-align:center;">
+              Saint-Gratien FC · Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise<br>
+              Cet e-mail vous est envoyé suite à votre demande d'inscription sur <a href="${siteUrl}" style="color:${INK_700};">saintgratienfc.fr</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject: `Rappel — inscription de ${nomEnfant} à finaliser`, html, text };
+}
+
+// Contrairement à sendConfirmationEmail/sendAdminNotification (best-effort, fire-and-forget via
+// waitUntil), l'appelant (functions/admin/inscriptions.js, action=bulk-reminder) a besoin du
+// résultat pour compter succès/échecs et l'afficher dans la bannière — donc `await`ée, retourne
+// true/false comme sendPasswordChangeCode.
+export async function sendReminderEmail(env, row, siteUrl) {
+  if (!env.BREVO_API_KEY) return false;
+  if (row.dossier_uploaded_at && row.paye) return false; // rien à relancer
+
+  const { subject, html, text } = buildReminderEmail(row, siteUrl);
+  const body = {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+    to: [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
+
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Code de double vérification avant un changement de mot de passe admin (voir
 // functions/admin/parametres.js et _shared/settings-kv.js). Contrairement aux e-mails ci-dessus,
 // un échec d'envoi ici DOIT bloquer le changement — sans lui, personne ne serait informé qu'un
