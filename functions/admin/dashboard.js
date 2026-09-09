@@ -4,8 +4,6 @@
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
 
-const CATEGORIES = ['U6 - U7', 'U8 - U9'];
-
 function statCard(label, value, sub) {
   return `<div class="dash-card">
     <div class="dash-card-value">${escapeHtml(String(value))}</div>
@@ -21,7 +19,7 @@ function page({ total, archivedCount, payeCount, dossierCount, categorieCounts }
     statCard('Inscriptions actives', total),
     statCard('Paiement reçu', `${payeCount} / ${total}`, total ? `${pct(payeCount)}%` : undefined),
     statCard('Dossier signé reçu', `${dossierCount} / ${total}`, total ? `${pct(dossierCount)}%` : undefined),
-    ...CATEGORIES.map((c) => statCard(c, categorieCounts[c] || 0)),
+    ...Object.keys(categorieCounts).sort().map((c) => statCard(c, categorieCounts[c])),
     statCard('Dans la corbeille', archivedCount),
   ].join('');
 

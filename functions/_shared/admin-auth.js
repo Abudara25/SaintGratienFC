@@ -73,6 +73,7 @@ const ADMIN_NAV_LINKS = [
   { key: 'inscriptions', href: '/admin/inscriptions', label: 'Inscriptions' },
   { key: 'archive', href: '/admin/inscriptions?view=archive', label: 'Corbeille' },
   { key: 'events', href: '/admin/events', label: 'Événements' },
+  { key: 'categories', href: '/admin/categories', label: 'Catégories' },
   { key: 'parametres', href: '/admin/parametres', label: 'Paramètres' },
 ];
 

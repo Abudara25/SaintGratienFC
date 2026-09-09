@@ -5,6 +5,7 @@
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, adminSidebar, getAdminPassword } from '../_shared/admin-auth.js';
 import { sendReminderEmail } from '../_shared/confirmation-email.js';
+import { getCategoriesConfig } from '../_shared/settings-kv.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -90,12 +91,13 @@ function parseFilters(searchParams) {
 // (jsPDF, voir le <script> en bas de page) le même document que celui produit à l'inscription :
 // utile si la famille n'a pas reçu (ou a perdu) l'e-mail de confirmation et que le club veut le
 // lui renvoyer manuellement.
-function actionsHtml(r, siteUrl) {
+function actionsHtml(r, siteUrl, saison) {
   const pdfData = {
     enfantPrenom: r.enfant_prenom,
     enfantNom: r.enfant_nom,
     naissance: r.naissance,
     categorie: r.categorie,
+    saison,
     tailleMaillot: r.taille_maillot,
     modePaiement: r.mode_paiement,
     parentPrenom: r.parent_prenom,
@@ -150,18 +152,20 @@ function actionsHtml(r, siteUrl) {
     </form>`;
 }
 
-// options : { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk,
-// inscriptionStatus, siteUrl } — years = années de naissance distinctes présentes en base
-// (calculées sur l'ensemble non filtré), total = nombre d'inscriptions de la vue courante
-// (active ou archivée, filters.view) avant filtres additionnels, archivedCount = nombre total de
-// profils archivés (badge du lien "Corbeille", affiché seulement en vue active), returnTo =
-// chemin+query courant (pour revenir ici après un dépôt de dossier, filtres compris — voir
-// safeRedirect dans [id]/dossier.js), bulkOk = message de résultat d'une action groupée (archiver/
-// relancer la sélection, voir onRequestPost), inscriptionStatus = 'open'|'closed' (KV
-// "saintgratienfc_config", voir functions/admin/inscription-status.js et
-// functions/api/inscription-status.js), siteUrl = origine (pour le lien de dépôt imprimé dans le
-// PDF régénéré, voir actionsHtml).
-function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl }) {
+// options : { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk,
+// bulkOk, inscriptionStatus, siteUrl, saison } — years/categories = années de naissance et
+// catégories distinctes présentes en base (calculées sur l'ensemble non filtré, comme pour "years" —
+// pas la liste éditable de /admin/categories, pour que le filtre reste exact même si une catégorie a
+// été renommée/supprimée depuis), total = nombre d'inscriptions de la vue courante (active ou
+// archivée, filters.view) avant filtres additionnels, archivedCount = nombre total de profils
+// archivés (badge du lien "Corbeille", affiché seulement en vue active), returnTo = chemin+query
+// courant (pour revenir ici après un dépôt de dossier, filtres compris — voir safeRedirect dans
+// [id]/dossier.js), bulkOk = message de résultat d'une action groupée (archiver/relancer la
+// sélection, voir onRequestPost), inscriptionStatus = 'open'|'closed' (KV "saintgratienfc_config",
+// voir functions/admin/inscription-status.js et functions/api/inscription-status.js), siteUrl =
+// origine (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml), saison = libellé
+// de saison courant (_shared/settings-kv.js, /admin/categories) imprimé dans ce même PDF régénéré.
+function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl, saison }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -190,8 +194,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
     <select name="categorie">
       <option value="">Toutes catégories</option>
-      <option value="U6 - U7" ${sel(filters.categorie, 'U6 - U7')}>U6 - U7</option>
-      <option value="U8 - U9" ${sel(filters.categorie, 'U8 - U9')}>U8 - U9</option>
+      ${categories.map((c) => `<option value="${escapeHtml(c)}" ${sel(filters.categorie, c)}>${escapeHtml(c)}</option>`).join('')}
     </select>
     <select name="annee">
       <option value="">Toutes années de naissance</option>
@@ -270,7 +273,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
             </dd>
           </div>
         </dl>
-        <div class="insc-card-actions">${actionsHtml(r, siteUrl)}</div>
+        <div class="insc-card-actions">${actionsHtml(r, siteUrl, saison)}</div>
       </details>`
     )
     .join('');
@@ -403,7 +406,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
     </main>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
+  <script src="/assets/js/pdf-inscription.js?v=20260909a"></script>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>
   <script src="/assets/js/admin-inscriptions.js?v=20260909d"></script>
 </body></html>`;
@@ -436,6 +439,7 @@ export async function onRequestGet({ request, env }) {
   }
 
   const years = [...new Set(results.map((r) => String(r.naissance || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const categories = [...new Set(results.map((r) => r.categorie).filter(Boolean))].sort();
 
   // Chemin+query courant (sans dossierError/dossierOk, qui sont des messages ponctuels, pas des
   // filtres à reproduire) — sert de redirectTo aux formulaires de dépôt de dossier des cartes, pour
@@ -453,10 +457,13 @@ export async function onRequestGet({ request, env }) {
     // KV indisponible (binding non configuré) : on reste sur "open" par défaut.
   }
 
+  const { saison } = await getCategoriesConfig(env);
+
   return new Response(
     tablePage(filtered, {
       filters,
       years,
+      categories,
       total: viewRows.length,
       archivedCount,
       returnTo,
@@ -465,6 +472,7 @@ export async function onRequestGet({ request, env }) {
       bulkOk: searchParams.get('bulkOk'),
       inscriptionStatus,
       siteUrl: new URL(request.url).origin,
+      saison,
     }),
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

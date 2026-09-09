@@ -44,3 +44,53 @@ export async function getPendingPasswordChange(env) {
 export async function clearPendingPasswordChange(env) {
   await env.INSCRIPTION_STATUS.delete(KV_KEY_PENDING_PASSWORD);
 }
+
+// Catégories d'âge (U6-U7, U8-U9...) + libellé de saison en cours, modifiables depuis
+// /admin/categories (functions/admin/categories.js) sans passer par une session Claude Code à
+// chaque rentrée — voir CLAUDE.md. Alimente dynamiquement le <select> catégorie d'inscription.html
+// (via functions/api/categories.js), le formulaire d'édition admin, le filtre de la liste, le PDF
+// et l'e-mail de confirmation. DEFAULT_CATEGORIES_CONFIG reprend les valeurs réelles de la saison
+// 2026-2027 (ex-constantes de assets/js/inscription.js) : sert de repli tant que /admin/categories
+// n'a jamais été enregistré (KV vide), pas seulement en cas d'erreur.
+const KV_KEY_CATEGORIES = 'categories_config';
+
+export const DEFAULT_CATEGORIES_CONFIG = {
+  saison: '2026-2027',
+  categories: [
+    {
+      id: 'u6-u7',
+      label: 'U6 - U7',
+      anneeMin: 2020,
+      anneeMax: 2021,
+      helloAssoUrl: 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
+      helloAssoWidgetUrl: 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027/widget',
+      active: true,
+    },
+    {
+      id: 'u8-u9',
+      label: 'U8 - U9',
+      anneeMin: 2018,
+      anneeMax: 2019,
+      helloAssoUrl: 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
+      helloAssoWidgetUrl: 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2/widget',
+      active: true,
+    },
+  ],
+};
+
+export async function getCategoriesConfig(env) {
+  try {
+    const stored = await env.INSCRIPTION_STATUS.get(KV_KEY_CATEGORIES);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && Array.isArray(parsed.categories) && parsed.categories.length) return parsed;
+    }
+  } catch {
+    // KV indisponible ou JSON corrompu : repli sur la config par défaut ci-dessus.
+  }
+  return DEFAULT_CATEGORIES_CONFIG;
+}
+
+export async function setCategoriesConfig(env, config) {
+  await env.INSCRIPTION_STATUS.put(KV_KEY_CATEGORIES, JSON.stringify(config));
+}

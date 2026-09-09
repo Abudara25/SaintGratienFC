@@ -1,17 +1,19 @@
 // Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose le dépôt du dossier signé (lien unique par famille, /depot/<token>) et le paiement HelloAsso (widget adapté à la catégorie choisie).
 
-const HELLOASSO_URLS = {
+// Repli utilisé tant que /api/categories n'a pas répondu (ou si l'appel échoue) : catégories,
+// tranches de naissance, saison et liens HelloAsso sont normalement gérés depuis /admin/categories
+// (voir functions/admin/categories.js et functions/_shared/settings-kv.js) sans devoir toucher au
+// code à chaque saison — ces constantes ne servent plus que de filet de sécurité hors-ligne.
+const FALLBACK_SAISON = '2026-2027';
+const FALLBACK_HELLOASSO_URLS = {
   'U6 - U7': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
   'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
 };
-
-// Widgets embarqués (fournis par le club depuis HelloAsso, onglet "Diffuser") : le paiement se
-// fait dans la page au lieu de rediriger vers helloasso.com. Note l'URL sans "/beta" (le widget
-// n'est pas servi sous ce préfixe, contrairement au lien de paiement externe ci-dessus).
-const HELLOASSO_WIDGET_URLS = {
+const FALLBACK_HELLOASSO_WIDGET_URLS = {
   'U6 - U7': 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027/widget',
   'U8 - U9': 'https://www.helloasso.com/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2/widget',
 };
+const FALLBACK_CATEGORIE_PAR_ANNEE = { 2020: 'U6 - U7', 2021: 'U6 - U7', 2018: 'U8 - U9', 2019: 'U8 - U9' };
 
 // `datetime('now')` (SQLite) renvoie "YYYY-MM-DD HH:MM:SS" en UTC, sans "T" ni "Z" — il faut les
 // ajouter pour que `new Date(...)` le reconnaisse de façon fiable (voir aussi la même fonction
@@ -26,14 +28,6 @@ function formatDuplicateDate(sqliteDatetime) {
     return sqliteDatetime;
   }
 }
-
-// Saison 2026-2027 : U6-U7 = nés en 2020 ou 2021, U8-U9 = nés en 2018 ou 2019.
-const CATEGORIE_PAR_ANNEE = {
-  2020: 'U6 - U7',
-  2021: 'U6 - U7',
-  2018: 'U8 - U9',
-  2019: 'U8 - U9',
-};
 
 // Construit l'iframe widget HelloAsso (auto-agrandie via postMessage — HelloAsso poste sa hauteur
 // réelle une fois le formulaire chargé, sinon l'iframe reste tronquée à la hauteur de départ).
@@ -101,15 +95,70 @@ document.addEventListener('DOMContentLoaded', () => {
   const helloassoWidgetContainer = document.getElementById('helloasso-widget-container');
   const helloassoFallbackLink = document.getElementById('helloasso-fallback-link');
 
+  // État rempli par /api/categories ci-dessous — initialisé au repli hors-ligne (FALLBACK_*) puis
+  // remplacé dès que l'appel réussit. Des `let` (pas `const`) : les gestionnaires d'événements
+  // enregistrés plus bas (fermeture) lisent la valeur en vigueur au moment où ils s'exécutent, pas
+  // celle au moment de leur enregistrement.
+  let saison = FALLBACK_SAISON;
+  let categorieParAnnee = FALLBACK_CATEGORIE_PAR_ANNEE;
+  let helloAssoUrls = FALLBACK_HELLOASSO_URLS;
+  let helloAssoWidgetUrls = FALLBACK_HELLOASSO_WIDGET_URLS;
+  let firstCategorieAvecHelloAsso = Object.keys(FALLBACK_HELLOASSO_WIDGET_URLS)[0];
+
   const naissanceInput = form.naissance;
   const categorieSelect = form.categorie;
+
+  fetch('/api/categories')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
+
+      if (data.saison) {
+        saison = data.saison;
+        document.querySelectorAll('[data-saison-text]').forEach((el) => {
+          el.textContent = saison;
+        });
+      }
+
+      categorieParAnnee = {};
+      helloAssoUrls = {};
+      helloAssoWidgetUrls = {};
+      firstCategorieAvecHelloAsso = null;
+
+      for (const c of data.categories) {
+        for (let annee = c.anneeMin; annee <= c.anneeMax; annee++) categorieParAnnee[annee] = c.label;
+        if (c.helloAssoUrl) helloAssoUrls[c.label] = c.helloAssoUrl;
+        if (c.helloAssoWidgetUrl) helloAssoWidgetUrls[c.label] = c.helloAssoWidgetUrl;
+        if (!firstCategorieAvecHelloAsso && c.helloAssoWidgetUrl) firstCategorieAvecHelloAsso = c.label;
+      }
+      if (!firstCategorieAvecHelloAsso) firstCategorieAvecHelloAsso = data.categories[0].label;
+
+      if (categorieSelect) {
+        const previousValue = categorieSelect.value;
+        // Le libellé vient de /admin/categories (réservé au club, protégé par mot de passe) : le
+        // risque d'y trouver du HTML malveillant est faible, mais on échappe quand même par principe
+        // avant de l'injecter via innerHTML.
+        const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        categorieSelect.innerHTML = data.categories
+          .map((c) => {
+            const annees = c.anneeMin === c.anneeMax ? c.anneeMin : `${c.anneeMin}-${c.anneeMax}`;
+            return `<option value="${escapeHtml(c.label)}">${escapeHtml(c.label)} (${annees})</option>`;
+          })
+          .join('');
+        // Reprend la sélection précédente si elle existe toujours (ex. l'auto-sélection par date de
+        // naissance a déjà tourné avant que cette réponse n'arrive), sinon garde le 1er élément par défaut.
+        if (data.categories.some((c) => c.label === previousValue)) categorieSelect.value = previousValue;
+      }
+    })
+    .catch(() => {}); // en cas d'échec, on garde les repères par défaut (FALLBACK_*) et le <select> statique du HTML
+
   if (naissanceInput && categorieSelect) {
     naissanceInput.addEventListener('change', () => {
       // getUTCFullYear (pas getFullYear) : "YYYY-MM-DD" est parsé comme minuit UTC, et lire
       // l'année en heure locale décalerait d'un an pour un fuseau très négatif (ex. UTC-8)
       // sur une naissance au 1er janvier.
       const annee = new Date(naissanceInput.value).getUTCFullYear();
-      const categorie = CATEGORIE_PAR_ANNEE[annee];
+      const categorie = categorieParAnnee[annee];
       if (categorie) categorieSelect.value = categorie;
     });
   }
@@ -162,6 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
       enfantNom: form.enfantNom.value.trim(),
       naissance: form.naissance.value,
       categorie: form.categorie.value,
+      saison,
       tailleMaillot: form.tailleMaillot.value,
       modePaiement: form.modePaiement.value,
       parentPrenom: form.parentPrenom.value.trim(),
@@ -254,10 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (data.modePaiement === 'HelloAsso') {
-      const widgetUrl = HELLOASSO_WIDGET_URLS[data.categorie] || HELLOASSO_WIDGET_URLS['U6 - U7'];
+      const widgetUrl = helloAssoWidgetUrls[data.categorie] || helloAssoWidgetUrls[firstCategorieAvecHelloAsso];
       helloassoWidgetContainer.innerHTML = '';
       helloassoWidgetContainer.appendChild(createHelloAssoWidget(widgetUrl));
-      helloassoFallbackLink.href = HELLOASSO_URLS[data.categorie] || HELLOASSO_URLS['U6 - U7'];
+      helloassoFallbackLink.href = helloAssoUrls[data.categorie] || helloAssoUrls[firstCategorieAvecHelloAsso];
       helloassoBox.hidden = false;
       especesChequeBox.hidden = true;
     } else {

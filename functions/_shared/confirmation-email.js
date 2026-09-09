@@ -11,12 +11,15 @@
 // seule approche fiable across les clients mail (Outlook en particulier ignore le CSS externe/
 // flexbox/grid). Ne jamais utiliser de <style> externe ni de classes CSS ici : tout doit être en
 // attributs/style inline directement sur chaque balise.
-import { getNotificationEmail } from './settings-kv.js';
+import { getNotificationEmail, getCategoriesConfig } from './settings-kv.js';
 
 const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-const CATEGORIE_LABEL = { 'U6 - U7': 'U6-U7', 'U8 - U9': 'U8-U9' };
+// Repris de la liste éditable de /admin/categories, mais purement cosmétique (retire les espaces
+// autour du tiret, ex. "U6 - U7" → "U6-U7") — pas besoin d'aller chercher le libellé exact d'une
+// catégorie potentiellement renommée/supprimée depuis, contrairement à la saison (voir buildEmail).
+const formatCategorie = (c = '') => c.replace(/\s*-\s*/g, '-');
 
 // Palette reprise de assets/css/styles.css (:root) pour rester cohérent avec le site.
 const MAROON_950 = '#3a0f10';
@@ -30,10 +33,10 @@ const CREAM_200 = '#f3ecd8';
 const INK_900 = '#201412';
 const INK_700 = '#4a3a36';
 
-function buildEmail(data, uploadToken, siteUrl) {
+function buildEmail(data, uploadToken, siteUrl, saison) {
   const depotUrl = `${siteUrl}/depot/${uploadToken}`;
   const nomEnfant = `${data.enfantPrenom} ${data.enfantNom}`;
-  const categorie = CATEGORIE_LABEL[data.categorie] || data.categorie;
+  const categorie = formatCategorie(data.categorie);
 
   // Le point important : ne jamais donner l'impression que l'inscription (ou la licence) est
   // déjà acquise. Elle ne l'est qu'une fois le dossier signé déposé, l'adhésion réglée, ET la
@@ -41,7 +44,7 @@ function buildEmail(data, uploadToken, siteUrl) {
   // pas par la famille, une fois le dossier complet — délai habituel de quelques jours).
   const text = `Bonjour ${data.parentPrenom},
 
-Nous avons bien reçu la demande d'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC pour la saison 2026-2027.
+Nous avons bien reçu la demande d'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC pour la saison ${saison}.
 
 Important : cette inscription n'est pas encore définitive. Elle sera confirmée une fois :
 1. le dossier signé déposé (lien ci-dessous),
@@ -92,7 +95,7 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
           <tr>
             <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
               <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(data.parentPrenom)},</p>
-              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Nous avons bien reçu la demande d'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) au Saint-Gratien FC pour la saison 2026-2027.</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Nous avons bien reçu la demande d'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) au Saint-Gratien FC pour la saison ${escapeHtml(saison)}.</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;">
                 <tr>
                   <td style="padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${INK_900};">
@@ -149,7 +152,10 @@ const MAX_PDF_BASE64_LENGTH = 8 * 1024 * 1024;
 export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
   if (!env.BREVO_API_KEY) return; // pas encore configuré côté Brevo, voir CLAUDE.md
 
-  const { subject, html, text } = buildEmail(data, uploadToken, siteUrl);
+  // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
+  // navigateur de la famille avait chargé /api/categories avant un changement de saison entre-temps.
+  const { saison } = await getCategoriesConfig(env);
+  const { subject, html, text } = buildEmail(data, uploadToken, siteUrl, saison);
   const hasPdf = typeof data.pdfBase64 === 'string' && data.pdfBase64.length > 0 && data.pdfBase64.length <= MAX_PDF_BASE64_LENGTH;
 
   const body = {
@@ -191,7 +197,7 @@ export async function sendAdminNotification(env, data, siteUrl) {
   if (!to.length) return;
 
   const nomEnfant = `${data.enfantPrenom} ${data.enfantNom}`;
-  const categorie = CATEGORIE_LABEL[data.categorie] || data.categorie;
+  const categorie = formatCategorie(data.categorie);
   const text = `Nouvelle inscription reçue sur le site :
 
 Enfant : ${nomEnfant} (${categorie})
@@ -232,7 +238,7 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
 // à la main dans chaque template e-mail, voir la note en tête de fichier).
 function buildReminderEmail(row, siteUrl) {
   const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
-  const categorie = CATEGORIE_LABEL[row.categorie] || row.categorie;
+  const categorie = formatCategorie(row.categorie);
   const depotUrl = row.upload_token ? `${siteUrl}/depot/${row.upload_token}` : null;
   const missingDossier = !row.dossier_uploaded_at;
   const missingPaiement = !row.paye;

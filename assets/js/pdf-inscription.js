@@ -7,6 +7,10 @@
 function buildInscriptionPdfDoc(data, depotUrl) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  // data.saison vient de /api/categories (voir inscription.js) ou du champ "saison" stocké en D1
+  // sur la fiche régénérée depuis /admin/inscriptions (functions/admin/inscriptions.js) — repli sur
+  // la saison actuelle si absent (appel depuis un contexte qui n'a pas encore cette info).
+  const saison = data.saison || '2026-2027';
 
   doc.setFillColor(58, 15, 16);
   doc.rect(0, 0, 210, 28, 'F');
@@ -16,7 +20,7 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   doc.text('Saint-Gratien FC', 14, 18);
   doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
-  doc.text("Fiche d'inscription — Saison 2026-2027", 14, 25);
+  doc.text(`Fiche d'inscription — Saison ${saison}`, 14, 25);
 
   let y = 42;
   doc.setTextColor(30, 30, 30);
@@ -51,7 +55,7 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   y += 4;
 
   heading('Offre choisie');
-  line('Adhésion saison 2026-2027 — 180 €');
+  line(`Adhésion saison ${saison} — 180 €`);
   line('Licence + tenue complète Patrick (maillot, short, survêtement, sac)');
   line(`Mode de paiement : ${data.modePaiement || '—'}`);
   y += 4;

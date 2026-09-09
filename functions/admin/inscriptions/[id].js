@@ -2,6 +2,7 @@
 // /admin/inscriptions. Même garde d'authentification que la liste (voir _shared/admin-auth.js).
 import { ensureInscriptionsTable } from '../../_shared/inscriptions-db.js';
 import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../../_shared/admin-auth.js';
+import { getCategoriesConfig } from '../../_shared/settings-kv.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 
@@ -26,9 +27,17 @@ const toRow = (data) => ({
   rgpd: data.rgpd ? 1 : 0,
 });
 
-function editPage(row, { error } = {}) {
+function editPage(row, categories, { error } = {}) {
   const checked = (v) => (v ? 'checked' : '');
   const selected = (value, option) => (value === option ? 'selected' : '');
+
+  // La catégorie de la fiche peut avoir été renommée/supprimée depuis /admin/categories : on
+  // l'ajoute à la liste si elle n'y figure plus, pour ne jamais faire disparaître silencieusement la
+  // valeur enregistrée du formulaire (voir aussi le filtre "catégorie" de /admin/inscriptions, qui
+  // dérive sa propre liste des données plutôt que de cette config éditable).
+  const categoryOptions = categories.some((c) => c.label === row.categorie)
+    ? categories
+    : [...categories, { label: row.categorie }];
 
   return `<!doctype html><html lang="fr"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,8 +80,12 @@ function editPage(row, { error } = {}) {
       <div class="form-field">
         <label for="categorie">Catégorie</label>
         <select id="categorie" name="categorie" required>
-          <option value="U6 - U7" ${selected(row.categorie, 'U6 - U7')}>U6 - U7 (2020-2021)</option>
-          <option value="U8 - U9" ${selected(row.categorie, 'U8 - U9')}>U8 - U9 (2018-2019)</option>
+          ${categoryOptions
+            .map((c) => {
+              const annees = c.anneeMin == null ? '' : c.anneeMin === c.anneeMax ? ` (${c.anneeMin})` : ` (${c.anneeMin}-${c.anneeMax})`;
+              return `<option value="${escapeHtml(c.label)}" ${selected(row.categorie, c.label)}>${escapeHtml(c.label)}${annees}</option>`;
+            })
+            .join('')}
         </select>
       </div>
     </div>
@@ -166,7 +179,8 @@ export async function onRequestGet({ request, env, params }) {
     return new Response('Inscription introuvable.', { status: 404 });
   }
 
-  return new Response(editPage(row), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  const { categories } = await getCategoriesConfig(env);
+  return new Response(editPage(row, categories), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
 }
 
 export async function onRequestPost({ request, env, params }) {
@@ -183,17 +197,18 @@ export async function onRequestPost({ request, env, params }) {
 
   const form = await request.formData();
   const data = Object.fromEntries(form.entries());
+  const { categories } = await getCategoriesConfig(env);
 
   for (const field of REQUIRED_FIELDS) {
     if (!String(data[field] ?? '').trim()) {
-      return new Response(editPage({ ...existing, ...toRow(data) }, { error: `Champ manquant : ${field}` }), {
+      return new Response(editPage({ ...existing, ...toRow(data) }, categories, { error: `Champ manquant : ${field}` }), {
         status: 400,
         headers: { 'Content-Type': 'text/html;charset=UTF-8' },
       });
     }
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    return new Response(editPage({ ...existing, ...toRow(data) }, { error: 'E-mail invalide' }), {
+    return new Response(editPage({ ...existing, ...toRow(data) }, categories, { error: 'E-mail invalide' }), {
       status: 400,
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },
     });
