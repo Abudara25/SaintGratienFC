@@ -44,6 +44,12 @@ function page({ siteUrl, inscription, error, success }) {
 <title>Déposer le dossier signé — Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/assets/images/favicon.ico">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon.png">
+<meta name="theme-color" content="#4f1414">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">

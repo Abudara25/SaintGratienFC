@@ -45,6 +45,12 @@ function editPage(row, categories, { error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon.png">
+<meta name="theme-color" content="#4f1414">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:640px;}
