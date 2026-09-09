@@ -34,7 +34,10 @@ if (bulkForm) {
   const countEl = document.getElementById('bulk-count');
   const idsContainer = document.getElementById('bulk-ids-container');
   const actionBtns = [...bulkForm.querySelectorAll('[data-bulk-action]')];
-  const selectCheckboxes = () => [...document.querySelectorAll('.insc-select')];
+  // :not(:disabled) : /admin/reinscription désactive la case des familles déjà réinscrites (rien à
+  // sélectionner pour elles) — sans ce filtre, "Tout sélectionner" les cocherait quand même via JS
+  // (disabled empêche seulement le clic manuel, pas une affectation programmatique de .checked).
+  const selectCheckboxes = () => [...document.querySelectorAll('.insc-select:not(:disabled)')];
 
   function syncBulkUI() {
     const all = selectCheckboxes();

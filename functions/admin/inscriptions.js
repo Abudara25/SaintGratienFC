@@ -415,7 +415,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260909b"></script>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909d"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260909e"></script>
 </body></html>`;
 }
 
@@ -578,7 +578,10 @@ export async function onRequestPost({ request, env }) {
   // bulk-reinscription : génère (si besoin) un reinscription_token par fiche sélectionnée puis
   // envoie à chaque famille son lien personnel /reinscription/<token> (functions/reinscription/
   // [token].js) — voir sendReinscriptionEmail. Branche séparée du bloc précédent (pas de SELECT *
-  // ni ids déjà résolus à ce stade), calquée sur son début.
+  // ni ids déjà résolus à ce stade), calquée sur son début. Lancée depuis /admin/inscriptions
+  // (sélection libre) ou /admin/reinscription (déjà scopée aux adhérents de la saison précédente) —
+  // redirectTo ramène sur la page d'où l'action a été lancée plutôt que de toujours renvoyer vers
+  // /admin/inscriptions, jamais une redirection ouverte (allowlist ci-dessous).
   if (action === 'bulk-reinscription') {
     if (!(await isAuthed(request, env))) {
       return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
@@ -586,19 +589,33 @@ export async function onRequestPost({ request, env }) {
     await ensureInscriptionsTable(env.DB);
     const ids = form.getAll('ids').map(Number).filter(Boolean);
     const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
+    const redirectTo = /^\/admin\/(inscriptions|reinscription)(\?[^\s]*)?$/.test(form.get('redirectTo') || '')
+      ? form.get('redirectTo')
+      : `/admin/inscriptions${redirectView}`;
+    const withParam = (url, param) => `${url}${url.includes('?') ? '&' : '?'}${param}`;
 
     if (!ids.length) {
-      return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}` } });
+      return new Response('', { status: 302, headers: { Location: redirectTo } });
     }
 
     const { results } = await env.DB.prepare('SELECT * FROM inscriptions').all();
     const selected = results.filter((r) => ids.includes(r.id));
-    const { dateLimiteReinscription } = await getCategoriesConfig(env);
+    const { saison, dateLimiteReinscription } = await getCategoriesConfig(env);
     const siteUrl = new URL(request.url).origin;
 
+    // Une fiche déjà réinscrite pour la saison en cours (même dedup_key qu'une fiche de cette
+    // saison — voir _shared/inscriptions-db.js) n'a pas besoin de recevoir le lien une seconde
+    // fois : renvoyer "réinscrivez-vous" à une famille qui l'a déjà fait serait déroutant.
+    const currentSeasonKeys = new Set(results.filter((r) => r.saison === saison).map((r) => r.dedup_key));
+
     let sent = 0;
+    let skipped = 0;
     let failed = 0;
     for (let row of selected) {
+      if (currentSeasonKeys.has(row.dedup_key)) {
+        skipped++;
+        continue;
+      }
       if (!row.reinscription_token) {
         const token = crypto.randomUUID();
         await env.DB.prepare('UPDATE inscriptions SET reinscription_token = ? WHERE id = ?').bind(token, row.id).run();
@@ -609,9 +626,10 @@ export async function onRequestPost({ request, env }) {
       else failed++;
     }
     const parts = [`${sent} lien${sent > 1 ? 's' : ''} de réinscription envoyé${sent > 1 ? 's' : ''}`];
+    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (déjà réinscrit${skipped > 1 ? 's' : ''})`);
     if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''} (BREVO_API_KEY manquante ou envoi refusé — le lien reste consultable sur la fiche « Modifier »)`);
     const msg = encodeURIComponent(`${parts.join(', ')}.`);
-    return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}${redirectView ? '&' : '?'}bulkOk=${msg}` } });
+    return new Response('', { status: 302, headers: { Location: withParam(redirectTo, `bulkOk=${msg}`) } });
   }
 
   const password = form.get('password');

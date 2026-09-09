@@ -71,6 +71,7 @@ export const escapeHtml = (str = '') =>
 const ADMIN_NAV_LINKS = [
   { key: 'dashboard', href: '/admin/dashboard', label: 'Tableau de bord' },
   { key: 'inscriptions', href: '/admin/inscriptions', label: 'Inscriptions' },
+  { key: 'reinscription', href: '/admin/reinscription', label: 'Réinscription' },
   { key: 'archive', href: '/admin/inscriptions?view=archive', label: 'Corbeille' },
   { key: 'events', href: '/admin/events', label: 'Événements' },
   { key: 'categories', href: '/admin/categories', label: 'Catégories' },
