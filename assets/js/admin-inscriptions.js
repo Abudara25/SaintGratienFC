@@ -13,6 +13,13 @@ document.querySelectorAll('.insc-delete-form').forEach((form) => {
   });
 });
 
+document.querySelectorAll('.insc-toggle-paye-form').forEach((form) => {
+  form.addEventListener('submit', (e) => {
+    const message = form.querySelector('button[type=submit]')?.dataset.confirm || 'Confirmer ?';
+    if (!confirm(message)) e.preventDefault();
+  });
+});
+
 document.querySelectorAll('.insc-pdf-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     downloadInscriptionPdf(JSON.parse(btn.dataset.pdf), btn.dataset.depotUrl || null);

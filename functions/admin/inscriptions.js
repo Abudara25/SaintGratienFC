@@ -6,7 +6,7 @@ import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK, getAdminPassword } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
-  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
+  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
   // Un champ commençant par =, +, -, @, tab ou retour chariot est préfixé d'une apostrophe :
   // sinon Excel/Sheets peut l'interpréter comme une formule (injection CSV) à l'ouverture de
   // l'export si un parent a saisi ce genre de contenu dans le formulaire public.
@@ -23,6 +23,7 @@ function toCsv(rows) {
       r.categorie,
       r.taille_maillot,
       r.mode_paiement,
+      r.paye ? 'Oui' : 'Non',
       `${r.parent_prenom} ${r.parent_nom}`,
       r.email,
       r.telephone,
@@ -51,7 +52,7 @@ const SORTS = {
 
 // Filtrage/tri appliqués côté JS après le SELECT * (peu de lignes attendues pour un seul club) —
 // plus simple et plus sûr qu'une clause WHERE dynamique construite à partir des query params.
-function filterAndSort(rows, { q, categorie, annee, paiement, dossier, sort }) {
+function filterAndSort(rows, { q, categorie, annee, paiement, dossier, paye, sort }) {
   const needle = q.trim().toLowerCase();
   const filtered = rows.filter((r) => {
     if (categorie && r.categorie !== categorie) return false;
@@ -59,6 +60,8 @@ function filterAndSort(rows, { q, categorie, annee, paiement, dossier, sort }) {
     if (annee && !String(r.naissance || '').startsWith(annee)) return false;
     if (dossier === 'recu' && !r.dossier_uploaded_at) return false;
     if (dossier === 'manquant' && r.dossier_uploaded_at) return false;
+    if (paye === 'oui' && !r.paye) return false;
+    if (paye === 'non' && r.paye) return false;
     if (needle) {
       const haystack = `${r.enfant_prenom} ${r.enfant_nom} ${r.parent_prenom} ${r.parent_nom} ${r.email}`.toLowerCase();
       if (!haystack.includes(needle)) return false;
@@ -75,6 +78,7 @@ function parseFilters(searchParams) {
     annee: searchParams.get('annee') || '',
     paiement: searchParams.get('paiement') || '',
     dossier: searchParams.get('dossier') || '',
+    paye: searchParams.get('paye') || '',
     sort: searchParams.get('sort') || 'date_desc',
   };
 }
@@ -105,6 +109,17 @@ function actionsHtml(r, siteUrl) {
 
   return `<button type="button" class="btn btn-sm insc-pdf-btn" data-pdf='${escapeHtml(JSON.stringify(pdfData))}' data-depot-url="${escapeHtml(depotUrl)}">Télécharger le PDF</button>
     <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
+    <form method="POST" action="/admin/inscriptions" class="insc-toggle-paye-form">
+      <input type="hidden" name="action" value="toggle-paye">
+      <input type="hidden" name="id" value="${r.id}">
+      <button type="submit" class="btn btn-sm" data-confirm="${
+        r.paye
+          ? `Marquer ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)} comme NON payé ?`
+          : `Confirmer que ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)} a payé ?`
+      }" style="background:${r.paye ? 'var(--cream-200)' : 'var(--gold-500)'};color:var(--maroon-950);">${
+        r.paye ? 'Marquer non payé' : 'Marquer payé'
+      }</button>
+    </form>
     <form method="POST" action="/admin/inscriptions" class="insc-delete-form">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" value="${r.id}">
@@ -127,8 +142,9 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   if (filters.annee) qs.set('annee', filters.annee);
   if (filters.paiement) qs.set('paiement', filters.paiement);
   if (filters.dossier) qs.set('dossier', filters.dossier);
+  if (filters.paye) qs.set('paye', filters.paye);
   const csvHref = `/admin/inscriptions?format=csv${qs.toString() ? `&${qs.toString()}` : ''}`;
-  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement || filters.dossier);
+  const hasActiveFilters = !!(filters.q || filters.categorie || filters.annee || filters.paiement || filters.dossier || filters.paye);
 
   const filterBar = `<form method="GET" class="insc-filters">
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
@@ -152,6 +168,11 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
       <option value="recu" ${sel(filters.dossier, 'recu')}>Dossier reçu</option>
       <option value="manquant" ${sel(filters.dossier, 'manquant')}>Dossier manquant</option>
     </select>
+    <select name="paye">
+      <option value="">Paiement reçu : tous</option>
+      <option value="oui" ${sel(filters.paye, 'oui')}>Payé</option>
+      <option value="non" ${sel(filters.paye, 'non')}>Non payé</option>
+    </select>
     <select name="sort">
       <option value="date_desc" ${sel(filters.sort, 'date_desc')}>Plus récent d'abord</option>
       <option value="date_asc" ${sel(filters.sort, 'date_asc')}>Plus ancien d'abord</option>
@@ -174,6 +195,9 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
           </span>
           <span class="insc-dossier-badge ${r.dossier_uploaded_at ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
             r.dossier_uploaded_at ? '✓ Dossier' : 'Dossier manquant'
+          }</span>
+          <span class="insc-dossier-badge ${r.paye ? 'insc-dossier-ok' : 'insc-dossier-missing'}">${
+            r.paye ? '✓ Payé' : 'Non payé'
           }</span>
           <span class="insc-card-chevron" aria-hidden="true">▸</span>
         </summary>
@@ -284,7 +308,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260909b"></script>
 </body></html>`;
 }
 
@@ -353,6 +377,18 @@ export async function onRequestPost({ request, env }) {
     if (id) {
       await ensureInscriptionsTable(env.DB);
       await env.DB.prepare('DELETE FROM inscriptions WHERE id = ?').bind(id).run();
+    }
+    return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
+  }
+
+  if (form.get('action') === 'toggle-paye') {
+    if (!(await isAuthed(request, env))) {
+      return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    }
+    const id = Number(form.get('id'));
+    if (id) {
+      await ensureInscriptionsTable(env.DB);
+      await env.DB.prepare('UPDATE inscriptions SET paye = 1 - paye WHERE id = ?').bind(id).run();
     }
     return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
   }

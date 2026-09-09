@@ -43,6 +43,12 @@ export async function ensureInscriptionsTable(db) {
     // ne détectait pas "Léa" vs "LÉA" comme le même prénom. dedup_key est calculée en JS
     // (accents retirés) à l'écriture, comparée par égalité stricte plutôt que via LOWER() en SQL.
     'dedup_key TEXT',
+    // 2026-09-09 : statut de paiement, coché manuellement par un responsable depuis /admin/
+    // inscriptions (mode_paiement dit *comment* la famille compte payer, choisi à l'inscription ;
+    // paye dit si l'argent a *effectivement* été reçu — utile pour Espèces/Chèque, qui ne sont pas
+    // confirmés automatiquement comme le serait un paiement HelloAsso). 0/1, INTEGER comme
+    // autorisation/droit_image/rgpd.
+    'paye INTEGER NOT NULL DEFAULT 0',
   ];
   for (const column of addedColumns) {
     try {
