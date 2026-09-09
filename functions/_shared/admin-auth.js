@@ -41,3 +41,8 @@ export function loginPage({ error } = {}) {
 
 export const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Lien de déconnexion identique sur chaque page /admin/* authentifiée (voir functions/admin/
+// logout.js) — string statique plutôt qu'un composant, il n'y a rien à paramétrer.
+export const LOGOUT_LINK =
+  '<a href="/admin/logout" style="font-size:.85rem;color:var(--color-text-muted);">Déconnexion</a>';

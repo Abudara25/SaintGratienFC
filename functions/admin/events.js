@@ -1,7 +1,7 @@
 // Consultation des événements enregistrés par functions/api/track-event.js (clic téléphone,
 // soumission du formulaire de contact) — même garde d'authentification que le reste de /admin.
 import { ensureEventsTable } from '../_shared/events-db.js';
-import { isAuthed, loginPage, escapeHtml } from '../_shared/admin-auth.js';
+import { isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../_shared/admin-auth.js';
 
 const LABELS = { phone_click: 'Clic sur le numéro de téléphone', contact_form_submit: 'Soumission du formulaire de contact' };
 
@@ -46,7 +46,10 @@ export async function onRequestGet({ request, env }) {
   th{font-family:var(--font-display);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);}
 </style>
 </head><body>
-  <p style="margin-bottom:16px;"><a href="/admin/inscriptions">&larr; Retour aux inscriptions</a></p>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <a href="/admin/inscriptions">&larr; Retour aux inscriptions</a>
+    ${LOGOUT_LINK}
+  </div>
   <h1 style="font-size:1.3rem;margin-bottom:20px;">Événements suivis</h1>
 
   <h2 style="font-size:1rem;">Totaux</h2>

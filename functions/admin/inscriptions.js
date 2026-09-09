@@ -3,7 +3,7 @@
 // L'édition d'une inscription se fait sur functions/admin/inscriptions/[id].js ; la suppression
 // est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
-import { COOKIE_NAME, isAuthed, loginPage, escapeHtml } from '../_shared/admin-auth.js';
+import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -258,7 +258,10 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   .insc-status-closed{background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
-  <p style="margin-bottom:12px;"><a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a></p>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a>
+    ${LOGOUT_LINK}
+  </div>
   <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
   <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
     <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
