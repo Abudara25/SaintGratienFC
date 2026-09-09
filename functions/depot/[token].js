@@ -53,18 +53,18 @@ function page({ siteUrl, inscription, error, success }) {
 
 <header class="site-header">
   <div class="container">
-    <a href="/index.html" class="brand">
+    <a href="/" class="brand">
       <img src="/assets/images/logo-96.webp" alt="Blason du Saint-Gratien FC" width="48" height="48">
       <span class="brand-name"><strong>Saint-Gratien FC</strong><span>Val-d'Oise</span></span>
     </a>
     <nav class="main-nav" id="main-nav" aria-label="Navigation principale">
       <ul>
-        <li><a href="/index.html">Accueil</a></li>
-        <li><a href="/actualites.html">Actualités</a></li>
-        <li><a href="/equipe.html">Le Club</a></li>
-        <li><a href="/entrainements.html">Entraînements</a></li>
-        <li><a href="/partenaires.html">Partenaires</a></li>
-        <li><a href="/contact.html">Contact</a></li>
+        <li><a href="/">Accueil</a></li>
+        <li><a href="/actualites">Actualités</a></li>
+        <li><a href="/equipe">Le Club</a></li>
+        <li><a href="/entrainements">Entraînements</a></li>
+        <li><a href="/partenaires">Partenaires</a></li>
+        <li><a href="/contact">Contact</a></li>
       </ul>
     </nav>
     <div class="header-actions">
@@ -105,12 +105,12 @@ function page({ siteUrl, inscription, error, success }) {
   <div class="container">
     <div class="footer-bottom">
       <p>© 2026 Saint-Gratien FC — Tous droits réservés.</p>
-      <p><a href="/mentions-legales.html">Mentions légales</a> · <a href="/confidentialite.html">Confidentialité</a></p>
+      <p><a href="/mentions-legales">Mentions légales</a> · <a href="/confidentialite">Confidentialité</a></p>
     </div>
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260909"></script>
+<script src="/assets/js/main.js?v=20260909b"></script>
 </body>
 </html>
 `;

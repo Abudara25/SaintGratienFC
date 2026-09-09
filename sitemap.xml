@@ -7,7 +7,7 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/actualites.html</loc>
+    <loc>https://saintgratienfc.fr/actualites</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -25,43 +25,43 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/equipe.html</loc>
+    <loc>https://saintgratienfc.fr/equipe</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/entrainements.html</loc>
+    <loc>https://saintgratienfc.fr/entrainements</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/partenaires.html</loc>
+    <loc>https://saintgratienfc.fr/partenaires</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/inscription.html</loc>
+    <loc>https://saintgratienfc.fr/inscription</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/contact.html</loc>
+    <loc>https://saintgratienfc.fr/contact</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/mentions-legales.html</loc>
+    <loc>https://saintgratienfc.fr/mentions-legales</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://saintgratienfc.fr/confidentialite.html</loc>
+    <loc>https://saintgratienfc.fr/confidentialite</loc>
     <lastmod>2026-09-09</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

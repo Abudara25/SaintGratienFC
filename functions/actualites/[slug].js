@@ -121,23 +121,23 @@ export async function onRequestGet({ request, params, env }) {
 
 <header class="site-header">
   <div class="container">
-    <a href="/index.html" class="brand">
+    <a href="/" class="brand">
       <img src="/assets/images/logo-96.webp" alt="Blason du Saint-Gratien FC" width="48" height="48">
       <span class="brand-name"><strong>Saint-Gratien FC</strong><span>Val-d'Oise</span></span>
     </a>
     <nav class="main-nav" id="main-nav" aria-label="Navigation principale">
       <ul>
-        <li><a href="/index.html">Accueil</a></li>
-        <li><a href="/actualites.html">Actualités</a></li>
-        <li><a href="/equipe.html">Le Club</a></li>
-        <li><a href="/entrainements.html">Entraînements</a></li>
-        <li><a href="/partenaires.html">Partenaires</a></li>
-        <li><a href="/contact.html">Contact</a></li>
+        <li><a href="/">Accueil</a></li>
+        <li><a href="/actualites">Actualités</a></li>
+        <li><a href="/equipe">Le Club</a></li>
+        <li><a href="/entrainements">Entraînements</a></li>
+        <li><a href="/partenaires">Partenaires</a></li>
+        <li><a href="/contact">Contact</a></li>
       </ul>
-      <a href="/inscription.html" class="btn btn-primary btn-sm nav-cta adhesion-cta">Inscription</a>
+      <a href="/inscription" class="btn btn-primary btn-sm nav-cta adhesion-cta">Inscription</a>
     </nav>
     <div class="header-actions">
-      <a href="/inscription.html" class="btn btn-primary btn-sm adhesion-cta">Inscription</a>
+      <a href="/inscription" class="btn btn-primary btn-sm adhesion-cta">Inscription</a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="main-nav">
         <span></span><span></span><span></span>
       </button>
@@ -162,7 +162,7 @@ export async function onRequestGet({ request, params, env }) {
       <div style="font-size:1.05rem;line-height:1.75;color:var(--color-text);">
         ${paragraphs || `<p>${excerpt}</p>`}
       </div>
-      <p style="margin-top:32px;"><a href="/actualites.html" class="card-link">Retour aux actualités</a></p>
+      <p style="margin-top:32px;"><a href="/actualites" class="card-link">Retour aux actualités</a></p>
     </div>
   </section>
 </main>
@@ -184,32 +184,32 @@ export async function onRequestGet({ request, params, env }) {
       <div>
         <h3>Navigation</h3>
         <ul>
-          <li><a href="/index.html">Accueil</a></li>
-          <li><a href="/actualites.html">Actualités</a></li>
-          <li><a href="/equipe.html">Le Club</a></li>
-          <li><a href="/entrainements.html">Entraînements</a></li>
-          <li><a href="/partenaires.html">Partenaires</a></li>
-          <li><a href="/contact.html">Contact</a></li>
+          <li><a href="/">Accueil</a></li>
+          <li><a href="/actualites">Actualités</a></li>
+          <li><a href="/equipe">Le Club</a></li>
+          <li><a href="/entrainements">Entraînements</a></li>
+          <li><a href="/partenaires">Partenaires</a></li>
+          <li><a href="/contact">Contact</a></li>
         </ul>
       </div>
       <div>
         <h3>Infos pratiques</h3>
         <ul>
-          <li><a href="/contact.html">Stade Robert Lemoine, Saint-Gratien</a></li>
+          <li><a href="/contact">Stade Robert Lemoine, Saint-Gratien</a></li>
           <li><a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <p>© 2026 Saint-Gratien FC — Tous droits réservés.</p>
-      <p><a href="/mentions-legales.html">Mentions légales</a> · <a href="/confidentialite.html">Confidentialité</a></p>
+      <p><a href="/mentions-legales">Mentions légales</a> · <a href="/confidentialite">Confidentialité</a></p>
       <p>Val-d'Oise · Depuis 2020</p>
       <p>Site créé par <a href="https://abiweb.fr" target="_blank" rel="nofollow noopener">Abiweb</a></p>
     </div>
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260909"></script>
+<script src="/assets/js/main.js?v=20260909b"></script>
 </body>
 </html>
 `;

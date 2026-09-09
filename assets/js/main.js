@@ -196,10 +196,12 @@ function initArticleLightbox() {
 }
 
 function markActiveNavLink() {
-  const current = (window.location.pathname.split('/').pop() || 'index.html');
+  // URLs propres (sans .html, Cloudflare Pages 308-redirige X.html vers X) : le pathname courant
+  // se compare directement aux href absolus ("/", "/actualites"...) plutôt qu'à un nom de fichier.
+  const current = window.location.pathname.replace(/\/$/, '') || '/';
   document.querySelectorAll('.main-nav a').forEach((link) => {
     const href = link.getAttribute('href');
-    if (href === current || (current === '' && href === 'index.html')) {
+    if (href === current) {
       link.setAttribute('aria-current', 'page');
     }
   });
