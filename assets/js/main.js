@@ -28,7 +28,12 @@ function initMapsConsent() {
       iframe.loading = 'lazy';
       iframe.referrerPolicy = 'no-referrer-when-downgrade';
       iframe.title = container.dataset.mapTitle || 'Carte';
+      // tabIndex + focus() : replaceChildren retire le bouton cliqué du DOM, ce qui ferait
+      // retomber le focus clavier sur <body> (perdu, sans repère) pour qui navigue au clavier
+      // ou au lecteur d'écran.
+      iframe.tabIndex = -1;
       container.replaceChildren(iframe);
+      iframe.focus();
     });
   });
 }
@@ -75,18 +80,24 @@ function initHeader() {
 function initMobileNav() {
   const burger = document.querySelector('.burger');
   const nav = document.querySelector('.main-nav');
+  const main = document.getElementById('main');
   if (!burger || !nav) return;
 
+  // inert sur <main> pendant que le panneau mobile est ouvert : sans ça, le contenu masqué
+  // derrière le panneau (position: fixed) reste dans l'ordre de tabulation, et un utilisateur
+  // clavier peut tabuler dans du contenu invisible à l'écran.
   const closeNav = () => {
     burger.classList.remove('is-active');
     nav.classList.remove('is-open');
     burger.setAttribute('aria-expanded', 'false');
+    if (main) main.inert = false;
   };
 
   burger.addEventListener('click', () => {
     const isOpen = nav.classList.toggle('is-open');
     burger.classList.toggle('is-active', isOpen);
     burger.setAttribute('aria-expanded', String(isOpen));
+    if (main) main.inert = isOpen;
   });
 
   nav.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeNav));
