@@ -174,3 +174,44 @@ export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
     // best-effort : un échec d'envoi ne doit jamais faire échouer l'inscription
   }
 }
+
+// Notifie le club (jusqu'ici seule la famille recevait un e-mail, voir sendConfirmationEmail
+// ci-dessus) : sans ça, le club ne sait qu'une nouvelle inscription est arrivée qu'en consultant
+// /admin/inscriptions manuellement. Volontairement simple (texte brut, pas le template habillé
+// ci-dessus) — usage interne, pas une communication destinée à une famille.
+export async function sendAdminNotification(env, data, siteUrl) {
+  if (!env.BREVO_API_KEY) return;
+
+  const nomEnfant = `${data.enfantPrenom} ${data.enfantNom}`;
+  const categorie = CATEGORIE_LABEL[data.categorie] || data.categorie;
+  const text = `Nouvelle inscription reçue sur le site :
+
+Enfant : ${nomEnfant} (${categorie})
+Naissance : ${data.naissance}
+Parent : ${data.parentPrenom} ${data.parentNom}
+E-mail : ${data.email}
+Téléphone : ${data.telephone || '—'}
+Mode de paiement : ${data.modePaiement}
+
+Voir le détail : ${siteUrl}/admin/inscriptions`;
+
+  const body = {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to: [{ email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' }],
+    subject: `Nouvelle inscription : ${nomEnfant}`,
+    textContent: text,
+  };
+
+  try {
+    await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // best-effort : un échec d'envoi ne doit jamais faire échouer l'inscription
+  }
+}
