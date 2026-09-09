@@ -63,6 +63,12 @@ export const DEFAULT_CATEGORIES_CONFIG = {
   // Date limite (YYYY-MM-DD) de la réinscription prioritaire — voir effectiveInscriptionStatus()
   // ci-dessous et functions/admin/categories.js. null = pas de campagne de réinscription en cours.
   dateLimiteReinscription: null,
+  // Valeur de "saison" juste avant le dernier changement effectif (voir onRequestPost dans
+  // functions/admin/categories.js, action=save-saison) — permet le bouton "Revenir à la saison
+  // précédente" (action=revert-saison), qui échange saison et previousSaison : un aller-retour reste
+  // toujours possible, pas seulement l'annulation d'un seul changement. null tant qu'aucun changement
+  // de saison n'a encore eu lieu depuis l'ajout de ce champ.
+  previousSaison: null,
   categories: [
     {
       id: 'u6-u7',

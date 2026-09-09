@@ -138,21 +138,29 @@ function page({ config, error, ok, archivedMessage }) {
       ${archivedMessage ? `<p class="cat-banner cat-banner-ok">${escapeHtml(archivedMessage)}</p>` : ok ? '<p class="cat-banner cat-banner-ok">Modifications enregistrées.</p>' : ''}
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Saison et tarif</h2>
-      <form method="POST" style="margin-bottom:32px;">
+      <form method="POST" id="saison-form" style="margin-bottom:12px;">
         <input type="hidden" name="action" value="save-saison">
         <div class="form-row">
           <div class="form-field">
             <label for="saison">Libellé de saison (ex. « 2026-2027 »)</label>
-            <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
+            <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" data-current-saison="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
           </div>
           <div class="form-field">
             <label for="prix">Tarif de l'adhésion (€)</label>
             <input type="number" id="prix" name="prix" value="${config.prix ?? 180}" required min="0" max="9999" step="1">
           </div>
         </div>
-        <p style="margin:8px 0 12px;font-size:.8rem;color:var(--color-text-muted);">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
+        <p style="margin:8px 0 12px;font-size:.8rem;color:var(--color-text-muted);">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Changer le libellé de saison fait automatiquement basculer tous les adhérents actuels dans <a href="/admin/reinscription">/admin/reinscription</a> — une confirmation vous sera demandée. Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
         <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
       </form>
+      ${
+        config.previousSaison && config.previousSaison !== config.saison
+          ? `<form method="POST" class="cat-confirm-form" style="margin-bottom:32px;">
+        <input type="hidden" name="action" value="revert-saison">
+        <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" data-confirm="Revenir à la saison « ${escapeHtml(config.previousSaison)} » ? La saison actuelle (« ${escapeHtml(config.saison)}») redeviendra « saison précédente » — vous pourrez y revenir de la même façon. Le tarif et les tranches de naissance déjà modifiés depuis ne sont pas annulés.">&larr; Revenir à la saison précédente (« ${escapeHtml(config.previousSaison)} »)</button>
+      </form>`
+          : '<div style="margin-bottom:32px;"></div>'
+      }
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Réinscription prioritaire — étape suivante</h2>
       <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la nouvelle saison et la date limite enregistrées ci-dessous, tout le pilotage de la campagne (liste des familles à contacter, envoi du lien, rappels) se fait sur <a href="/admin/reinscription"><strong>/admin/reinscription</strong></a> — pas ici. Tant que la date limite n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir les inscriptions » dans /admin/inscriptions, sauf pour rouvrir plus tôt.</p>
@@ -219,7 +227,7 @@ function page({ config, error, ok, archivedMessage }) {
     </main>
   </div>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-categories.js?v=20260909a"></script>
+  <script src="/assets/js/admin-categories.js?v=20260909b"></script>
 </body></html>`;
 }
 
@@ -273,6 +281,19 @@ export async function onRequestPost({ request, env }) {
     if (!saison) return withError('Le libellé de saison est obligatoire.');
     if (!Number.isInteger(prix) || prix < 0 || prix > 9999) return withError('Le tarif doit être un nombre entier valide.');
     const nextConfig = { ...config, saison, prix };
+    // Ne mémorise l'ancienne valeur que si la saison change réellement (pas à chaque modification
+    // du tarif seul) — voir action=revert-saison ci-dessous et le bouton "Revenir à la saison
+    // précédente" du formulaire.
+    if (saison !== config.saison) nextConfig.previousSaison = config.saison;
+    await setCategoriesConfig(env, nextConfig);
+    return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  // Échange saison et previousSaison — un aller-retour reste toujours possible (pas seulement
+  // l'annulation d'un seul changement), donc pas de risque à cliquer deux fois par erreur.
+  if (action === 'revert-saison') {
+    if (!config.previousSaison) return withError('Aucune saison précédente enregistrée.');
+    const nextConfig = { ...config, saison: config.previousSaison, previousSaison: config.saison };
     await setCategoriesConfig(env, nextConfig);
     return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
