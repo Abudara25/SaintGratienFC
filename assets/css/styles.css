@@ -741,7 +741,11 @@ article.card { cursor: zoom-in; }
   .admin-layout { flex-direction: column; }
   .admin-sidebar { width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; }
   .admin-sidebar-brand { flex-basis: 100%; }
-  .admin-sidebar-links { flex-direction: row; flex-wrap: wrap; flex: none; gap: 6px; }
+  /* flex:1 1 auto + min-width:0 (pas flex:none) : sinon ce conteneur refuse de rétrécir et
+     s'agrandit pour loger tous les liens sur une seule ligne avant de déborder de .admin-sidebar,
+     au lieu de rétrécir puis de wrapper ses propres enfants (repéré via mesure DOM à 360px — le
+     débordement horizontal ne se voyait pas à l'oeil sur une capture d'écran). */
+  .admin-sidebar-links { flex-direction: row; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; gap: 6px; }
   .admin-nav-link { min-height: 40px; padding: 6px 10px; }
   .admin-nav-logout { margin-left: auto; }
 }

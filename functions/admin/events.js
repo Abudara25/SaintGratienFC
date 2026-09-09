@@ -39,7 +39,7 @@ export async function onRequestGet({ request, env }) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909e">
 <style>
   .admin-main{max-width:900px;}
   table{width:100%;border-collapse:collapse;margin-bottom:32px;}
