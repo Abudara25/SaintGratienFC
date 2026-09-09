@@ -5,7 +5,7 @@
 // lien de dépôt du dossier signé (functions/depot/[token].js) — ce n'est plus un pur filet de
 // sécurité silencieux comme avant l'ajout du dépôt (2026-09-04). Envoie aussi un e-mail de
 // réception (pas de confirmation définitive, voir confirmation-email.js) via Brevo.
-import { ensureInscriptionsTable, findExistingInscription } from '../_shared/inscriptions-db.js';
+import { ensureInscriptionsTable, findExistingInscription, buildDedupKey } from '../_shared/inscriptions-db.js';
 import { sendConfirmationEmail, sendAdminNotification } from '../_shared/confirmation-email.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
@@ -82,12 +82,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
   }
 
   const uploadToken = crypto.randomUUID();
+  const dedupKey = buildDedupKey({ enfantPrenom: data.enfantPrenom, enfantNom: data.enfantNom, email: data.email });
 
   try {
     await env.DB.prepare(
       `INSERT INTO inscriptions
-        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         data.enfantPrenom.trim(),
@@ -106,7 +107,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.autorisation ? 1 : 0,
         data.droitImage ? 1 : 0,
         data.rgpd ? 1 : 0,
-        uploadToken
+        uploadToken,
+        dedupKey
       )
       .run();
   } catch (e) {

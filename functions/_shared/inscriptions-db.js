@@ -38,6 +38,11 @@ export async function ensureInscriptionsTable(db) {
     'dossier_key TEXT',
     'dossier_content_type TEXT',
     'dossier_uploaded_at TEXT',
+    // 2026-09-09 : voir buildDedupKey() ci-dessous — SQLite/D1 ne gère pas les accents dans
+    // LOWER()/UPPER() (LOWER('É') renvoie 'É' inchangé), donc LOWER(TRIM(enfant_prenom)) = LOWER(?)
+    // ne détectait pas "Léa" vs "LÉA" comme le même prénom. dedup_key est calculée en JS
+    // (accents retirés) à l'écriture, comparée par égalité stricte plutôt que via LOWER() en SQL.
+    'dedup_key TEXT',
   ];
   for (const column of addedColumns) {
     try {
@@ -46,22 +51,42 @@ export async function ensureInscriptionsTable(db) {
   }
 
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)').run();
+  await db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)').run();
+}
+
+// Retire les accents et met en minuscules — SQLite LOWER() étant limité à l'ASCII (voir plus haut),
+// la normalisation se fait ici, côté JS, avant toute comparaison ou écriture.
+function normalize(str) {
+  return String(str || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+}
+
+// Clé de déduplication : prénom+nom+e-mail normalisés (sans naissance — voir findExistingInscription
+// ci-dessous pour pourquoi). Calculée à l'identique à l'écriture (functions/api/inscriptions.js) et
+// à la lecture, pour une comparaison par égalité stricte en SQL plutôt qu'un LOWER() qui échoue sur
+// les caractères accentués.
+export function buildDedupKey({ enfantPrenom, enfantNom, email }) {
+  return `${normalize(enfantPrenom)}|${normalize(enfantNom)}|${normalize(email)}`;
 }
 
 // Recherche une inscription existante par identité enfant+parent. Utilisé par le contrôle strict
 // au submit (functions/api/inscriptions.js, POST — naissance toujours fournie) et par le contrôle
 // temps réel pendant la saisie (même fichier, GET — naissance optionnelle, pas forcément encore
-// remplie au moment où prénom/nom/e-mail le sont, l'ordre des champs du formulaire plaçant
-// naissance avant e-mail mais un utilisateur peut remplir dans le désordre).
+// remplie au moment où prénom/nom/e-mail le sont). La correspondance sur prénom/nom/e-mail se fait
+// via dedup_key (égalité stricte, calculée en JS) ; la naissance, quand fournie, est filtrée
+// ensuite en JS sur les candidats trouvés — la table reste petite (un seul club), pas besoin de
+// l'inclure dans la clé indexée.
 export async function findExistingInscription(db, { enfantPrenom, enfantNom, naissance, email }) {
-  const conditions = ['LOWER(TRIM(enfant_prenom)) = LOWER(?)', 'LOWER(TRIM(enfant_nom)) = LOWER(?)', 'LOWER(TRIM(email)) = LOWER(?)'];
-  const params = [enfantPrenom.trim(), enfantNom.trim(), email.trim()];
-  if (naissance) {
-    conditions.push('naissance = ?');
-    params.push(naissance);
-  }
-  return db
-    .prepare(`SELECT upload_token, created_at FROM inscriptions WHERE ${conditions.join(' AND ')} LIMIT 1`)
-    .bind(...params)
-    .first();
+  const dedupKey = buildDedupKey({ enfantPrenom, enfantNom, email });
+  const { results } = await db
+    .prepare('SELECT upload_token, created_at, naissance FROM inscriptions WHERE dedup_key = ?')
+    .bind(dedupKey)
+    .all();
+
+  if (!results.length) return null;
+  if (!naissance) return results[0];
+  return results.find((r) => r.naissance === naissance) || null;
 }
