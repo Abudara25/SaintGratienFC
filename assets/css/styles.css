@@ -714,3 +714,34 @@ article.card { cursor: zoom-in; }
   transition: background .2s var(--ease);
 }
 .lightbox-close:hover { background: var(--gold-100); }
+
+/* Sidebar de navigation /admin/* (voir _shared/admin-auth.js, adminSidebar()) — remplace les
+   liens de retour/déconnexion dispersés en haut de chaque page admin par une navigation commune
+   (Inscriptions, Corbeille, Événements, Paramètres, Déconnexion). Un seul bloc CSS partagé plutôt
+   que dupliqué dans le <style> inline de chaque page admin (elles chargent déjà ce fichier). */
+.admin-layout { display: flex; min-height: 100vh; }
+.admin-sidebar {
+  flex-shrink: 0; width: 220px; background: var(--maroon-900); color: var(--cream-100);
+  display: flex; flex-direction: column; gap: 20px; padding: 24px 16px;
+}
+.admin-sidebar-brand { font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: .02em; }
+.admin-sidebar-links { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.admin-nav-link {
+  display: flex; align-items: center; min-height: 44px; padding: 8px 12px;
+  border-radius: var(--radius-sm); color: var(--cream-100); font-size: .92rem; text-decoration: none;
+}
+.admin-nav-link:hover { background: rgba(255, 255, 255, .1); }
+.admin-nav-link.admin-nav-active { background: var(--gold-500); color: var(--maroon-950); font-weight: 600; }
+.admin-nav-logout { font-size: .85rem; opacity: .8; }
+.admin-main { flex: 1; min-width: 0; padding: 16px; }
+@media (min-width: 600px) { .admin-main { padding: 24px; } }
+/* En dessous de 760px, la sidebar passe en rangée horizontale en haut de page plutôt qu'un menu
+   burger : peu de liens (5), pas besoin de JS pour les cacher — ils wrappent simplement. */
+@media (max-width: 760px) {
+  .admin-layout { flex-direction: column; }
+  .admin-sidebar { width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; }
+  .admin-sidebar-brand { flex-basis: 100%; }
+  .admin-sidebar-links { flex-direction: row; flex-wrap: wrap; flex: none; gap: 6px; }
+  .admin-nav-link { min-height: 40px; padding: 6px 10px; }
+  .admin-nav-logout { margin-left: auto; }
+}

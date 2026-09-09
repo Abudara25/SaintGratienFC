@@ -1,7 +1,7 @@
 // Édition d'une inscription (base D1 "DB"), liée depuis le bouton "Modifier" de
 // /admin/inscriptions. Même garde d'authentification que la liste (voir _shared/admin-auth.js).
 import { ensureInscriptionsTable } from '../../_shared/inscriptions-db.js';
-import { isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../../_shared/admin-auth.js';
+import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../../_shared/admin-auth.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 
@@ -36,13 +36,16 @@ function editPage(row, { error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
-</head><body style="padding:16px;max-width:640px;margin:0 auto;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <a href="/admin/inscriptions">&larr; Retour à la liste</a>
-    ${LOGOUT_LINK}
-  </div>
-  <h1 style="font-size:1.3rem;margin-bottom:16px;">Modifier l'inscription de ${escapeHtml(row.enfant_prenom)} ${escapeHtml(row.enfant_nom)}</h1>
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
+<style>
+  .admin-main{max-width:640px;}
+</style>
+</head><body>
+  <div class="admin-layout">
+    ${adminSidebar('inscriptions')}
+    <main class="admin-main">
+      <a href="/admin/inscriptions">&larr; Retour à la liste</a>
+      <h1 style="font-size:1.3rem;margin:12px 0 16px;">Modifier l'inscription de ${escapeHtml(row.enfant_prenom)} ${escapeHtml(row.enfant_nom)}</h1>
   <p style="margin-bottom:16px;">Dossier signé : ${
     row.dossier_uploaded_at
       ? `<a href="/admin/inscriptions/${row.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
@@ -146,6 +149,8 @@ function editPage(row, { error } = {}) {
       <a href="/admin/inscriptions" class="btn btn-dark" style="flex:1;min-width:140px;">Annuler</a>
     </div>
   </form>
+    </main>
+  </div>
 </body></html>`;
 }
 

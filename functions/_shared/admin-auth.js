@@ -46,7 +46,7 @@ export function loginPage({ error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
@@ -63,7 +63,25 @@ export function loginPage({ error } = {}) {
 export const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Lien de déconnexion identique sur chaque page /admin/* authentifiée (voir functions/admin/
-// logout.js) — string statique plutôt qu'un composant, il n'y a rien à paramétrer.
-export const LOGOUT_LINK =
-  '<a href="/admin/logout" style="font-size:.85rem;color:var(--color-text-muted);">Déconnexion</a>';
+// Navigation commune à chaque page /admin/* authentifiée — remplace les liens de retour/
+// déconnexion qui étaient dispersés (et incohérents d'une page à l'autre) dans une petite barre
+// en haut de chaque page. `active` sélectionne l'entrée en surbrillance (voir ADMIN_NAV_LINKS) ;
+// CSS partagé dans assets/css/styles.css (.admin-layout/.admin-sidebar/...), pas dupliqué dans le
+// <style> inline de chaque page puisqu'elles chargent déjà ce fichier.
+const ADMIN_NAV_LINKS = [
+  { key: 'inscriptions', href: '/admin/inscriptions', label: 'Inscriptions' },
+  { key: 'archive', href: '/admin/inscriptions?view=archive', label: 'Corbeille' },
+  { key: 'events', href: '/admin/events', label: 'Événements' },
+  { key: 'parametres', href: '/admin/parametres', label: 'Paramètres' },
+];
+
+export function adminSidebar(active) {
+  const links = ADMIN_NAV_LINKS.map(
+    (l) => `<a href="${l.href}" class="admin-nav-link${l.key === active ? ' admin-nav-active' : ''}">${l.label}</a>`
+  ).join('');
+  return `<nav class="admin-sidebar" aria-label="Navigation admin">
+    <span class="admin-sidebar-brand">Saint-Gratien FC</span>
+    <div class="admin-sidebar-links">${links}</div>
+    <a href="/admin/logout" class="admin-nav-link admin-nav-logout">Déconnexion</a>
+  </nav>`;
+}

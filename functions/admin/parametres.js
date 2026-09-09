@@ -8,7 +8,7 @@
 // _shared/confirmation-email.js) et stocké 15 min dans le KV (_shared/settings-kv.js). Le nouveau
 // mot de passe n'est appliqué qu'après saisie de ce code — protège contre un changement fait
 // depuis une session compromise (cookie volé) sans que le vrai responsable en soit informé.
-import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK, getAdminPassword, setAdminPassword } from '../_shared/admin-auth.js';
+import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, adminSidebar, getAdminPassword, setAdminPassword } from '../_shared/admin-auth.js';
 import {
   getNotificationEmail,
   setNotificationEmail,
@@ -59,28 +59,32 @@ function page({ notificationEmail, passwordError, passwordOk, emailError, emailO
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
-</head><body style="padding:16px;max-width:480px;margin:0 auto;">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <a href="/admin/inscriptions">&larr; Retour aux inscriptions</a>
-    ${LOGOUT_LINK}
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
+<style>
+  .admin-main{max-width:480px;}
+</style>
+</head><body>
+  <div class="admin-layout">
+    ${adminSidebar('parametres')}
+    <main class="admin-main">
+      <h1 style="font-size:1.3rem;margin-bottom:24px;">Paramètres</h1>
+
+      <h2 style="font-size:1rem;margin-bottom:8px;">Notification des nouvelles inscriptions</h2>
+      ${emailOk ? '<p style="color:var(--maroon-900);margin-bottom:12px;">Adresse mise à jour.</p>' : ''}
+      ${emailError ? `<p style="color:var(--color-error, #b3261e);margin-bottom:12px;">${escapeHtml(emailError)}</p>` : ''}
+      <form method="POST" style="margin-bottom:32px;">
+        <input type="hidden" name="action" value="notification-email">
+        <div class="form-field" style="margin-bottom:12px;">
+          <label for="notification-email">E-mail(s) recevant la notification (séparés par une virgule)</label>
+          <input type="text" id="notification-email" name="notificationEmail" value="${escapeHtml(notificationEmail)}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </form>
+
+      <h2 style="font-size:1rem;margin-bottom:8px;">Mot de passe admin</h2>
+      ${passwordSection}
+    </main>
   </div>
-  <h1 style="font-size:1.3rem;margin-bottom:24px;">Paramètres</h1>
-
-  <h2 style="font-size:1rem;margin-bottom:8px;">Notification des nouvelles inscriptions</h2>
-  ${emailOk ? '<p style="color:var(--maroon-900);margin-bottom:12px;">Adresse mise à jour.</p>' : ''}
-  ${emailError ? `<p style="color:var(--color-error, #b3261e);margin-bottom:12px;">${escapeHtml(emailError)}</p>` : ''}
-  <form method="POST" style="margin-bottom:32px;">
-    <input type="hidden" name="action" value="notification-email">
-    <div class="form-field" style="margin-bottom:12px;">
-      <label for="notification-email">E-mail(s) recevant la notification (séparés par une virgule)</label>
-      <input type="text" id="notification-email" name="notificationEmail" value="${escapeHtml(notificationEmail)}" required>
-    </div>
-    <button type="submit" class="btn btn-primary">Enregistrer</button>
-  </form>
-
-  <h2 style="font-size:1rem;margin-bottom:8px;">Mot de passe admin</h2>
-  ${passwordSection}
 </body></html>`;
 }
 

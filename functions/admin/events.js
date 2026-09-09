@@ -1,7 +1,7 @@
 // Consultation des événements enregistrés par functions/api/track-event.js (clic téléphone,
 // soumission du formulaire de contact) — même garde d'authentification que le reste de /admin.
 import { ensureEventsTable } from '../_shared/events-db.js';
-import { isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../_shared/admin-auth.js';
+import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
 
 const LABELS = { phone_click: 'Clic sur le numéro de téléphone', contact_form_submit: 'Soumission du formulaire de contact' };
 
@@ -39,32 +39,32 @@ export async function onRequestGet({ request, env }) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
 <style>
-  body{padding:16px;max-width:900px;margin:0 auto;}
-  @media (min-width:600px){ body{padding:24px;} }
+  .admin-main{max-width:900px;}
   table{width:100%;border-collapse:collapse;margin-bottom:32px;}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--cream-200);font-size:.9rem;}
   th{font-family:var(--font-display);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);}
 </style>
 </head><body>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-    <a href="/admin/inscriptions">&larr; Retour aux inscriptions</a>
-    ${LOGOUT_LINK}
+  <div class="admin-layout">
+    ${adminSidebar('events')}
+    <main class="admin-main">
+      <h1 style="font-size:1.3rem;margin-bottom:20px;">Événements suivis</h1>
+
+      <h2 style="font-size:1rem;">Totaux</h2>
+      <table>
+        <thead><tr><th>Événement</th><th>Total</th><th>Dernier</th></tr></thead>
+        <tbody>${totalsHtml}</tbody>
+      </table>
+
+      <h2 style="font-size:1rem;">50 derniers événements</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
+        <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
+      </table>
+    </main>
   </div>
-  <h1 style="font-size:1.3rem;margin-bottom:20px;">Événements suivis</h1>
-
-  <h2 style="font-size:1rem;">Totaux</h2>
-  <table>
-    <thead><tr><th>Événement</th><th>Total</th><th>Dernier</th></tr></thead>
-    <tbody>${totalsHtml}</tbody>
-  </table>
-
-  <h2 style="font-size:1rem;">50 derniers événements</h2>
-  <table>
-    <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
-    <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
-  </table>
 </body></html>`,
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

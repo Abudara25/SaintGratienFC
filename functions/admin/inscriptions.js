@@ -3,7 +3,7 @@
 // L'édition d'une inscription se fait sur functions/admin/inscriptions/[id].js ; la suppression
 // est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
-import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK, getAdminPassword } from '../_shared/admin-auth.js';
+import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, adminSidebar, getAdminPassword } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -267,10 +267,9 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909d">
 <style>
-  body{padding:16px;max-width:1400px;margin:0 auto;}
-  @media (min-width:600px){ body{padding:24px;} }
+  .admin-main{max-width:1400px;}
   .insc-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center;}
   .insc-filters input[type=search],
   .insc-filters select{
@@ -326,21 +325,17 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
   .insc-status-closed{background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-      <a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a>
-      ${
-        filters.view === 'archive'
-          ? '<a href="/admin/inscriptions">&larr; Retour aux inscriptions actives</a>'
-          : `<a href="/admin/inscriptions?view=archive">Corbeille (${archivedCount})</a>`
-      }
-    </div>
-    <div style="display:flex;gap:16px;align-items:center;">
-      <a href="/admin/parametres">Paramètres</a>
-      ${LOGOUT_LINK}
-    </div>
-  </div>
+  <div class="admin-layout">
+    ${adminSidebar(filters.view === 'archive' ? 'archive' : 'inscriptions')}
+    <main class="admin-main">
   <h1 style="font-size:1.3rem;">${filters.view === 'archive' ? 'Corbeille' : 'Inscriptions'} (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
+  ${
+    filters.view === 'archive'
+      ? '<p style="margin-bottom:12px;"><a href="/admin/inscriptions">&larr; Retour aux inscriptions actives</a></p>'
+      : archivedCount
+        ? `<p style="margin-bottom:12px;"><a href="/admin/inscriptions?view=archive">Voir la corbeille (${archivedCount}) &rarr;</a></p>`
+        : ''
+  }
   <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
     <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
     <form method="POST" action="/admin/inscription-status">
@@ -364,6 +359,8 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
           : 'Aucune inscription pour le moment.'
     }</p>`
   }</div>
+    </main>
+  </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
   <script src="/assets/js/admin-inscriptions.js?v=20260909c"></script>
