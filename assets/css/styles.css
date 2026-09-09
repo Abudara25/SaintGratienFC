@@ -724,7 +724,14 @@ article.card { cursor: zoom-in; }
   flex-shrink: 0; width: 220px; background: var(--maroon-900); color: var(--cream-100);
   display: flex; flex-direction: column; gap: 20px; padding: 24px 16px;
 }
+.admin-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .admin-sidebar-brand { font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: .02em; }
+.admin-nav-toggle {
+  display: none; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 44px; height: 44px; padding: 0; border: none; border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, .1); color: var(--cream-100); font-size: 1.3rem; line-height: 1; cursor: pointer;
+}
+.admin-nav-toggle:hover { background: rgba(255, 255, 255, .18); }
 .admin-sidebar-links { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .admin-nav-link {
   display: flex; align-items: center; min-height: 44px; padding: 8px 12px;
@@ -735,17 +742,17 @@ article.card { cursor: zoom-in; }
 .admin-nav-logout { font-size: .85rem; opacity: .8; }
 .admin-main { flex: 1; min-width: 0; padding: 16px; }
 @media (min-width: 600px) { .admin-main { padding: 24px; } }
-/* En dessous de 760px, la sidebar passe en rangée horizontale en haut de page plutôt qu'un menu
-   burger : peu de liens (5), pas besoin de JS pour les cacher — ils wrappent simplement. */
+/* Sous 760px : sidebar repliée en simple barre (marque + bouton burger) — les liens et la
+   déconnexion restent dans le DOM mais masqués (display:none) tant que .admin-sidebar n'a pas la
+   classe admin-nav-open, basculée par assets/js/admin-nav.js (script externe : le CSP du site
+   bloque les attributs onclick/<script> inline, voir la note dans admin-inscriptions.js). Choisi
+   plutôt que la rangée de liens qui wrappait avant (repérée en débordement à 360px) : avec 5 liens,
+   un menu replié est plus compact et plus net sur petit écran qu'une rangée qui wrappe. */
 @media (max-width: 760px) {
   .admin-layout { flex-direction: column; }
-  .admin-sidebar { width: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 14px 16px; }
-  .admin-sidebar-brand { flex-basis: 100%; }
-  /* flex:1 1 auto + min-width:0 (pas flex:none) : sinon ce conteneur refuse de rétrécir et
-     s'agrandit pour loger tous les liens sur une seule ligne avant de déborder de .admin-sidebar,
-     au lieu de rétrécir puis de wrapper ses propres enfants (repéré via mesure DOM à 360px — le
-     débordement horizontal ne se voyait pas à l'oeil sur une capture d'écran). */
-  .admin-sidebar-links { flex-direction: row; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; gap: 6px; }
-  .admin-nav-link { min-height: 40px; padding: 6px 10px; }
-  .admin-nav-logout { margin-left: auto; }
+  .admin-sidebar { width: auto; padding: 12px 16px; gap: 12px; }
+  .admin-nav-toggle { display: inline-flex; }
+  .admin-sidebar-links, .admin-nav-logout { display: none; }
+  .admin-sidebar.admin-nav-open .admin-sidebar-links { display: flex; }
+  .admin-sidebar.admin-nav-open .admin-nav-logout { display: flex; }
 }

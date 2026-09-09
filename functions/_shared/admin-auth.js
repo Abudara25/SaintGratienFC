@@ -46,7 +46,7 @@ export function loginPage({ error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909e">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
@@ -79,9 +79,16 @@ export function adminSidebar(active) {
   const links = ADMIN_NAV_LINKS.map(
     (l) => `<a href="${l.href}" class="admin-nav-link${l.key === active ? ' admin-nav-active' : ''}">${l.label}</a>`
   ).join('');
+  // Le bouton burger n'existe visuellement (CSS) que sous 760px ; toggle géré par
+  // assets/js/admin-nav.js (basculement de la classe admin-nav-open sur .admin-sidebar).
   return `<nav class="admin-sidebar" aria-label="Navigation admin">
-    <span class="admin-sidebar-brand">Saint-Gratien FC</span>
-    <div class="admin-sidebar-links">${links}</div>
+    <div class="admin-sidebar-top">
+      <span class="admin-sidebar-brand">Saint-Gratien FC</span>
+      <button type="button" class="admin-nav-toggle" aria-expanded="false" aria-controls="admin-nav-links">
+        <span aria-hidden="true">&#9776;</span><span class="visually-hidden">Menu</span>
+      </button>
+    </div>
+    <div class="admin-sidebar-links" id="admin-nav-links">${links}</div>
     <a href="/admin/logout" class="admin-nav-link admin-nav-logout">Déconnexion</a>
   </nav>`;
 }

@@ -36,7 +36,7 @@ function editPage(row, { error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909e">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
 <style>
   .admin-main{max-width:640px;}
 </style>
@@ -151,6 +151,7 @@ function editPage(row, { error } = {}) {
   </form>
     </main>
   </div>
+  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
 </body></html>`;
 }
 

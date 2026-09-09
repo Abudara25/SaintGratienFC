@@ -267,7 +267,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909e">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
 <style>
   .admin-main{max-width:1400px;}
   .insc-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center;}
@@ -363,6 +363,7 @@ function tablePage(rows, { filters, years, total, archivedCount, returnTo, dossi
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
+  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
   <script src="/assets/js/admin-inscriptions.js?v=20260909c"></script>
 </body></html>`;
 }
