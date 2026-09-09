@@ -53,6 +53,14 @@ export async function ensureInscriptionsTable(db) {
     // définitivement (voir functions/admin/inscriptions.js, action=archive/restore). NULL = actif ;
     // une date = archivé, affichée telle quelle dans la corbeille (même convention que created_at).
     'archived_at TEXT',
+    // Saison au moment de l'inscription (ex. "2026-2027"), lue côté serveur depuis
+    // _shared/settings-kv.js au moment du POST (functions/api/inscriptions.js) — jamais la valeur
+    // envoyée par le client, qui a pu charger /api/categories avant un changement de saison entre-
+    // temps. NULL pour les inscriptions créées avant l'ajout de cette colonne (traitées comme
+    // "saison en cours" par l'action "Archiver les saisons précédentes" de /admin/categories,
+    // plutôt que rétro-datées : au lancement de cette fonctionnalité, le club n'a connu qu'une
+    // seule saison, donc toutes les lignes existantes sont bien de la saison en cours).
+    'saison TEXT',
   ];
   for (const column of addedColumns) {
     try {

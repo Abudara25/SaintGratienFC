@@ -7,6 +7,7 @@
 // réception (pas de confirmation définitive, voir confirmation-email.js) via Brevo.
 import { ensureInscriptionsTable, findExistingInscription, buildDedupKey } from '../_shared/inscriptions-db.js';
 import { sendConfirmationEmail, sendAdminNotification } from '../_shared/confirmation-email.js';
+import { getCategoriesConfig } from '../_shared/settings-kv.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 
@@ -83,12 +84,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   const uploadToken = crypto.randomUUID();
   const dedupKey = buildDedupKey({ enfantPrenom: data.enfantPrenom, enfantNom: data.enfantNom, email: data.email });
+  // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
+  // navigateur avait chargé /api/categories avant un changement de saison entre-temps. Sert à
+  // l'action "Archiver les saisons précédentes" de /admin/categories.
+  const { saison } = await getCategoriesConfig(env);
 
   try {
     await env.DB.prepare(
       `INSERT INTO inscriptions
-        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         data.enfantPrenom.trim(),
@@ -108,7 +113,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.droitImage ? 1 : 0,
         data.rgpd ? 1 : 0,
         uploadToken,
-        dedupKey
+        dedupKey,
+        saison
       )
       .run();
   } catch (e) {

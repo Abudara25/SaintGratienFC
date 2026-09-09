@@ -6,11 +6,15 @@
 // - functions/admin/inscriptions/[id].js (select catégorie du formulaire d'édition) ;
 // - functions/_shared/confirmation-email.js (libellé de saison dans l'e-mail de confirmation) ;
 // - functions/admin/inscriptions.js (libellé de saison injecté dans le PDF régénéré depuis l'admin).
+// L'action "Archiver les saisons précédentes" (onRequestPost, archive-previous-seasons) compare le
+// libellé de saison courant à la colonne D1 "saison" (_shared/inscriptions-db.js), écrite à
+// l'inscription par functions/api/inscriptions.js.
 // Le champ "categorie" stocké en base D1 reste le libellé texte (ex. "U6 - U7"), pas l'id interne
 // ci-dessous : renommer une catégorie ne modifie donc pas les inscriptions déjà enregistrées (comme
 // pour le filtre "année de naissance", dérivé des données existantes plutôt que d'une liste figée).
 import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
 import { getCategoriesConfig, setCategoriesConfig } from '../_shared/settings-kv.js';
+import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 
 function slugify(label) {
   const base = String(label)
@@ -20,6 +24,27 @@ function slugify(label) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return base || 'categorie';
+}
+
+// Rappel visuel (pas d'e-mail automatique : ce projet est une Pages Function sans wrangler.toml/
+// Cron Trigger, une automatisation par e-mail programmée serait un chantier d'infra à part — voir
+// la discussion avec l'utilisateur). Fenêtre du 1er mai au 31 août de l'année de fin de la saison
+// enregistrée (ex. mai-août 2027 pour "2026-2027") : la saison se termine en juin, les inscriptions
+// de la suivante démarrent juste après pour l'anticiper (voir CLAUDE.md). Se recale tout seul
+// l'année suivante dès que l'admin met à jour le libellé de saison ci-dessous — pas d'état à
+// stocker ni de "ne plus afficher" à gérer.
+function seasonEndYear(saison) {
+  const match = /(\d{4})\s*-\s*(\d{4})/.exec(saison || '');
+  return match ? Number(match[2]) : null;
+}
+
+function showSeasonReminder(saison) {
+  const endYear = seasonEndYear(saison);
+  if (!endYear) return false;
+  const now = Date.now();
+  const start = Date.UTC(endYear, 4, 1);
+  const end = Date.UTC(endYear, 7, 31, 23, 59, 59);
+  return now >= start && now <= end;
 }
 
 function uniqueId(base, existingIds) {
@@ -77,7 +102,7 @@ function categoryCard(c, { isFirst, isLast }) {
   </div>`;
 }
 
-function page({ config, error, ok }) {
+function page({ config, error, ok, archivedMessage }) {
   const cards = config.categories
     .map((c, i) => categoryCard(c, { isFirst: i === 0, isLast: i === config.categories.length - 1 }))
     .join('');
@@ -104,18 +129,36 @@ function page({ config, error, ok }) {
     <main class="admin-main">
       <h1 style="font-size:1.3rem;margin-bottom:8px;">Catégories</h1>
       <p style="margin-bottom:20px;color:var(--color-text-muted);font-size:.9rem;">Gérez ici les catégories d'âge affichées sur le formulaire d'inscription, leurs tranches de naissance et leurs liens de paiement HelloAsso — pratique pour préparer la saison suivante dès la fin de la saison en cours, sans coder.</p>
+      ${
+        showSeasonReminder(config.saison)
+          ? `<p class="cat-banner" style="background:var(--gold-100);color:var(--maroon-900);border-left:4px solid var(--gold-500);">La saison <strong>${escapeHtml(config.saison)}</strong> touche à sa fin — c'est le bon moment pour préparer la suivante : mettre à jour le libellé de saison et le tarif ci-dessous, ajuster les tranches de naissance de chaque catégorie, demander les nouveaux liens HelloAsso au club si besoin, puis utiliser « Archiver les inscriptions des saisons précédentes » une fois la nouvelle saison enregistrée.</p>`
+          : ''
+      }
       ${error ? `<p class="cat-banner cat-banner-error">${escapeHtml(error)}</p>` : ''}
-      ${ok ? '<p class="cat-banner cat-banner-ok">Modifications enregistrées.</p>' : ''}
+      ${archivedMessage ? `<p class="cat-banner cat-banner-ok">${escapeHtml(archivedMessage)}</p>` : ok ? '<p class="cat-banner cat-banner-ok">Modifications enregistrées.</p>' : ''}
 
-      <h2 style="font-size:1rem;margin-bottom:8px;">Saison en cours</h2>
+      <h2 style="font-size:1rem;margin-bottom:8px;">Saison et tarif</h2>
       <form method="POST" style="margin-bottom:32px;">
         <input type="hidden" name="action" value="save-saison">
-        <div class="form-field" style="margin-bottom:12px;">
-          <label for="saison">Libellé de saison (ex. « 2026-2027 »)</label>
-          <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
-          <small style="font-size:.8rem;color:var(--color-text-muted);">Utilisé dans le PDF d'inscription et l'e-mail de confirmation. Le reste du site (page « Entraînements », textes de présentation...) reste à mettre à jour à la main chaque saison.</small>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="saison">Libellé de saison (ex. « 2026-2027 »)</label>
+            <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
+          </div>
+          <div class="form-field">
+            <label for="prix">Tarif de l'adhésion (€)</label>
+            <input type="number" id="prix" name="prix" value="${config.prix ?? 180}" required min="0" max="9999" step="1">
+          </div>
         </div>
-        <button type="submit" class="btn btn-primary btn-sm">Enregistrer la saison</button>
+        <p style="margin:8px 0 12px;font-size:.8rem;color:var(--color-text-muted);">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
+        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+      </form>
+
+      <h2 style="font-size:1rem;margin-bottom:8px;">Fin de saison</h2>
+      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la saison ${escapeHtml(config.saison)} enregistrée ci-dessus comme saison en cours, cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
+      <form method="POST" class="cat-confirm-form" style="margin-bottom:32px;">
+        <input type="hidden" name="action" value="archive-previous-seasons">
+        <button type="submit" class="btn btn-dark btn-sm" data-confirm="Archiver toutes les inscriptions actives d'une saison autre que ${escapeHtml(config.saison)} ? Elles resteront consultables et récupérables depuis la Corbeille.">Archiver les inscriptions des saisons précédentes</button>
       </form>
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Catégories (${config.categories.length})</h2>
@@ -203,9 +246,12 @@ export async function onRequestPost({ request, env }) {
 
   if (action === 'save-saison') {
     const saison = String(form.get('saison') || '').trim();
+    const prix = Number(form.get('prix'));
     if (!saison) return withError('Le libellé de saison est obligatoire.');
-    await setCategoriesConfig(env, { ...config, saison });
-    return new Response(page({ config: { ...config, saison }, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    if (!Number.isInteger(prix) || prix < 0 || prix > 9999) return withError('Le tarif doit être un nombre entier valide.');
+    const nextConfig = { ...config, saison, prix };
+    await setCategoriesConfig(env, nextConfig);
+    return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
   if (action === 'add') {
@@ -235,6 +281,25 @@ export async function onRequestPost({ request, env }) {
     const nextConfig = { ...config, categories: config.categories.filter((c) => c.id !== id) };
     await setCategoriesConfig(env, nextConfig);
     return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  if (action === 'archive-previous-seasons') {
+    await ensureInscriptionsTable(env.DB);
+    // saison IS NOT NULL AND != '' : une fiche sans saison enregistrée date d'avant l'ajout de
+    // cette colonne (voir _shared/inscriptions-db.js) — traitée comme "saison en cours", jamais
+    // archivée automatiquement par erreur.
+    const { results } = await env.DB.prepare(
+      "SELECT id FROM inscriptions WHERE archived_at IS NULL AND saison IS NOT NULL AND saison != '' AND saison != ?"
+    )
+      .bind(config.saison)
+      .all();
+    for (const row of results) {
+      await env.DB.prepare("UPDATE inscriptions SET archived_at = datetime('now') WHERE id = ?").bind(row.id).run();
+    }
+    const archivedMessage = results.length
+      ? `${results.length} inscription${results.length > 1 ? 's' : ''} d'une saison précédente archivée${results.length > 1 ? 's' : ''}.`
+      : "Aucune inscription d'une saison précédente à archiver.";
+    return new Response(page({ config, archivedMessage }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
   if (action === 'move-up' || action === 'move-down') {

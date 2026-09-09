@@ -5,6 +5,7 @@
 // (voir functions/admin/categories.js et functions/_shared/settings-kv.js) sans devoir toucher au
 // code à chaque saison — ces constantes ne servent plus que de filet de sécurité hors-ligne.
 const FALLBACK_SAISON = '2026-2027';
+const FALLBACK_PRIX = 180;
 const FALLBACK_HELLOASSO_URLS = {
   'U6 - U7': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
   'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
@@ -100,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // enregistrés plus bas (fermeture) lisent la valeur en vigueur au moment où ils s'exécutent, pas
   // celle au moment de leur enregistrement.
   let saison = FALLBACK_SAISON;
+  let prix = FALLBACK_PRIX;
   let categorieParAnnee = FALLBACK_CATEGORIE_PAR_ANNEE;
   let helloAssoUrls = FALLBACK_HELLOASSO_URLS;
   let helloAssoWidgetUrls = FALLBACK_HELLOASSO_WIDGET_URLS;
@@ -117,6 +119,18 @@ document.addEventListener('DOMContentLoaded', () => {
         saison = data.saison;
         document.querySelectorAll('[data-saison-text]').forEach((el) => {
           el.textContent = saison;
+        });
+      }
+      if (Number.isFinite(data.prix)) {
+        prix = data.prix;
+        document.querySelectorAll('[data-prix-text]').forEach((el) => {
+          el.textContent = prix;
+        });
+        // Approximation du montant par échéance affiché sur la carte d'offre — le détail exact des
+        // 3 prélèvements dépend du plan de paiement configuré côté HelloAsso (onglet campagne), pas
+        // de ce site ; ce n'est qu'un aperçu, jamais utilisé pour calculer un vrai paiement.
+        document.querySelectorAll('[data-prix-tiers-text]').forEach((el) => {
+          el.textContent = Math.round(prix / 3);
         });
       }
 
@@ -212,6 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
       naissance: form.naissance.value,
       categorie: form.categorie.value,
       saison,
+      prix,
       tailleMaillot: form.tailleMaillot.value,
       modePaiement: form.modePaiement.value,
       parentPrenom: form.parentPrenom.value.trim(),

@@ -17,7 +17,7 @@ export async function onRequestGet({ env }) {
       helloAssoWidgetUrl: c.helloAssoWidgetUrl || '',
     }));
 
-  return new Response(JSON.stringify({ saison: config.saison, categories }), {
+  return new Response(JSON.stringify({ saison: config.saison, prix: config.prix ?? 180, categories }), {
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-store',

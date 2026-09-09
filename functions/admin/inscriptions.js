@@ -91,13 +91,14 @@ function parseFilters(searchParams) {
 // (jsPDF, voir le <script> en bas de page) le même document que celui produit à l'inscription :
 // utile si la famille n'a pas reçu (ou a perdu) l'e-mail de confirmation et que le club veut le
 // lui renvoyer manuellement.
-function actionsHtml(r, siteUrl, saison) {
+function actionsHtml(r, siteUrl, saison, prix) {
   const pdfData = {
     enfantPrenom: r.enfant_prenom,
     enfantNom: r.enfant_nom,
     naissance: r.naissance,
     categorie: r.categorie,
     saison,
+    prix,
     tailleMaillot: r.taille_maillot,
     modePaiement: r.mode_paiement,
     parentPrenom: r.parent_prenom,
@@ -163,9 +164,10 @@ function actionsHtml(r, siteUrl, saison) {
 // [id]/dossier.js), bulkOk = message de résultat d'une action groupée (archiver/relancer la
 // sélection, voir onRequestPost), inscriptionStatus = 'open'|'closed' (KV "saintgratienfc_config",
 // voir functions/admin/inscription-status.js et functions/api/inscription-status.js), siteUrl =
-// origine (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml), saison = libellé
-// de saison courant (_shared/settings-kv.js, /admin/categories) imprimé dans ce même PDF régénéré.
-function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl, saison }) {
+// origine (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml), saison/prix =
+// libellé de saison et tarif courants (_shared/settings-kv.js, /admin/categories) imprimés dans ce
+// même PDF régénéré.
+function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl, saison, prix }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -273,7 +275,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
             </dd>
           </div>
         </dl>
-        <div class="insc-card-actions">${actionsHtml(r, siteUrl, saison)}</div>
+        <div class="insc-card-actions">${actionsHtml(r, siteUrl, saison, prix)}</div>
       </details>`
     )
     .join('');
@@ -406,7 +408,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
     </main>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script src="/assets/js/pdf-inscription.js?v=20260909a"></script>
+  <script src="/assets/js/pdf-inscription.js?v=20260909b"></script>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>
   <script src="/assets/js/admin-inscriptions.js?v=20260909d"></script>
 </body></html>`;
@@ -457,7 +459,7 @@ export async function onRequestGet({ request, env }) {
     // KV indisponible (binding non configuré) : on reste sur "open" par défaut.
   }
 
-  const { saison } = await getCategoriesConfig(env);
+  const { saison, prix } = await getCategoriesConfig(env);
 
   return new Response(
     tablePage(filtered, {
@@ -473,6 +475,7 @@ export async function onRequestGet({ request, env }) {
       inscriptionStatus,
       siteUrl: new URL(request.url).origin,
       saison,
+      prix,
     }),
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

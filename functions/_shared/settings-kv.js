@@ -45,17 +45,21 @@ export async function clearPendingPasswordChange(env) {
   await env.INSCRIPTION_STATUS.delete(KV_KEY_PENDING_PASSWORD);
 }
 
-// Catégories d'âge (U6-U7, U8-U9...) + libellé de saison en cours, modifiables depuis
-// /admin/categories (functions/admin/categories.js) sans passer par une session Claude Code à
-// chaque rentrée — voir CLAUDE.md. Alimente dynamiquement le <select> catégorie d'inscription.html
-// (via functions/api/categories.js), le formulaire d'édition admin, le filtre de la liste, le PDF
-// et l'e-mail de confirmation. DEFAULT_CATEGORIES_CONFIG reprend les valeurs réelles de la saison
-// 2026-2027 (ex-constantes de assets/js/inscription.js) : sert de repli tant que /admin/categories
-// n'a jamais été enregistré (KV vide), pas seulement en cas d'erreur.
+// Catégories d'âge (U6-U7, U8-U9...) + libellé de saison + tarif de l'adhésion en cours,
+// modifiables depuis /admin/categories (functions/admin/categories.js) sans passer par une session
+// Claude Code à chaque rentrée — voir CLAUDE.md. Alimente dynamiquement le <select> catégorie
+// d'inscription.html (via functions/api/categories.js), le formulaire d'édition admin, le filtre de
+// la liste, le PDF et l'e-mail de confirmation. Le tarif est unique pour tout le club (pas par
+// catégorie) : c'est ainsi qu'il est présenté aujourd'hui sur inscription.html (une seule carte
+// "Offre Saison"), pas de raison de complexifier tant que le club ne facture pas différemment selon
+// l'âge. DEFAULT_CATEGORIES_CONFIG reprend les valeurs réelles de la saison 2026-2027 (ex-constantes
+// de assets/js/inscription.js) : sert de repli tant que /admin/categories n'a jamais été enregistré
+// (KV vide), pas seulement en cas d'erreur.
 const KV_KEY_CATEGORIES = 'categories_config';
 
 export const DEFAULT_CATEGORIES_CONFIG = {
   saison: '2026-2027',
+  prix: 180,
   categories: [
     {
       id: 'u6-u7',

@@ -11,6 +11,7 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   // sur la fiche régénérée depuis /admin/inscriptions (functions/admin/inscriptions.js) — repli sur
   // la saison actuelle si absent (appel depuis un contexte qui n'a pas encore cette info).
   const saison = data.saison || '2026-2027';
+  const prix = Number.isFinite(data.prix) ? data.prix : 180;
 
   doc.setFillColor(58, 15, 16);
   doc.rect(0, 0, 210, 28, 'F');
@@ -55,7 +56,7 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   y += 4;
 
   heading('Offre choisie');
-  line(`Adhésion saison ${saison} — 180 €`);
+  line(`Adhésion saison ${saison} — ${prix} €`);
   line('Licence + tenue complète Patrick (maillot, short, survêtement, sac)');
   line(`Mode de paiement : ${data.modePaiement || '—'}`);
   y += 4;
