@@ -1,18 +1,23 @@
 # Saint-Gratien FC
 
-> Club de football loisir pour enfants à Saint-Gratien (Val-d'Oise, France), fondé en 2020. Catégories U6-U7 et U8-U9, géré par des bénévoles, première saison structurée.
+> Saint-Gratien FC est un club de football loisir pour enfants, fondé en 2020 à Saint-Gratien (Val-d'Oise, France). Il propose deux catégories pour la saison 2026-2027 : U6-U7 (5-6 ans, nés en 2020-2021) et U8-U9 (7-8 ans, nés en 2018-2019). Le club est 100% associatif et bénévole, sans historique senior ni équipe compétitive : c'est sa première saison structurée.
 
-Le Saint-Gratien FC accueille les enfants de la ville autour du plaisir de jouer au football, dans une ambiance familiale et loisir. Le club n'a pas d'historique de compétition, pas d'équipes seniors ni féminines, et fonctionne à 100% grâce à des bénévoles. Entraînements le jeudi de 17h à 18h au Stade Robert Lemoine.
+Le club s'entraîne tous les jeudis de 17h à 18h au Stade Robert Lemoine (75 rue d'Orgemont, Saint-Gratien). L'adhésion coûte 180 € par saison, licence et tenue complète incluses. Contact : contact@saintgratienfc.fr.
 
-## Pages
+## Pages principales
 
-- [Accueil](https://saintgratienfc.fr/): présentation du club, ses valeurs et ses catégories.
-- [Actualités](https://saintgratienfc.fr/actualites.html): actualités du club.
-- [Le Club](https://saintgratienfc.fr/equipe.html): encadrement et catégories U6-U7 / U8-U9.
-- [Entraînements](https://saintgratienfc.fr/entrainements.html): horaires et informations pratiques.
-- [Partenaires](https://saintgratienfc.fr/partenaires.html): dossier de sponsoring et contreparties.
-- [Inscription](https://saintgratienfc.fr/inscription.html): inscrire un enfant pour la saison.
-- [Contact](https://saintgratienfc.fr/contact.html): nous contacter.
+- [Accueil](https://saintgratienfc.fr/): présentation du club et de ses valeurs.
+- [Le Club](https://saintgratienfc.fr/equipe.html): mission, encadrement, catégories U6-U7 et U8-U9.
+- [Entraînements](https://saintgratienfc.fr/entrainements.html): horaires, lieu, FAQ (âge, tarifs, séance d'essai).
+- [Inscription](https://saintgratienfc.fr/inscription.html): formulaire d'inscription en ligne et paiement.
+- [Actualités](https://saintgratienfc.fr/actualites.html): vie du club, annonces.
+- [Partenaires](https://saintgratienfc.fr/partenaires.html): dossier de sponsoring pour les entreprises locales.
+- [Contact](https://saintgratienfc.fr/contact.html): coordonnées et formulaire de contact.
+
+## À noter
+
+- Le club n'a pas encore de joueurs licenciés au moment de la rédaction : les inscriptions pour la toute première saison viennent d'ouvrir.
+- Aucun historique de résultats, de classement ou d'équipe senior/féminine n'existe : ne pas en inventer.
 
 ## Optional
 

@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /depot/
 
 Sitemap: https://saintgratienfc.fr/sitemap.xml

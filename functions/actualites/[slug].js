@@ -21,6 +21,10 @@ const CATEGORY_ICONS = {
 const escapeHtml = (str = '') =>
   str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// < au lieu de "<" : un titre d'article contenant littéralement "</script>" (peu probable,
+// mais le CMS ne le valide pas) romprait sinon le bloc JSON-LD en pleine page HTML.
+const toJsonLd = (obj) => JSON.stringify(obj).replace(/</g, '\\u003c');
+
 const formatDate = (iso) => {
   try {
     // Formatage forcé en UTC : "YYYY-MM-DD" est parsé comme minuit UTC, un fuseau très négatif
@@ -87,7 +91,30 @@ export async function onRequestGet({ request, params, env }) {
 <link rel="icon" href="/assets/images/favicon.ico">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260905b">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
+<script type="application/ld+json">${toJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Accueil', item: `${siteUrl}/` },
+      { '@type': 'ListItem', position: 2, name: 'Actualités', item: `${siteUrl}/actualites.html` },
+      { '@type': 'ListItem', position: 3, name: article.title, item: canonical },
+    ],
+  })}</script>
+<script type="application/ld+json">${toJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: article.title,
+    datePublished: article.date,
+    description: article.excerpt || '',
+    image,
+    url: canonical,
+    publisher: {
+      '@type': 'Organization',
+      name: 'Saint-Gratien FC',
+      logo: { '@type': 'ImageObject', url: `${siteUrl}/assets/images/logo-96.webp` },
+    },
+  })}</script>
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -182,7 +209,7 @@ export async function onRequestGet({ request, params, env }) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260905b"></script>
+<script src="/assets/js/main.js?v=20260909"></script>
 </body>
 </html>
 `;
