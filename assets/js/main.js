@@ -10,7 +10,24 @@ document.addEventListener('DOMContentLoaded', () => {
   initArticleLightbox();
   initMapsConsent();
   initAdhesionCtaStatus();
+  initEventTracking();
 });
+
+// Envoie un événement via Cloudflare Zaraz (outil "Requête HTTP" first-party configuré côté
+// dashboard, voir confidentialite.html — pas de pixel tiers) pour tout élément marqué
+// data-track-event. window.zaraz peut ne pas être encore chargé (script injecté par Zaraz,
+// asynchrone) : l'appel est silencieusement ignoré dans ce cas plutôt que de lever une erreur.
+// { event: name } est redondant avec le nom d'action zaraz.track() lui-même, mais c'est ce champ
+// que lit functions/api/track-event.js dans le corps JSON forwardé par l'action "Requête HTTP".
+function initEventTracking() {
+  document.querySelectorAll('[data-track-event]').forEach((el) => {
+    const eventName = el.dataset.trackEvent;
+    const type = el.tagName === 'FORM' ? 'submit' : 'click';
+    el.addEventListener(type, () => {
+      window.zaraz?.track(eventName, { event: eventName, page: location.pathname });
+    });
+  });
+}
 
 function initMapsConsent() {
   // La carte Google Maps n'est chargée qu'après un clic explicite (Google peut déposer

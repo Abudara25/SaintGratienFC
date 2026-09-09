@@ -209,7 +209,7 @@ export async function onRequestGet({ request, params, env }) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260909b"></script>
+<script src="/assets/js/main.js?v=20260909c"></script>
 </body>
 </html>
 `;
