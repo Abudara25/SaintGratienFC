@@ -4,7 +4,7 @@
 // téléchargement du PDF, mais son résultat (uploadToken) conditionne désormais l'affichage du
 // lien de dépôt du dossier signé (functions/depot/[token].js) — ce n'est plus un pur filet de
 // sécurité silencieux comme avant l'ajout du dépôt (2026-09-04). Envoie aussi un e-mail de
-// réception (pas de confirmation définitive, voir confirmation-email.js) via Resend.
+// réception (pas de confirmation définitive, voir confirmation-email.js) via Brevo.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { sendConfirmationEmail } from '../_shared/confirmation-email.js';
 

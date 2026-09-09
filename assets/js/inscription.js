@@ -23,7 +23,16 @@ const CATEGORIE_PAR_ANNEE = {
 
 // Construit l'iframe widget HelloAsso (auto-agrandie via postMessage — HelloAsso poste sa hauteur
 // réelle une fois le formulaire chargé, sinon l'iframe reste tronquée à la hauteur de départ).
+// helloassoMessageAbort : un nouveau submit (retry, changement de mode de paiement) recrée un
+// widget sans jamais retirer l'ancien listener "message" sur window — l'AbortController permet de
+// désabonner l'ancien avant d'en attacher un nouveau plutôt que de les empiler indéfiniment.
+let helloassoMessageAbort = null;
+
 function createHelloAssoWidget(url) {
+  helloassoMessageAbort?.abort();
+  helloassoMessageAbort = new AbortController();
+  const { signal } = helloassoMessageAbort;
+
   const iframe = document.createElement('iframe');
   iframe.id = 'haWidget';
   iframe.allowTransparency = 'true';
@@ -32,15 +41,23 @@ function createHelloAssoWidget(url) {
   iframe.style.width = '100%';
   iframe.style.height = '750px';
   iframe.style.border = 'none';
-  iframe.addEventListener('load', () => {
-    window.addEventListener('message', (e) => {
-      if (e.origin !== 'https://www.helloasso.com') return;
-      const dataHeight = e.data?.height;
-      if (dataHeight > parseFloat(iframe.style.height || 0)) {
-        iframe.style.height = `${dataHeight}px`;
-      }
-    });
-  });
+  iframe.addEventListener(
+    'load',
+    () => {
+      window.addEventListener(
+        'message',
+        (e) => {
+          if (e.origin !== 'https://www.helloasso.com') return;
+          const dataHeight = e.data?.height;
+          if (dataHeight > parseFloat(iframe.style.height || 0)) {
+            iframe.style.height = `${dataHeight}px`;
+          }
+        },
+        { signal }
+      );
+    },
+    { signal }
+  );
   return iframe;
 }
 

@@ -7,7 +7,14 @@ import { COOKIE_NAME, isAuthed, loginPage, escapeHtml } from '../_shared/admin-a
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
-  const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  // Un champ commençant par =, +, -, @, tab ou retour chariot est préfixé d'une apostrophe :
+  // sinon Excel/Sheets peut l'interpréter comme une formule (injection CSV) à l'ouverture de
+  // l'export si un parent a saisi ce genre de contenu dans le formulaire public.
+  const escapeCsv = (v) => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return `"${s.replace(/"/g, '""')}"`;
+  };
   const lines = rows.map((r) =>
     [
       r.created_at,
@@ -98,7 +105,7 @@ function actionsHtml(r, siteUrl) {
 
   return `<button type="button" class="btn btn-sm insc-pdf-btn" data-pdf='${escapeHtml(JSON.stringify(pdfData))}' data-depot-url="${escapeHtml(depotUrl)}">Télécharger le PDF</button>
     <a href="/admin/inscriptions/${r.id}" class="btn btn-dark btn-sm">Modifier</a>
-    <form method="POST" action="/admin/inscriptions" onsubmit="return confirm('Supprimer cette inscription ?');">
+    <form method="POST" action="/admin/inscriptions" class="insc-delete-form">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" value="${r.id}">
       <button type="submit" class="btn btn-sm" style="background:var(--color-error, #b3261e);color:#fff;">Supprimer</button>
@@ -125,27 +132,27 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
 
   const filterBar = `<form method="GET" class="insc-filters">
     <input type="search" name="q" value="${escapeHtml(filters.q)}" placeholder="Chercher un nom, prénom, e-mail…" class="insc-search">
-    <select name="categorie" onchange="this.form.submit()">
+    <select name="categorie">
       <option value="">Toutes catégories</option>
       <option value="U6 - U7" ${sel(filters.categorie, 'U6 - U7')}>U6 - U7</option>
       <option value="U8 - U9" ${sel(filters.categorie, 'U8 - U9')}>U8 - U9</option>
     </select>
-    <select name="annee" onchange="this.form.submit()">
+    <select name="annee">
       <option value="">Toutes années de naissance</option>
       ${years.map((y) => `<option value="${escapeHtml(y)}" ${sel(filters.annee, y)}>${escapeHtml(y)}</option>`).join('')}
     </select>
-    <select name="paiement" onchange="this.form.submit()">
+    <select name="paiement">
       <option value="">Tous paiements</option>
       <option value="HelloAsso" ${sel(filters.paiement, 'HelloAsso')}>HelloAsso</option>
       <option value="Espèces" ${sel(filters.paiement, 'Espèces')}>Espèces</option>
       <option value="Chèque" ${sel(filters.paiement, 'Chèque')}>Chèque</option>
     </select>
-    <select name="dossier" onchange="this.form.submit()">
+    <select name="dossier">
       <option value="">Dossier signé : tous</option>
       <option value="recu" ${sel(filters.dossier, 'recu')}>Dossier reçu</option>
       <option value="manquant" ${sel(filters.dossier, 'manquant')}>Dossier manquant</option>
     </select>
-    <select name="sort" onchange="this.form.submit()">
+    <select name="sort">
       <option value="date_desc" ${sel(filters.sort, 'date_desc')}>Plus récent d'abord</option>
       <option value="date_asc" ${sel(filters.sort, 'date_asc')}>Plus ancien d'abord</option>
       <option value="nom_asc" ${sel(filters.sort, 'nom_asc')}>Enfant A → Z</option>
@@ -202,7 +209,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inscriptions — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260905b">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
 <style>
   body{padding:16px;max-width:1400px;margin:0 auto;}
   @media (min-width:600px){ body{padding:24px;} }
@@ -268,13 +275,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   <div class="insc-cards">${cards || `<p>${hasActiveFilters ? 'Aucune inscription ne correspond à ces filtres.' : 'Aucune inscription pour le moment.'}</p>`}</div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260905"></script>
-  <script>
-    document.querySelectorAll('.insc-pdf-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        downloadInscriptionPdf(JSON.parse(btn.dataset.pdf), btn.dataset.depotUrl || null);
-      });
-    });
-  </script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260909"></script>
 </body></html>`;
 }
 
@@ -360,7 +361,7 @@ export async function onRequestPost({ request, env }) {
     status: 302,
     headers: {
       Location: '/admin/inscriptions',
-      'Set-Cookie': `${COOKIE_NAME}=${password}; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=2592000`,
+      'Set-Cookie': `${COOKIE_NAME}=${encodeURIComponent(password)}; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=2592000`,
     },
   });
 }

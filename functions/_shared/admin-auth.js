@@ -8,7 +8,16 @@ export const COOKIE_NAME = 'admin_auth';
 export function isAuthed(request, env) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/\badmin_auth=([^;]+)/);
-  return !!env.ADMIN_PASSWORD && match?.[1] === env.ADMIN_PASSWORD;
+  if (!match || !env.ADMIN_PASSWORD) return false;
+  // decodeURIComponent : la valeur est encodée à l'écriture (voir functions/admin/inscriptions.js)
+  // pour qu'un mot de passe contenant ';', ',' ou un espace ne tronque pas le cookie.
+  let value;
+  try {
+    value = decodeURIComponent(match[1]);
+  } catch {
+    return false;
+  }
+  return value === env.ADMIN_PASSWORD;
 }
 
 export function loginPage({ error } = {}) {
@@ -16,7 +25,7 @@ export function loginPage({ error } = {}) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connexion — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260905b">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
