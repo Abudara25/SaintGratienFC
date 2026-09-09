@@ -47,3 +47,21 @@ export async function ensureInscriptionsTable(db) {
 
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)').run();
 }
+
+// Recherche une inscription existante par identité enfant+parent. Utilisé par le contrôle strict
+// au submit (functions/api/inscriptions.js, POST — naissance toujours fournie) et par le contrôle
+// temps réel pendant la saisie (même fichier, GET — naissance optionnelle, pas forcément encore
+// remplie au moment où prénom/nom/e-mail le sont, l'ordre des champs du formulaire plaçant
+// naissance avant e-mail mais un utilisateur peut remplir dans le désordre).
+export async function findExistingInscription(db, { enfantPrenom, enfantNom, naissance, email }) {
+  const conditions = ['LOWER(TRIM(enfant_prenom)) = LOWER(?)', 'LOWER(TRIM(enfant_nom)) = LOWER(?)', 'LOWER(TRIM(email)) = LOWER(?)'];
+  const params = [enfantPrenom.trim(), enfantNom.trim(), email.trim()];
+  if (naissance) {
+    conditions.push('naissance = ?');
+    params.push(naissance);
+  }
+  return db
+    .prepare(`SELECT upload_token, created_at FROM inscriptions WHERE ${conditions.join(' AND ')} LIMIT 1`)
+    .bind(...params)
+    .first();
+}

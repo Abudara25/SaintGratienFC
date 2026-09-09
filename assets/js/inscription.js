@@ -117,6 +117,39 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitBtn = form.querySelector('button[type=submit]');
   const submitBtnDefaultLabel = submitBtn.textContent;
 
+  // Avertissement précoce (pas le contrôle définitif, qui reste au submit ci-dessous avec la
+  // date exacte) : dès que prénom+nom de l'enfant et e-mail du parent sont remplis, un parent
+  // n'a plus à finir tout le formulaire pour apprendre que son enfant est déjà inscrit — cas
+  // réel d'un parent ayant soumis 4 fois de suite le même dossier.
+  const duplicateWarning = document.getElementById('inscription-duplicate-warning');
+  let duplicateCheckController = null;
+
+  async function checkDuplicateInline() {
+    const enfantPrenom = form.enfantPrenom.value.trim();
+    const enfantNom = form.enfantNom.value.trim();
+    const email = form.email.value.trim();
+    if (!duplicateWarning || !enfantPrenom || !enfantNom || !email) {
+      if (duplicateWarning) duplicateWarning.hidden = true;
+      return;
+    }
+
+    duplicateCheckController?.abort();
+    duplicateCheckController = new AbortController();
+    try {
+      const params = new URLSearchParams({ enfantPrenom, enfantNom, email });
+      if (form.naissance.value) params.set('naissance', form.naissance.value);
+      const res = await fetch(`/api/inscriptions?${params}`, { signal: duplicateCheckController.signal });
+      const json = res.ok ? await res.json() : null;
+      duplicateWarning.hidden = !json?.duplicate;
+    } catch {
+      // Requête abandonnée (nouvelle frappe pendant la vérification) ou réseau indisponible :
+      // on n'affiche rien plutôt qu'une fausse alerte — le contrôle au submit reste la garde
+      // définitive contre un vrai doublon en base.
+    }
+  }
+
+  [form.enfantPrenom, form.enfantNom, form.email].forEach((el) => el.addEventListener('blur', checkDuplicateInline));
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!form.checkValidity()) {
