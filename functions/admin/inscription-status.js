@@ -6,7 +6,7 @@
 import { isAuthed, loginPage } from '../_shared/admin-auth.js';
 
 export async function onRequestPost({ request, env }) {
-  if (!isAuthed(request, env)) {
+  if (!(await isAuthed(request, env))) {
     return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 

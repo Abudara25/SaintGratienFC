@@ -148,7 +148,7 @@ function editPage(row, { error } = {}) {
 }
 
 export async function onRequestGet({ request, env, params }) {
-  if (!isAuthed(request, env)) {
+  if (!(await isAuthed(request, env))) {
     return new Response(loginPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
@@ -162,7 +162,7 @@ export async function onRequestGet({ request, env, params }) {
 }
 
 export async function onRequestPost({ request, env, params }) {
-  if (!isAuthed(request, env)) {
+  if (!(await isAuthed(request, env))) {
     return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 

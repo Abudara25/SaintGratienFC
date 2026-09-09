@@ -3,7 +3,7 @@
 // L'édition d'une inscription se fait sur functions/admin/inscriptions/[id].js ; la suppression
 // est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
-import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../_shared/admin-auth.js';
+import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, LOGOUT_LINK, getAdminPassword } from '../_shared/admin-auth.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -258,9 +258,12 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
   .insc-status-closed{background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
     <a href="/admin/events">Voir les événements suivis (clics, formulaire de contact) &rarr;</a>
-    ${LOGOUT_LINK}
+    <div style="display:flex;gap:16px;align-items:center;">
+      <a href="/admin/parametres">Paramètres</a>
+      ${LOGOUT_LINK}
+    </div>
   </div>
   <h1 style="font-size:1.3rem;">Inscriptions (${rows.length}${rows.length !== total ? ` / ${total}` : ''})</h1>
   <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
@@ -284,7 +287,7 @@ function tablePage(rows, { filters, years, total, returnTo, dossierError, dossie
 }
 
 export async function onRequestGet({ request, env }) {
-  if (!isAuthed(request, env)) {
+  if (!(await isAuthed(request, env))) {
     return new Response(loginPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
@@ -341,7 +344,7 @@ export async function onRequestPost({ request, env }) {
   const form = await request.formData();
 
   if (form.get('action') === 'delete') {
-    if (!isAuthed(request, env)) {
+    if (!(await isAuthed(request, env))) {
       return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
     }
     const id = Number(form.get('id'));
@@ -353,8 +356,9 @@ export async function onRequestPost({ request, env }) {
   }
 
   const password = form.get('password');
+  const currentPassword = await getAdminPassword(env);
 
-  if (!env.ADMIN_PASSWORD || password !== env.ADMIN_PASSWORD) {
+  if (!currentPassword || password !== currentPassword) {
     return new Response(loginPage({ error: true }), {
       status: 401,
       headers: { 'Content-Type': 'text/html;charset=UTF-8' },

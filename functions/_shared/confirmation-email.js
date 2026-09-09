@@ -11,6 +11,8 @@
 // seule approche fiable across les clients mail (Outlook en particulier ignore le CSS externe/
 // flexbox/grid). Ne jamais utiliser de <style> externe ni de classes CSS ici : tout doit être en
 // attributs/style inline directement sur chaque balise.
+import { getNotificationEmail } from './settings-kv.js';
+
 const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -182,6 +184,12 @@ export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
 export async function sendAdminNotification(env, data, siteUrl) {
   if (!env.BREVO_API_KEY) return;
 
+  // Destinataire(s) configurable(s) depuis /admin/parametres (par défaut contact@saintgratienfc.fr,
+  // voir _shared/settings-kv.js) — utile si plusieurs personnes du bureau veulent la recevoir.
+  const notificationEmail = await getNotificationEmail(env);
+  const to = notificationEmail.split(',').map((e) => ({ email: e.trim() })).filter((r) => r.email);
+  if (!to.length) return;
+
   const nomEnfant = `${data.enfantPrenom} ${data.enfantNom}`;
   const categorie = CATEGORIE_LABEL[data.categorie] || data.categorie;
   const text = `Nouvelle inscription reçue sur le site :
@@ -197,7 +205,7 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
 
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
-    to: [{ email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' }],
+    to,
     subject: `Nouvelle inscription : ${nomEnfant}`,
     textContent: text,
   };

@@ -1,14 +1,33 @@
 // Authentification partagée par les pages /admin/* (liste, édition, suppression des
-// inscriptions...) : mot de passe unique (secret Cloudflare ADMIN_PASSWORD, jamais commité)
-// comparé à un cookie HttpOnly. Centralisé ici pour qu'une nouvelle page admin applique la même
-// vérification sans la dupliquer — voir functions/admin/inscriptions.js et
-// functions/admin/inscriptions/[id].js.
+// inscriptions...) : mot de passe unique comparé à un cookie HttpOnly. Centralisé ici pour qu'une
+// nouvelle page admin applique la même vérification sans la dupliquer — voir
+// functions/admin/inscriptions.js et functions/admin/inscriptions/[id].js.
 export const COOKIE_NAME = 'admin_auth';
 
-export function isAuthed(request, env) {
+// Mot de passe actuel : le secret Cloudflare ADMIN_PASSWORD reste la valeur par défaut, mais
+// functions/admin/parametres.js permet de le changer depuis l'interface — dans ce cas la valeur
+// choisie est stockée dans le KV "saintgratienfc_config" (même binding INSCRIPTION_STATUS que le
+// statut d'ouverture des inscriptions, clé "admin_password") et prend le pas sur le secret. Sans
+// changement via l'interface, le comportement est inchangé (secret Cloudflare seul).
+export async function getAdminPassword(env) {
+  try {
+    const stored = await env.INSCRIPTION_STATUS.get('admin_password');
+    if (stored) return stored;
+  } catch {
+    // KV indisponible (binding non configuré) : repli sur le secret.
+  }
+  return env.ADMIN_PASSWORD || null;
+}
+
+export async function setAdminPassword(env, newPassword) {
+  await env.INSCRIPTION_STATUS.put('admin_password', newPassword);
+}
+
+export async function isAuthed(request, env) {
   const cookie = request.headers.get('Cookie') || '';
   const match = cookie.match(/\badmin_auth=([^;]+)/);
-  if (!match || !env.ADMIN_PASSWORD) return false;
+  const currentPassword = await getAdminPassword(env);
+  if (!match || !currentPassword) return false;
   // decodeURIComponent : la valeur est encodée à l'écriture (voir functions/admin/inscriptions.js)
   // pour qu'un mot de passe contenant ';', ',' ou un espace ne tronque pas le cookie.
   let value;
@@ -17,7 +36,7 @@ export function isAuthed(request, env) {
   } catch {
     return false;
   }
-  return value === env.ADMIN_PASSWORD;
+  return value === currentPassword;
 }
 
 export function loginPage({ error } = {}) {

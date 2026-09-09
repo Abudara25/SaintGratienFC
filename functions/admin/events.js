@@ -6,7 +6,7 @@ import { isAuthed, loginPage, escapeHtml, LOGOUT_LINK } from '../_shared/admin-a
 const LABELS = { phone_click: 'Clic sur le numéro de téléphone', contact_form_submit: 'Soumission du formulaire de contact' };
 
 export async function onRequestGet({ request, env }) {
-  if (!isAuthed(request, env)) {
+  if (!(await isAuthed(request, env))) {
     return new Response(loginPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }
 
