@@ -60,6 +60,9 @@ const KV_KEY_CATEGORIES = 'categories_config';
 export const DEFAULT_CATEGORIES_CONFIG = {
   saison: '2026-2027',
   prix: 180,
+  // Date limite (YYYY-MM-DD) de la réinscription prioritaire — voir effectiveInscriptionStatus()
+  // ci-dessous et functions/admin/categories.js. null = pas de campagne de réinscription en cours.
+  dateLimiteReinscription: null,
   categories: [
     {
       id: 'u6-u7',
@@ -97,4 +100,20 @@ export async function getCategoriesConfig(env) {
 
 export async function setCategoriesConfig(env, config) {
   await env.INSCRIPTION_STATUS.put(KV_KEY_CATEGORIES, JSON.stringify(config));
+}
+
+// Statut d'ouverture "effectif" du formulaire public (inscription.html), utilisé par
+// functions/api/inscription-status.js et l'entête de functions/admin/inscriptions.js — distinct du
+// statut brut stocké dans le KV (clé "inscription_status", voir functions/admin/inscription-status.js)
+// : quand ce dernier vaut "closed" ET qu'une date limite de réinscription prioritaire est enregistrée
+// (voir dateLimiteReinscription ci-dessus) et dépassée, le site rouvre automatiquement au public sans
+// action de l'admin — pas besoin de Cron Trigger, juste une comparaison de date à chaque requête. Un
+// statut brut "open" reste toujours prioritaire (l'admin garde la main pour rouvrir plus tôt).
+export function effectiveInscriptionStatus(rawStatus, dateLimiteReinscription) {
+  if (rawStatus === 'open') return 'open';
+  if (dateLimiteReinscription) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (today >= dateLimiteReinscription) return 'open';
+  }
+  return 'closed';
 }

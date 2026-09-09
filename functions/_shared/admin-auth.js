@@ -46,7 +46,7 @@ export function loginPage({ error } = {}) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>

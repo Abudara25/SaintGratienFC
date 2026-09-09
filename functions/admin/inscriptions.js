@@ -4,8 +4,8 @@
 // est gérée ici (onRequestPost, action=delete) car elle ne nécessite pas de formulaire dédié.
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 import { COOKIE_NAME, isAuthed, loginPage, escapeHtml, adminSidebar, getAdminPassword } from '../_shared/admin-auth.js';
-import { sendReminderEmail } from '../_shared/confirmation-email.js';
-import { getCategoriesConfig } from '../_shared/settings-kv.js';
+import { sendReminderEmail, sendReinscriptionEmail } from '../_shared/confirmation-email.js';
+import { getCategoriesConfig, effectiveInscriptionStatus } from '../_shared/settings-kv.js';
 
 function toCsv(rows) {
   const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu'];
@@ -167,7 +167,7 @@ function actionsHtml(r, siteUrl, saison, prix) {
 // origine (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml), saison/prix =
 // libellé de saison et tarif courants (_shared/settings-kv.js, /admin/categories) imprimés dans ce
 // même PDF régénéré.
-function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, siteUrl, saison, prix }) {
+function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, effectiveStatus, siteUrl, saison, prix }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -286,7 +286,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:1400px;}
   .insc-filters-details{margin-bottom:20px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);background:var(--white);}
@@ -368,8 +368,12 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
         ? `<p style="margin-bottom:12px;"><a href="/admin/inscriptions?view=archive">Voir la corbeille (${archivedCount}) &rarr;</a></p>`
         : ''
   }
-  <div class="insc-status-bar ${inscriptionStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
-    <span>Inscriptions sur le site : <strong>${inscriptionStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong></span>
+  <div class="insc-status-bar ${effectiveStatus === 'closed' ? 'insc-status-closed' : 'insc-status-open'}">
+    <span>Inscriptions sur le site : <strong>${effectiveStatus === 'closed' ? 'fermées' : 'ouvertes'}</strong>${
+      effectiveStatus === 'open' && inscriptionStatus === 'closed'
+        ? ' <em style="font-weight:400;">(rouverture automatique — date limite de réinscription atteinte, voir /admin/categories)</em>'
+        : ''
+    }</span>
     <form method="POST" action="/admin/inscription-status">
       <input type="hidden" name="status" value="${inscriptionStatus === 'closed' ? 'open' : 'closed'}">
       <button type="submit" class="btn btn-sm ${inscriptionStatus === 'closed' ? 'btn-primary' : 'btn-dark'}">${
@@ -394,6 +398,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-archive" data-confirm="Archiver les profils sélectionnés ? Ils seront déplacés dans la corbeille, récupérables à tout moment." style="background:var(--cream-200);color:var(--maroon-950);" disabled>Archiver la sélection</button>
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-export" style="background:var(--cream-200);color:var(--maroon-950);" disabled>Exporter la sélection (CSV)</button>
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-reminder" data-confirm="Envoyer une relance par e-mail aux profils sélectionnés qui n'ont pas encore payé ou envoyé leur dossier ? Les profils déjà complets ne recevront rien." style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer une relance</button>
+    <button type="button" class="btn btn-sm" data-bulk-action="bulk-reinscription" data-confirm="Envoyer aux profils sélectionnés leur lien personnel de réinscription prioritaire pour la saison suivante ?" style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer le lien de réinscription</button>
   </form>
   <div class="insc-cards">${
     cards ||
@@ -459,7 +464,8 @@ export async function onRequestGet({ request, env }) {
     // KV indisponible (binding non configuré) : on reste sur "open" par défaut.
   }
 
-  const { saison, prix } = await getCategoriesConfig(env);
+  const { saison, prix, dateLimiteReinscription } = await getCategoriesConfig(env);
+  const effectiveStatus = effectiveInscriptionStatus(inscriptionStatus, dateLimiteReinscription);
 
   return new Response(
     tablePage(filtered, {
@@ -473,6 +479,7 @@ export async function onRequestGet({ request, env }) {
       dossierOk: searchParams.get('dossierOk'),
       bulkOk: searchParams.get('bulkOk'),
       inscriptionStatus,
+      effectiveStatus,
       siteUrl: new URL(request.url).origin,
       saison,
       prix,
@@ -564,6 +571,45 @@ export async function onRequestPost({ request, env }) {
     const parts = [`${sent} relance${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''}`];
     if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (déjà complet${skipped > 1 ? 's' : ''})`);
     if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''}`);
+    const msg = encodeURIComponent(`${parts.join(', ')}.`);
+    return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}${redirectView ? '&' : '?'}bulkOk=${msg}` } });
+  }
+
+  // bulk-reinscription : génère (si besoin) un reinscription_token par fiche sélectionnée puis
+  // envoie à chaque famille son lien personnel /reinscription/<token> (functions/reinscription/
+  // [token].js) — voir sendReinscriptionEmail. Branche séparée du bloc précédent (pas de SELECT *
+  // ni ids déjà résolus à ce stade), calquée sur son début.
+  if (action === 'bulk-reinscription') {
+    if (!(await isAuthed(request, env))) {
+      return new Response(loginPage(), { status: 401, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+    }
+    await ensureInscriptionsTable(env.DB);
+    const ids = form.getAll('ids').map(Number).filter(Boolean);
+    const redirectView = form.get('view') === 'archive' ? '?view=archive' : '';
+
+    if (!ids.length) {
+      return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}` } });
+    }
+
+    const { results } = await env.DB.prepare('SELECT * FROM inscriptions').all();
+    const selected = results.filter((r) => ids.includes(r.id));
+    const { dateLimiteReinscription } = await getCategoriesConfig(env);
+    const siteUrl = new URL(request.url).origin;
+
+    let sent = 0;
+    let failed = 0;
+    for (let row of selected) {
+      if (!row.reinscription_token) {
+        const token = crypto.randomUUID();
+        await env.DB.prepare('UPDATE inscriptions SET reinscription_token = ? WHERE id = ?').bind(token, row.id).run();
+        row = { ...row, reinscription_token: token };
+      }
+      const ok = await sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription);
+      if (ok) sent++;
+      else failed++;
+    }
+    const parts = [`${sent} lien${sent > 1 ? 's' : ''} de réinscription envoyé${sent > 1 ? 's' : ''}`];
+    if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''} (BREVO_API_KEY manquante ou envoi refusé — le lien reste consultable sur la fiche « Modifier »)`);
     const msg = encodeURIComponent(`${parts.join(', ')}.`);
     return new Response('', { status: 302, headers: { Location: `/admin/inscriptions${redirectView}${redirectView ? '&' : '?'}bulkOk=${msg}` } });
   }

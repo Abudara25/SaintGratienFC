@@ -28,7 +28,8 @@ export async function onRequestGet({ request, env }) {
 
   try {
     await ensureInscriptionsTable(env.DB);
-    const existing = await findExistingInscription(env.DB, { enfantPrenom, enfantNom, naissance, email });
+    const { saison } = await getCategoriesConfig(env);
+    const existing = await findExistingInscription(env.DB, { enfantPrenom, enfantNom, naissance, email }, saison);
     return new Response(JSON.stringify({ duplicate: !!existing }), { headers: { 'Content-Type': 'application/json' } });
   } catch {
     return new Response(JSON.stringify({ error: 'Échec de la vérification' }), { status: 500 });
@@ -57,20 +58,34 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return new Response(JSON.stringify({ error: 'Date de naissance invalide' }), { status: 400 });
   }
 
+  // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
+  // navigateur avait chargé /api/categories avant un changement de saison entre-temps. Sert à la
+  // fois à scoper le contrôle anti-doublon ci-dessous à la saison en cours (voir
+  // findExistingInscription) et à tamponner la fiche pour l'action "Archiver les saisons
+  // précédentes"/"Envoyer le lien de réinscription" de /admin/inscriptions et /admin/categories.
+  const { saison } = await getCategoriesConfig(env);
+
   try {
     await ensureInscriptionsTable(env.DB);
 
     // Anti-doublon : un même enfant (nom+prénom+naissance) déjà inscrit par le même parent
-    // (e-mail) ne recrée pas une nouvelle fiche. Ajouté après qu'un parent a soumis 4 fois de
-    // suite le même dossier (clics répétés) — chaque soumission créait une ligne D1 distincte et
-    // renvoyait un nouvel e-mail de confirmation. Requête factorisée dans _shared/inscriptions-db.js
-    // (aussi utilisée par le contrôle temps réel, onRequestGet ci-dessus).
-    const existing = await findExistingInscription(env.DB, {
-      enfantPrenom: data.enfantPrenom,
-      enfantNom: data.enfantNom,
-      naissance: data.naissance,
-      email: data.email,
-    });
+    // (e-mail) POUR LA SAISON EN COURS ne recrée pas une nouvelle fiche. Ajouté après qu'un parent
+    // a soumis 4 fois de suite le même dossier (clics répétés) — chaque soumission créait une ligne
+    // D1 distincte et renvoyait un nouvel e-mail de confirmation. Scopé à `saison` depuis l'ajout de
+    // la réinscription : sans ça, une famille qui se réinscrit légitimement l'année suivante était
+    // bloquée par sa fiche de l'an dernier. Requête factorisée dans _shared/inscriptions-db.js (aussi
+    // utilisée par le contrôle temps réel, onRequestGet ci-dessus, et par functions/reinscription/
+    // [token].js).
+    const existing = await findExistingInscription(
+      env.DB,
+      {
+        enfantPrenom: data.enfantPrenom,
+        enfantNom: data.enfantNom,
+        naissance: data.naissance,
+        email: data.email,
+      },
+      saison
+    );
 
     if (existing) {
       return new Response(
@@ -84,10 +99,6 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
   const uploadToken = crypto.randomUUID();
   const dedupKey = buildDedupKey({ enfantPrenom: data.enfantPrenom, enfantNom: data.enfantNom, email: data.email });
-  // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
-  // navigateur avait chargé /api/categories avant un changement de saison entre-temps. Sert à
-  // l'action "Archiver les saisons précédentes" de /admin/categories.
-  const { saison } = await getCategoriesConfig(env);
 
   try {
     await env.DB.prepare(

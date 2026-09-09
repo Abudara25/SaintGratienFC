@@ -21,7 +21,7 @@
 <link rel="icon" type="image/png" href="assets/images/favicon-inscription.png">
 <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/styles.css?v=20260909f">
+<link rel="stylesheet" href="assets/css/styles.css?v=20260909g">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -232,6 +232,18 @@
             </div>
           </div>
 
+          <!-- Réinscription prioritaire en cours (voir functions/api/inscription-status.js et
+               assets/js/inscription.js) : les familles déjà inscrites reçoivent un lien personnel
+               (/reinscription/<token>, functions/reinscription/[token].js) pendant cette période,
+               ce bloc informe simplement le public que ce n'est pas encore son tour. -->
+          <div class="inscription-priority card" style="background:var(--gold-100);box-shadow:none;">
+            <div class="card-body">
+              <h3 style="margin-bottom:8px;">Réinscription prioritaire en cours</h3>
+              <p style="color:var(--color-text-muted);">Les familles déjà inscrites la saison précédente ont reçu un lien personnel pour réserver la place de leur enfant en priorité. Les nouvelles inscriptions ouvriront au public le <strong id="inscription-priority-date">—</strong>. Contactez-nous pour être informé(e) dès l'ouverture.</p>
+              <a href="/contact" class="btn btn-primary btn-block">Nous contacter</a>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -322,6 +334,6 @@
 <script src="assets/js/main.js?v=20260909c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="assets/js/pdf-inscription.js?v=20260909b"></script>
-<script src="assets/js/inscription.js?v=20260909e"></script>
+<script src="assets/js/inscription.js?v=20260909f"></script>
 </body>
 </html>

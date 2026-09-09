@@ -113,7 +113,7 @@ function page({ config, error, ok, archivedMessage }) {
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
 <link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:640px;}
   .cat-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:16px 18px;margin-bottom:16px;}
@@ -153,6 +153,28 @@ function page({ config, error, ok, archivedMessage }) {
         <p style="margin:8px 0 12px;font-size:.8rem;color:var(--color-text-muted);">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
         <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
       </form>
+
+      <h2 style="font-size:1rem;margin-bottom:8px;">Réinscription prioritaire</h2>
+      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Les familles déjà inscrites peuvent recevoir un lien personnel de réinscription depuis <a href="/admin/inscriptions">/admin/inscriptions</a> (sélection multiple → « Envoyer le lien de réinscription »), avant l'ouverture au public. Tant que la date ci-dessous n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir les inscriptions » dans /admin/inscriptions, sauf pour rouvrir plus tôt.</p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:32px;">
+        <form method="POST">
+          <input type="hidden" name="action" value="save-deadline">
+          <div class="form-field" style="margin-bottom:12px;">
+            <label for="date-limite">Date limite de réinscription prioritaire</label>
+            <input type="date" id="date-limite" name="dateLimiteReinscription" value="${escapeHtml(config.dateLimiteReinscription || '')}">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Enregistrer la date</button>
+        </form>
+        ${
+          config.dateLimiteReinscription
+            ? `<form method="POST">
+          <input type="hidden" name="action" value="save-deadline">
+          <input type="hidden" name="dateLimiteReinscription" value="">
+          <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Retirer la date</button>
+        </form>`
+            : ''
+        }
+      </div>
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Fin de saison</h2>
       <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la saison ${escapeHtml(config.saison)} enregistrée ci-dessus comme saison en cours, cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
@@ -250,6 +272,14 @@ export async function onRequestPost({ request, env }) {
     if (!saison) return withError('Le libellé de saison est obligatoire.');
     if (!Number.isInteger(prix) || prix < 0 || prix > 9999) return withError('Le tarif doit être un nombre entier valide.');
     const nextConfig = { ...config, saison, prix };
+    await setCategoriesConfig(env, nextConfig);
+    return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  if (action === 'save-deadline') {
+    const value = String(form.get('dateLimiteReinscription') || '').trim();
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return withError('Date invalide.');
+    const nextConfig = { ...config, dateLimiteReinscription: value || null };
     await setCategoriesConfig(env, nextConfig);
     return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }

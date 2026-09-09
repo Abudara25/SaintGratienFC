@@ -91,7 +91,7 @@ export async function onRequestGet({ request, params, env }) {
 <link rel="icon" href="/assets/images/favicon.ico">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909f">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <script type="application/ld+json">${toJsonLd({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',

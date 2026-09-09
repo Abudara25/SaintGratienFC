@@ -356,6 +356,122 @@ export async function sendReminderEmail(env, row, siteUrl) {
   }
 }
 
+// Réinscription prioritaire, envoyée depuis /admin/inscriptions (sélection multiple → "Envoyer le
+// lien de réinscription", action=bulk-reinscription) sur les fiches de la saison qui se termine —
+// donne à chaque famille déjà inscrite un lien personnel (/reinscription/<token>, voir
+// functions/reinscription/[token].js) pour réserver la place de son enfant avant l'ouverture au
+// public. Reprend la même structure visuelle que buildReminderEmail() ci-dessus (dupliquée, voir la
+// note en tête de fichier sur le choix de ne pas factoriser ces templates).
+function buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription) {
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const lienUrl = `${siteUrl}/reinscription/${row.reinscription_token}`;
+  const deadlinePhrase = dateLimiteReinscription
+    ? ` avant le ${escapeHtml(dateLimiteReinscription.split('-').reverse().join('/'))}`
+    : '';
+
+  const text = `Bonjour ${row.parent_prenom},
+
+En tant que famille déjà inscrite, ${nomEnfant} bénéficie d'une place prioritaire pour la saison prochaine au Saint-Gratien FC — avant l'ouverture des inscriptions au public.
+
+Pour réserver sa place${deadlinePhrase}, cliquez sur ce lien personnel (les informations de l'an dernier sont déjà pré-remplies, il ne reste qu'à les vérifier) :
+${lienUrl}
+
+Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
+
+Sportivement,
+Saint-Gratien FC
+Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Réinscription prioritaire — Saint-Gratien FC</title>
+</head>
+<body style="margin:0;padding:0;background-color:${CREAM_100};">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
+    Réservez la place de ${escapeHtml(nomEnfant)} pour la saison prochaine, en priorité.
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
+          <tr>
+            <td style="background-color:${MAROON_900};padding:28px 32px;text-align:center;">
+              <img src="${siteUrl}/assets/images/logo-96.webp" width="48" height="48" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:.02em;">Saint-Gratien FC</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.12em;margin-top:2px;">Val-d'Oise · École de foot U6-U9</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(row.parent_prenom)},</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">En tant que famille déjà inscrite, <strong>${escapeHtml(nomEnfant)}</strong> bénéficie d'une place prioritaire pour la saison prochaine — avant l'ouverture des inscriptions au public.</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${INK_900};">
+                    Réservez sa place${deadlinePhrase} : les informations de l'an dernier sont déjà pré-remplies, il ne reste qu'à les vérifier.
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 28px auto;">
+                <tr>
+                  <td align="center" style="background-color:${GOLD_500};border-radius:8px;">
+                    <a href="${lienUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Réserver la place de ${escapeHtml(row.enfant_prenom)}</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:${INK_700};">Des questions ? Répondez directement à cet e-mail ou écrivez-nous à <a href="mailto:contact@saintgratienfc.fr" style="color:${MAROON_900};">contact@saintgratienfc.fr</a>.</p>
+              <p style="margin:24px 0 0 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:${CREAM_200};padding:20px 32px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:${INK_700};text-align:center;">
+              Saint-Gratien FC · Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise<br>
+              Cet e-mail vous est envoyé suite à votre inscription précédente sur <a href="${siteUrl}" style="color:${INK_700};">saintgratienfc.fr</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject: `Réinscription prioritaire — ${nomEnfant} — Saint-Gratien FC`, html, text };
+}
+
+// Contrairement à sendConfirmationEmail/sendAdminNotification (best-effort, fire-and-forget via
+// waitUntil), l'appelant (functions/admin/inscriptions.js, action=bulk-reinscription) a besoin du
+// résultat pour compter succès/échecs et l'afficher dans la bannière — donc `await`ée, retourne
+// true/false comme sendReminderEmail. row.reinscription_token doit déjà être généré et enregistré
+// avant cet appel (voir onRequestPost dans functions/admin/inscriptions.js).
+export async function sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinscription) {
+  if (!env.BREVO_API_KEY) return false;
+  if (!row.reinscription_token) return false;
+
+  const { subject, html, text } = buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription);
+  const body = {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+    to: [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
+
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // Code de double vérification avant un changement de mot de passe admin (voir
 // functions/admin/parametres.js et _shared/settings-kv.js). Contrairement aux e-mails ci-dessus,
 // un échec d'envoi ici DOIT bloquer le changement — sans lui, personne ne serait informé qu'un

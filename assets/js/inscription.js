@@ -76,7 +76,22 @@ document.addEventListener('DOMContentLoaded', () => {
     fetch('/api/inscription-status')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && (data.status === 'open' || data.status === 'closed')) {
+        if (!data || (data.status !== 'open' && data.status !== 'closed')) return;
+        // "priority" (pas renvoyé tel quel par l'API — voir functions/api/inscription-status.js) :
+        // le statut brut est "closed" mais une date limite de réinscription prioritaire est encore
+        // en cours, on affiche donc un message différent de "fermé" (voir .inscription-priority
+        // ci-dessous et sa date limite, plutôt que le bloc .inscription-closed générique).
+        if (data.status === 'closed' && data.dateLimiteReinscription) {
+          statusEl.dataset.status = 'priority';
+          const dateEl = document.getElementById('inscription-priority-date');
+          if (dateEl) {
+            try {
+              dateEl.textContent = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long' }).format(new Date(`${data.dateLimiteReinscription}T00:00:00`));
+            } catch {
+              dateEl.textContent = data.dateLimiteReinscription;
+            }
+          }
+        } else {
           statusEl.dataset.status = data.status;
         }
       })
@@ -159,9 +174,19 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<option value="${escapeHtml(c.label)}">${escapeHtml(c.label)} (${annees})</option>`;
           })
           .join('');
-        // Reprend la sélection précédente si elle existe toujours (ex. l'auto-sélection par date de
-        // naissance a déjà tourné avant que cette réponse n'arrive), sinon garde le 1er élément par défaut.
-        if (data.categories.some((c) => c.label === previousValue)) categorieSelect.value = previousValue;
+        // Si une date de naissance est déjà renseignée (pré-remplie par functions/reinscription/
+        // [token].js, ou déjà saisie par l'utilisateur avant que cette réponse n'arrive), on
+        // recalcule la catégorie à partir des tranches d'âge à jour plutôt que de garder l'ancienne
+        // valeur telle quelle — indispensable pour la réinscription, où l'enfant change souvent de
+        // catégorie d'une saison à l'autre. Sinon, reprend la sélection précédente si elle existe
+        // toujours, ou garde le 1er élément par défaut.
+        const anneeNaissance = naissanceInput?.value ? new Date(naissanceInput.value).getUTCFullYear() : null;
+        const categorieRecalculee = anneeNaissance && categorieParAnnee[anneeNaissance];
+        if (categorieRecalculee) {
+          categorieSelect.value = categorieRecalculee;
+        } else if (data.categories.some((c) => c.label === previousValue)) {
+          categorieSelect.value = previousValue;
+        }
       }
     })
     .catch(() => {}); // en cas d'échec, on garde les repères par défaut (FALLBACK_*) et le <select> statique du HTML

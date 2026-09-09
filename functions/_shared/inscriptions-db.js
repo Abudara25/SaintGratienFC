@@ -55,20 +55,38 @@ export async function ensureInscriptionsTable(db) {
     'archived_at TEXT',
     // Saison au moment de l'inscription (ex. "2026-2027"), lue côté serveur depuis
     // _shared/settings-kv.js au moment du POST (functions/api/inscriptions.js) — jamais la valeur
-    // envoyée par le client, qui a pu charger /api/categories avant un changement de saison entre-
-    // temps. NULL pour les inscriptions créées avant l'ajout de cette colonne (traitées comme
-    // "saison en cours" par l'action "Archiver les saisons précédentes" de /admin/categories,
-    // plutôt que rétro-datées : au lancement de cette fonctionnalité, le club n'a connu qu'une
-    // seule saison, donc toutes les lignes existantes sont bien de la saison en cours).
+    // envoyée par le client, qui a pu charger /api/categories avant un changement de saison
+    // entre-temps. Tamponnée rétroactivement pour les fiches déjà en base au moment de l'ajout de
+    // cette colonne (voir juste après la boucle ci-dessous) : au lancement de cette fonctionnalité,
+    // le club n'a connu qu'une seule saison ("2026-2027"), donc toutes les lignes existantes en sont
+    // forcément — indispensable pour que la comparaison stricte de saison utilisée par la
+    // réinscription (functions/reinscription/[token].js) et par le contrôle anti-doublon
+    // (findExistingInscription ci-dessous) les reconnaisse encore comme "saison en cours" une fois
+    // la saison suivante ouverte, plutôt que de les traiter en permanence comme "saison inconnue".
     'saison TEXT',
+    // Jeton pour /reinscription/<token> (functions/reinscription/[token].js) : généré par l'action
+    // "Envoyer le lien de réinscription" de /admin/inscriptions (onRequestPost, bulk-reinscription)
+    // sur la fiche de la saison qui se termine — ouvre un formulaire pré-rempli à partir de cette
+    // fiche pour créer celle de la saison suivante. NULL tant que la campagne n'a pas été lancée
+    // pour cette famille.
+    'reinscription_token TEXT',
   ];
   for (const column of addedColumns) {
     try {
       await db.prepare(`ALTER TABLE inscriptions ADD COLUMN ${column}`).run();
+      if (column.startsWith('saison ')) {
+        // Ne s'exécute qu'une fois : ce bloc try ne réussit que la toute première fois que la
+        // colonne est ajoutée (les appels suivants échouent sur "duplicate column name" et passent
+        // au catch ci-dessous, sans repasser ici). Toutes les fiches déjà présentes à ce moment sont
+        // forcément de la saison "2026-2027" (seule saison ayant jamais existé pour ce club à la
+        // date de cet ajout) — voir le commentaire sur 'saison TEXT' ci-dessus.
+        await db.prepare("UPDATE inscriptions SET saison = '2026-2027' WHERE saison IS NULL").run();
+      }
     } catch {}
   }
 
   await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)').run();
+  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_reinscription_token ON inscriptions(reinscription_token)').run();
   await db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)').run();
 }
 
@@ -94,17 +112,44 @@ export function buildDedupKey({ enfantPrenom, enfantNom, email }) {
 // au submit (functions/api/inscriptions.js, POST — naissance toujours fournie) et par le contrôle
 // temps réel pendant la saisie (même fichier, GET — naissance optionnelle, pas forcément encore
 // remplie au moment où prénom/nom/e-mail le sont). La correspondance sur prénom/nom/e-mail se fait
-// via dedup_key (égalité stricte, calculée en JS) ; la naissance, quand fournie, est filtrée
-// ensuite en JS sur les candidats trouvés — la table reste petite (un seul club), pas besoin de
-// l'inclure dans la clé indexée.
-export async function findExistingInscription(db, { enfantPrenom, enfantNom, naissance, email }) {
+// via dedup_key (égalité stricte, calculée en JS) ; la naissance, quand fournie, est filtrée ensuite
+// en JS sur les candidats trouvés — la table reste petite (un seul club), pas besoin de l'inclure
+// dans la clé indexée.
+//
+// currentSaison (optionnel) : sans lui, une même famille redevenait "doublon" à chaque nouvelle
+// saison, y compris pour une vraie réinscription légitime — corrigé en scopant le contrôle aux
+// fiches de la saison en cours (saison = currentSaison). Le repli "!r.saison" (fiche sans saison
+// connue) est une pure sécurité : ensureInscriptionsTable() ci-dessus tamponne déjà toutes les
+// fiches existantes à "2026-2027" dès l'ajout de la colonne, il ne devrait plus jamais y avoir de
+// saison NULL en pratique. functions/reinscription/[token].js n'utilise volontairement PAS cette
+// fonction pour savoir si une réinscription a déjà eu lieu : il lui faut une correspondance stricte
+// sur la saison (voir findCurrentSeasonSubmission dans ce fichier), pas ce repli — la fiche chargée
+// par le token est elle-même celle de la saison qui se termine.
+export async function findExistingInscription(db, { enfantPrenom, enfantNom, naissance, email }, currentSaison) {
   const dedupKey = buildDedupKey({ enfantPrenom, enfantNom, email });
   const { results } = await db
-    .prepare('SELECT upload_token, created_at, naissance FROM inscriptions WHERE dedup_key = ?')
+    .prepare('SELECT upload_token, created_at, naissance, saison FROM inscriptions WHERE dedup_key = ?')
     .bind(dedupKey)
     .all();
 
-  if (!results.length) return null;
-  if (!naissance) return results[0];
-  return results.find((r) => r.naissance === naissance) || null;
+  const scoped = currentSaison ? results.filter((r) => !r.saison || r.saison === currentSaison) : results;
+
+  if (!scoped.length) return null;
+  if (!naissance) return scoped[0];
+  return scoped.find((r) => r.naissance === naissance) || null;
+}
+
+// Utilisé uniquement par functions/reinscription/[token].js pour savoir si une famille a déjà
+// finalisé sa réinscription de la saison en cours (affiche alors "déjà réinscrit" plutôt que le
+// formulaire). Volontairement une correspondance STRICTE sur la saison (pas de repli "!r.saison"
+// comme dans findExistingInscription ci-dessus) : la fiche chargée par le token de réinscription est
+// elle-même celle de la saison qui se termine, un repli sur "sans saison connue" la ferait
+// correspondre à elle-même dès le premier chargement du lien, avant toute réinscription réelle.
+export async function findCurrentSeasonSubmission(db, { enfantPrenom, enfantNom, naissance, email }, currentSaison) {
+  const dedupKey = buildDedupKey({ enfantPrenom, enfantNom, email });
+  const { results } = await db
+    .prepare('SELECT naissance FROM inscriptions WHERE dedup_key = ? AND saison = ?')
+    .bind(dedupKey, currentSaison)
+    .all();
+  return results.some((r) => r.naissance === naissance);
 }
