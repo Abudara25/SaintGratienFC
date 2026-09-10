@@ -63,7 +63,24 @@ export async function onRequestPost({ request, env, waitUntil }) {
   // fois à scoper le contrôle anti-doublon ci-dessous à la saison en cours (voir
   // findExistingInscription) et à tamponner la fiche pour l'action "Archiver les saisons
   // précédentes"/"Envoyer le lien de réinscription" de /admin/inscriptions et /admin/categories.
-  const { saison } = await getCategoriesConfig(env);
+  const { saison, categories } = await getCategoriesConfig(env);
+
+  // Garde définitive contre un enfant hors tranche d'âge (ex. né en 2017 alors que la catégorie
+  // la plus âgée s'arrête à 2018) : assets/js/inscription.js bloque déjà ce cas côté formulaire,
+  // mais ce contrôle serveur reste la seule protection fiable contre un appel direct à cette API
+  // (JS désactivé, requête rejouée, formulaire modifié) — un incident réel a montré qu'une
+  // inscription avec une catégorie ne correspondant pas à l'année de naissance pouvait autrement
+  // être enregistrée.
+  const anneeNaissance = Number(data.naissance.slice(0, 4));
+  const categorieValide = categories.some(
+    (c) => c.active && c.label === data.categorie && anneeNaissance >= c.anneeMin && anneeNaissance <= c.anneeMax
+  );
+  if (!categorieValide) {
+    return new Response(
+      JSON.stringify({ error: "La date de naissance ne correspond pas à la catégorie sélectionnée" }),
+      { status: 400 }
+    );
+  }
 
   try {
     await ensureInscriptionsTable(env.DB);

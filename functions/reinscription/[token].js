@@ -112,7 +112,7 @@ function shell({ title, intro, body }) {
 <script src="/assets/js/main.js?v=20260909c"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/assets/js/pdf-inscription.js?v=20260909b"></script>
-<script src="/assets/js/inscription.js?v=20260909f"></script>
+<script src="/assets/js/inscription.js?v=20260910a"></script>
 </body>
 </html>
 `;

@@ -191,6 +191,19 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .catch(() => {}); // en cas d'échec, on garde les repères par défaut (FALLBACK_*) et le <select> statique du HTML
 
+  const ageWarning = document.getElementById('inscription-age-warning');
+
+  // Vrai uniquement si la date de naissance saisie tombe dans la tranche d'âge d'une catégorie
+  // ouverte cette saison — évite qu'une naissance hors tranche (ex. 2017, alors que la plus âgée
+  // des catégories s'arrête à 2018) ne passe avec la catégorie précédemment sélectionnée restée
+  // inchangée (voir le gestionnaire de "change" ci-dessous, qui ne touche à la catégorie que si la
+  // date est valide).
+  function naissanceCorrespondACategorie() {
+    if (!naissanceInput.value) return false;
+    const annee = new Date(naissanceInput.value).getUTCFullYear();
+    return categorieParAnnee[annee] === categorieSelect.value;
+  }
+
   if (naissanceInput && categorieSelect) {
     naissanceInput.addEventListener('change', () => {
       // getUTCFullYear (pas getFullYear) : "YYYY-MM-DD" est parsé comme minuit UTC, et lire
@@ -198,7 +211,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // sur une naissance au 1er janvier.
       const annee = new Date(naissanceInput.value).getUTCFullYear();
       const categorie = categorieParAnnee[annee];
-      if (categorie) categorieSelect.value = categorie;
+      if (categorie) {
+        categorieSelect.value = categorie;
+        if (ageWarning) ageWarning.hidden = true;
+      } else if (ageWarning) {
+        // Année hors de toute tranche connue (ex. 2017) : on ne force plus une catégorie qui ne
+        // correspond pas à l'âge réel de l'enfant — le contrôle au submit ci-dessous bloque
+        // l'envoi tant que ce message reste affiché.
+        ageWarning.hidden = false;
+      }
     });
   }
 
@@ -242,6 +263,16 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     if (!form.checkValidity()) {
       form.reportValidity();
+      return;
+    }
+    // Garde définitive (pas seulement l'avertissement au changement de date ci-dessus) : bloque
+    // tout envoi si la date de naissance ne correspond pas à la catégorie sélectionnée, quelle
+    // que soit la façon dont ce décalage s'est produit.
+    if (!naissanceCorrespondACategorie()) {
+      if (ageWarning) {
+        ageWarning.hidden = false;
+        ageWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
       return;
     }
 
