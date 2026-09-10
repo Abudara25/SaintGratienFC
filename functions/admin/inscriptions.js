@@ -404,7 +404,6 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-archive" data-confirm="Archiver les profils sélectionnés ? Ils seront déplacés dans la corbeille, récupérables à tout moment." style="background:var(--cream-200);color:var(--maroon-950);" disabled>Archiver la sélection</button>
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-export" style="background:var(--cream-200);color:var(--maroon-950);" disabled>Exporter la sélection (CSV)</button>
     <button type="button" class="btn btn-sm" data-bulk-action="bulk-reminder" data-confirm="Envoyer une relance par e-mail aux profils sélectionnés qui n'ont pas encore payé ou envoyé leur dossier ? Les profils déjà complets ne recevront rien." style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer une relance</button>
-    <button type="button" class="btn btn-sm" data-bulk-action="bulk-reinscription" data-confirm="Envoyer aux profils sélectionnés leur lien personnel de réinscription prioritaire pour la saison suivante ?" style="background:var(--gold-500);color:var(--maroon-950);" disabled>Envoyer le lien de réinscription</button>
   </form>
   <div class="insc-cards">${
     cards ||
