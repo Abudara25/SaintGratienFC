@@ -45,7 +45,7 @@ export async function onRequestGet({ request, env }) {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:900px;}
   .events-table-wrap{overflow-x:auto;margin-bottom:32px;}
@@ -76,7 +76,7 @@ export async function onRequestGet({ request, env }) {
       </div>
     </main>
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
 </body></html>`,
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

@@ -8,14 +8,8 @@ document.querySelectorAll('.insc-filters select').forEach((select) => {
 });
 
 // Bouton "Archiver"/"Supprimer définitivement"/"Marquer payé" d'une fiche (voir actionsHtml dans
-// functions/admin/inscriptions.js) : le message vient de l'attribut data-confirm du bouton plutôt
-// que d'un texte fixe ici, chaque action ayant un libellé différent (et une gravité différente).
-document.querySelectorAll('.insc-confirm-form').forEach((form) => {
-  form.addEventListener('submit', (e) => {
-    const message = form.querySelector('button[type=submit]')?.dataset.confirm || 'Confirmer ?';
-    if (!confirm(message)) e.preventDefault();
-  });
-});
+// functions/admin/inscriptions.js) : la confirmation avant envoi est gérée par le handler partagé
+// .admin-confirm-form dans assets/js/admin-nav.js (chargé sur cette page), pas ici.
 
 document.querySelectorAll('.insc-pdf-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -50,10 +44,12 @@ if (bulkForm) {
     selectAllCb.checked = all.length > 0 && checked.length === all.length;
   }
 
+  // stopPropagation à la fois sur la case et sur son enveloppe .insc-select-wrap (qui agrandit la
+  // zone cliquable à 44px, voir styles.css) : sans ça, un clic dans cette zone élargie mais hors de
+  // la case elle-même (20px) déclencherait un click sur le <label>, qui bulle jusqu'au <summary
+  // class="insc-card-head"> et ouvrirait/replierait la carte au lieu de seulement cocher la case.
+  document.querySelectorAll('.insc-select-wrap').forEach((wrap) => wrap.addEventListener('click', (e) => e.stopPropagation()));
   selectCheckboxes().forEach((cb) => {
-    // stopPropagation : la case vit dans <summary class="insc-card-head">, sans ça la cliquer
-    // ouvrirait/replierait aussi la carte (comportement natif de <summary> sur tout clic à
-    // l'intérieur, pas seulement sur le texte).
     cb.addEventListener('click', (e) => e.stopPropagation());
     cb.addEventListener('change', syncBulkUI);
   });

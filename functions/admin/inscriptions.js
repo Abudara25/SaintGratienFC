@@ -127,7 +127,7 @@ function actionsHtml(r, siteUrl, saison, prix) {
       <input type="hidden" name="view" value="archive">
       <button type="submit" class="btn btn-sm" style="background:var(--gold-500);color:var(--maroon-950);">Restaurer</button>
     </form>
-    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form insc-full-form">
+    <form method="POST" action="/admin/inscriptions" class="admin-confirm-form insc-full-form">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" value="${r.id}">
       <input type="hidden" name="view" value="archive">
@@ -137,7 +137,7 @@ function actionsHtml(r, siteUrl, saison, prix) {
 
   return `${pdfBtn}
     ${editLink}
-    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form">
+    <form method="POST" action="/admin/inscriptions" class="admin-confirm-form">
       <input type="hidden" name="action" value="toggle-paye">
       <input type="hidden" name="id" value="${r.id}">
       <button type="submit" class="btn btn-sm" data-confirm="${
@@ -146,7 +146,7 @@ function actionsHtml(r, siteUrl, saison, prix) {
         r.paye ? 'Marquer non payé' : 'Marquer payé'
       }</button>
     </form>
-    <form method="POST" action="/admin/inscriptions" class="insc-confirm-form">
+    <form method="POST" action="/admin/inscriptions" class="admin-confirm-form">
       <input type="hidden" name="action" value="archive">
       <input type="hidden" name="id" value="${r.id}">
       <button type="submit" class="btn btn-sm" data-confirm="Archiver ${name} ? Le profil sera déplacé dans la corbeille, récupérable à tout moment." style="background:var(--cream-200);color:var(--maroon-950);">Archiver</button>
@@ -236,7 +236,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
       (r) => `<details class="insc-card">
         <summary class="insc-card-head">
           <span class="insc-card-head-top">
-            <input type="checkbox" class="insc-select" data-id="${r.id}" aria-label="Sélectionner ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}">
+            <label class="insc-select-wrap"><input type="checkbox" class="insc-select" data-id="${r.id}" aria-label="Sélectionner ${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}"></label>
             <span class="insc-card-head-main">
               <strong>${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}</strong>
               <span class="insc-card-date">${r.archived_at ? `Archivé le ${escapeHtml(r.archived_at)}` : escapeHtml(r.created_at)}</span>
@@ -292,7 +292,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:1400px;}
   .insc-filters-details{margin-bottom:20px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);background:var(--white);}
@@ -332,9 +332,6 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
   .insc-card-chevron{color:var(--color-text-muted);font-size:.8rem;transition:transform .15s ease;flex-shrink:0;}
   .insc-card[open] .insc-card-chevron{transform:rotate(90deg);}
   .insc-card-badges{display:flex;flex-wrap:wrap;gap:6px;}
-  .insc-dossier-badge{font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
-  .insc-dossier-ok{background:var(--gold-100);color:var(--maroon-900);}
-  .insc-dossier-missing{background:var(--cream-200);color:var(--color-text-muted);}
   .insc-card-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin:0 0 14px;font-size:.88rem;}
   .insc-card-fields dt{font-weight:600;color:var(--color-text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
   .insc-card-fields dd{margin:0;word-break:break-word;}
@@ -349,14 +346,6 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
      120px sans que le texte ne déborde (nowrap hérité de .btn) — pleine largeur, comme le bouton
      PDF, ce qui lui donne aussi un peu plus de poids visuel avant un clic aussi irréversible. */
   .insc-card-actions .insc-full-form{flex-basis:100%;}
-  .insc-select{width:20px;height:20px;flex-shrink:0;cursor:pointer;}
-  .insc-bulk-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;margin-bottom:16px;background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.85rem;}
-  .insc-bulk-select-all{display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;}
-  .insc-bulk-count{color:var(--color-text-muted);white-space:nowrap;}
-  .insc-bulk-bar .btn[disabled]{opacity:.45;cursor:not-allowed;}
-  .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
-  .insc-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
-  .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
   .insc-status-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
   .insc-status-bar form{margin:0;}
   .insc-status-open{background:var(--gold-100);color:var(--maroon-900);}
@@ -387,10 +376,10 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
       }</button>
     </form>
   </div>
-  ${dossierError ? `<p class="insc-banner insc-banner-error">${escapeHtml(dossierError)}</p>` : ''}
-  ${dossierOk ? '<p class="insc-banner insc-banner-ok">Dossier enregistré.</p>' : ''}
-  ${bulkOk ? `<p class="insc-banner insc-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
-  ${savedOk ? '<p class="insc-banner insc-banner-ok">Inscription mise à jour.</p>' : ''}
+  ${dossierError ? `<p class="admin-banner admin-banner-error">${escapeHtml(dossierError)}</p>` : ''}
+  ${dossierOk ? '<p class="admin-banner admin-banner-ok">Dossier enregistré.</p>' : ''}
+  ${bulkOk ? `<p class="admin-banner admin-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
+  ${savedOk ? '<p class="admin-banner admin-banner-ok">Inscription mise à jour.</p>' : ''}
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
   <form method="POST" action="/admin/inscriptions" id="bulk-form" class="insc-bulk-bar">
@@ -420,8 +409,8 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="/assets/js/pdf-inscription.js?v=20260909b"></script>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909e"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260910a"></script>
 </body></html>`;
 }
 

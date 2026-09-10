@@ -94,7 +94,7 @@ function categoryCard(c, { isFirst, isLast }) {
         ${!isLast ? `<button type="submit" name="action" value="move-down" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" formnovalidate>&darr; Descendre</button>` : ''}
       </div>
     </form>
-    <form method="POST" class="cat-confirm-form">
+    <form method="POST" class="admin-confirm-form">
       <input type="hidden" name="action" value="delete">
       <input type="hidden" name="id" value="${escapeHtml(c.id)}">
       <button type="submit" class="btn btn-sm" data-confirm="Supprimer la catégorie « ${escapeHtml(c.label)} » ? Les inscriptions déjà enregistrées avec cette catégorie ne seront pas modifiées, mais elle disparaîtra du formulaire d'inscription et des filtres." style="background:var(--color-error, #b3261e);color:#fff;">Supprimer la catégorie</button>
@@ -119,15 +119,12 @@ function page({ config, error, ok, archivedMessage }) {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:640px;}
   .cat-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:16px 18px;margin-bottom:16px;}
   .cat-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
-  .cat-confirm-form{margin-top:10px;}
-  .cat-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
-  .cat-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
-  .cat-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
+  .admin-confirm-form{margin-top:10px;}
 </style>
 </head><body>
   <div class="admin-layout">
@@ -137,11 +134,11 @@ function page({ config, error, ok, archivedMessage }) {
       <p style="margin-bottom:20px;color:var(--color-text-muted);font-size:.9rem;">Gérez ici les catégories d'âge affichées sur le formulaire d'inscription, leurs tranches de naissance et leurs liens de paiement HelloAsso — pratique pour préparer la saison suivante dès la fin de la saison en cours, sans coder.</p>
       ${
         showSeasonReminder(config.saison)
-          ? `<p class="cat-banner" style="background:var(--gold-100);color:var(--maroon-900);border-left:4px solid var(--gold-500);">La saison <strong>${escapeHtml(config.saison)}</strong> touche à sa fin — c'est le bon moment pour préparer la suivante : mettre à jour le libellé de saison et le tarif ci-dessous, ajuster les tranches de naissance de chaque catégorie, demander les nouveaux liens HelloAsso au club si besoin, puis utiliser « Archiver les inscriptions des saisons précédentes » une fois la nouvelle saison enregistrée.</p>`
+          ? `<p class="admin-banner" style="background:var(--gold-100);color:var(--maroon-900);border-left:4px solid var(--gold-500);">La saison <strong>${escapeHtml(config.saison)}</strong> touche à sa fin — c'est le bon moment pour préparer la suivante : mettre à jour le libellé de saison et le tarif ci-dessous, ajuster les tranches de naissance de chaque catégorie, demander les nouveaux liens HelloAsso au club si besoin, puis utiliser « Archiver les inscriptions des saisons précédentes » une fois la nouvelle saison enregistrée.</p>`
           : ''
       }
-      ${error ? `<p class="cat-banner cat-banner-error">${escapeHtml(error)}</p>` : ''}
-      ${archivedMessage ? `<p class="cat-banner cat-banner-ok">${escapeHtml(archivedMessage)}</p>` : ok ? '<p class="cat-banner cat-banner-ok">Modifications enregistrées.</p>' : ''}
+      ${error ? `<p class="admin-banner admin-banner-error">${escapeHtml(error)}</p>` : ''}
+      ${archivedMessage ? `<p class="admin-banner admin-banner-ok">${escapeHtml(archivedMessage)}</p>` : ok ? '<p class="admin-banner admin-banner-ok">Modifications enregistrées.</p>' : ''}
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Saison et tarif</h2>
       <form method="POST" id="saison-form" style="margin-bottom:12px;">
@@ -161,7 +158,7 @@ function page({ config, error, ok, archivedMessage }) {
       </form>
       ${
         config.previousSaison && config.previousSaison !== config.saison
-          ? `<form method="POST" class="cat-confirm-form" style="margin-bottom:32px;">
+          ? `<form method="POST" class="admin-confirm-form" style="margin-bottom:32px;">
         <input type="hidden" name="action" value="revert-saison">
         <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" data-confirm="Revenir à la saison « ${escapeHtml(config.previousSaison)} » ? La saison actuelle (« ${escapeHtml(config.saison)}») redeviendra « saison précédente » — vous pourrez y revenir de la même façon. Le tarif et les tranches de naissance déjà modifiés depuis ne sont pas annulés.">&larr; Revenir à la saison précédente (« ${escapeHtml(config.previousSaison)} »)</button>
       </form>`
@@ -193,7 +190,7 @@ function page({ config, error, ok, archivedMessage }) {
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Fin de saison</h2>
       <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Dernière étape, une fois la campagne de réinscription bien avancée sur <a href="/admin/reinscription">/admin/reinscription</a> (pas besoin d'attendre que 100% aient répondu — les retardataires restent visibles là-bas même après archivage) : cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente de « ${escapeHtml(config.saison)} » — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
-      <form method="POST" class="cat-confirm-form" style="margin-bottom:32px;">
+      <form method="POST" class="admin-confirm-form" style="margin-bottom:32px;">
         <input type="hidden" name="action" value="archive-previous-seasons">
         <button type="submit" class="btn btn-dark btn-sm" data-confirm="Archiver toutes les inscriptions actives d'une saison autre que ${escapeHtml(config.saison)} ? Elles resteront consultables et récupérables depuis la Corbeille.">Archiver les inscriptions des saisons précédentes</button>
       </form>
@@ -232,8 +229,8 @@ function page({ config, error, ok, archivedMessage }) {
       </form>
     </main>
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-categories.js?v=20260909b"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
+  <script src="/assets/js/admin-categories.js?v=20260910a"></script>
 </body></html>`;
 }
 

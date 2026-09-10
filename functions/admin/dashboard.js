@@ -35,7 +35,7 @@ function page({ total, archivedCount, payeCount, dossierCount, categorieCounts }
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:900px;}
   .dash-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:16px;margin-top:20px;}
@@ -53,7 +53,7 @@ function page({ total, archivedCount, payeCount, dossierCount, categorieCounts }
       <div class="dash-grid">${cards}</div>
     </main>
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
 </body></html>`;
 }
 

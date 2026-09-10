@@ -51,10 +51,9 @@ function editPage(row, categories, { error } = {}) {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:640px;}
-  .edit-banner-error{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
   <div class="admin-layout">
@@ -67,7 +66,7 @@ function editPage(row, categories, { error } = {}) {
       ? `<a href="/admin/inscriptions/${row.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
       : '— pas encore reçu'
   }</p>
-  ${error ? `<p class="edit-banner-error">${escapeHtml(error)}</p>` : ''}
+  ${error ? `<p class="admin-banner admin-banner-error">${escapeHtml(error)}</p>` : ''}
   <form method="POST">
     <div class="form-row">
       <div class="form-field">
@@ -171,7 +170,7 @@ function editPage(row, categories, { error } = {}) {
   </form>
     </main>
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
 </body></html>`;
 }
 

@@ -52,7 +52,7 @@ export function loginPage({ error } = {}) {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 </head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-100);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
   <h1 style="font-size:1.2rem;margin-bottom:16px;">Administration</h1>

@@ -45,7 +45,7 @@ function linkBlock(r, siteUrl, returnTo) {
 function row(r, siteUrl, returnTo) {
   const name = `${escapeHtml(r.enfant_prenom)} ${escapeHtml(r.enfant_nom)}`;
   return `<div class="reinsc-row">
-    <label class="reinsc-row-check">
+    <label class="insc-select-wrap">
       <input type="checkbox" class="insc-select" data-id="${r.id}" aria-label="Sélectionner ${name}" ${r.dejaReinscrit ? 'disabled' : ''}>
     </label>
     <div class="reinsc-row-main">
@@ -78,7 +78,7 @@ function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteRei
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
 <style>
   .admin-main{max-width:1000px;}
   .reinsc-stats{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
@@ -87,20 +87,8 @@ function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteRei
   .reinsc-stat span{font-size:.78rem;color:var(--color-text-muted);}
   .reinsc-search{display:flex;gap:10px;margin-bottom:16px;}
   .reinsc-search input{flex:1;padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:1rem;min-height:44px;}
-  .insc-select{width:20px;height:20px;flex-shrink:0;cursor:pointer;}
-  .insc-select:disabled{cursor:not-allowed;opacity:.35;}
-  .insc-bulk-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;margin-bottom:16px;background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.85rem;}
-  .insc-bulk-select-all{display:flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap;}
-  .insc-bulk-count{color:var(--color-text-muted);white-space:nowrap;}
-  .insc-bulk-bar .btn[disabled]{opacity:.45;cursor:not-allowed;}
-  .insc-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;}
-  .insc-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
-  .insc-dossier-badge{font-size:.66rem;font-weight:700;padding:4px 9px;border-radius:999px;white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
-  .insc-dossier-ok{background:var(--gold-100);color:var(--maroon-900);}
-  .insc-dossier-missing{background:var(--cream-200);color:var(--color-text-muted);}
   .reinsc-rows{display:flex;flex-direction:column;gap:10px;}
   .reinsc-row{display:flex;align-items:flex-start;gap:14px;background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:14px 16px;}
-  .reinsc-row-check{padding-top:2px;}
   .reinsc-row-main{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;}
   .reinsc-row-sub{font-size:.82rem;color:var(--color-text-muted);word-break:break-word;}
   .reinsc-row-actions{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0;}
@@ -116,7 +104,7 @@ function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteRei
       <h1 style="font-size:1.3rem;margin-bottom:8px;">Réinscription prioritaire</h1>
       <p style="margin-bottom:20px;color:var(--color-text-muted);font-size:.9rem;">Adhérents de la saison précédente (pas encore rattachés à la saison en cours, « ${escapeHtml(saison)} »). Contrairement à la liste générale d'<a href="/admin/inscriptions">Inscriptions</a>, cette page ne montre que les familles concernées par la réinscription — pas de risque de contacter quelqu'un déjà inscrit cette saison.</p>
 
-      ${bulkOk ? `<p class="insc-banner insc-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
+      ${bulkOk ? `<p class="admin-banner admin-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
 
       <div class="reinsc-stats">
         <div class="reinsc-stat"><strong>${total}</strong><span>Adhérents à réinscrire</span></div>
@@ -163,8 +151,8 @@ function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteRei
       }</div>
     </main>
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260909a"></script>
-  <script src="/assets/js/admin-inscriptions.js?v=20260909e"></script>
+  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
+  <script src="/assets/js/admin-inscriptions.js?v=20260910a"></script>
 </body></html>`;
 }
 

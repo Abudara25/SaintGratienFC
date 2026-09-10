@@ -1,13 +1,6 @@
-// Page /admin/categories (functions/admin/categories.js) : le CSP site-wide (_headers,
-// script-src sans 'unsafe-inline') bloque les attributs onsubmit, donc la confirmation avant
-// suppression d'une catégorie passe par un fichier externe, comme sur /admin/inscriptions
-// (voir assets/js/admin-inscriptions.js, même pattern .cat-confirm-form/data-confirm).
-document.querySelectorAll('.cat-confirm-form').forEach((form) => {
-  form.addEventListener('submit', (e) => {
-    const message = form.querySelector('button[type=submit]')?.dataset.confirm || 'Confirmer ?';
-    if (!confirm(message)) e.preventDefault();
-  });
-});
+// Page /admin/categories (functions/admin/categories.js). La confirmation avant suppression d'une
+// catégorie (.admin-confirm-form) est gérée par le handler partagé dans assets/js/admin-nav.js
+// (chargé sur cette page), pas ici.
 
 // Formulaire "Saison et tarif" : confirmation seulement si le libellé de saison change vraiment
 // (pas à chaque enregistrement du tarif seul) — data-current-saison porte la valeur enregistrée
