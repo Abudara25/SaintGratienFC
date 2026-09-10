@@ -48,8 +48,9 @@ export async function onRequestGet({ request, env }) {
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:900px;}
-  table{width:100%;border-collapse:collapse;margin-bottom:32px;}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--cream-200);font-size:.9rem;}
+  .events-table-wrap{overflow-x:auto;margin-bottom:32px;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--cream-200);font-size:.9rem;white-space:nowrap;}
   th{font-family:var(--font-display);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);}
 </style>
 </head><body>
@@ -59,16 +60,20 @@ export async function onRequestGet({ request, env }) {
       <h1 style="font-size:1.3rem;margin-bottom:20px;">Événements suivis</h1>
 
       <h2 style="font-size:1rem;">Totaux</h2>
-      <table>
-        <thead><tr><th>Événement</th><th>Total</th><th>Dernier</th></tr></thead>
-        <tbody>${totalsHtml}</tbody>
-      </table>
+      <div class="events-table-wrap">
+        <table>
+          <thead><tr><th>Événement</th><th>Total</th><th>Dernier</th></tr></thead>
+          <tbody>${totalsHtml}</tbody>
+        </table>
+      </div>
 
       <h2 style="font-size:1rem;">50 derniers événements</h2>
-      <table>
-        <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
-        <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
-      </table>
+      <div class="events-table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
+          <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
+        </table>
+      </div>
     </main>
   </div>
   <script src="/assets/js/admin-nav.js?v=20260909a"></script>

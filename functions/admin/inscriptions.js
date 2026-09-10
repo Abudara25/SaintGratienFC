@@ -167,7 +167,7 @@ function actionsHtml(r, siteUrl, saison, prix) {
 // origine (pour le lien de dépôt imprimé dans le PDF régénéré, voir actionsHtml), saison/prix =
 // libellé de saison et tarif courants (_shared/settings-kv.js, /admin/categories) imprimés dans ce
 // même PDF régénéré.
-function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, inscriptionStatus, effectiveStatus, siteUrl, saison, prix }) {
+function tablePage(rows, { filters, years, categories, total, archivedCount, returnTo, dossierError, dossierOk, bulkOk, savedOk, inscriptionStatus, effectiveStatus, siteUrl, saison, prix }) {
   const sel = (actual, value) => (actual === value ? 'selected' : '');
   const qs = new URLSearchParams();
   if (filters.q) qs.set('q', filters.q);
@@ -307,7 +307,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
   .insc-filters input[type=search],
   .insc-filters select{
     padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);
-    font-size:.88rem;min-height:44px;background:var(--white);color:inherit;
+    font-size:1rem;min-height:44px;background:var(--white);color:inherit;
   }
   .insc-search{flex:1 1 220px;}
   @media (max-width:520px){
@@ -390,6 +390,7 @@ function tablePage(rows, { filters, years, categories, total, archivedCount, ret
   ${dossierError ? `<p class="insc-banner insc-banner-error">${escapeHtml(dossierError)}</p>` : ''}
   ${dossierOk ? '<p class="insc-banner insc-banner-ok">Dossier enregistré.</p>' : ''}
   ${bulkOk ? `<p class="insc-banner insc-banner-ok">${escapeHtml(bulkOk)}</p>` : ''}
+  ${savedOk ? '<p class="insc-banner insc-banner-ok">Inscription mise à jour.</p>' : ''}
   ${filterBar}
   <p style="margin-bottom:16px;"><a href="${csvHref}" class="btn btn-dark btn-sm">Exporter en CSV${hasActiveFilters ? ' (résultats filtrés)' : ''}</a></p>
   <form method="POST" action="/admin/inscriptions" id="bulk-form" class="insc-bulk-bar">
@@ -459,6 +460,7 @@ export async function onRequestGet({ request, env }) {
   const returnParams = new URLSearchParams(searchParams);
   returnParams.delete('dossierError');
   returnParams.delete('dossierOk');
+  returnParams.delete('savedOk');
   const returnTo = `/admin/inscriptions${returnParams.toString() ? `?${returnParams.toString()}` : ''}`;
 
   let inscriptionStatus = 'open';
@@ -483,6 +485,7 @@ export async function onRequestGet({ request, env }) {
       dossierError: searchParams.get('dossierError'),
       dossierOk: searchParams.get('dossierOk'),
       bulkOk: searchParams.get('bulkOk'),
+      savedOk: searchParams.get('savedOk'),
       inscriptionStatus,
       effectiveStatus,
       siteUrl: new URL(request.url).origin,

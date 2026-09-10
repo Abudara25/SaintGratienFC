@@ -20,8 +20,8 @@ import { sendPasswordChangeCode } from '../_shared/confirmation-email.js';
 
 function page({ notificationEmail, passwordError, passwordOk, emailError, emailOk, awaitingCode }) {
   const passwordSection = awaitingCode
-    ? `<p style="color:var(--maroon-900);margin-bottom:12px;">Un code à 6 chiffres a été envoyé par e-mail. Saisissez-le pour confirmer le changement (valable 15 min).</p>
-       ${passwordError ? `<p style="color:var(--color-error, #b3261e);margin-bottom:12px;">${escapeHtml(passwordError)}</p>` : ''}
+    ? `<p class="param-banner param-banner-ok">Un code à 6 chiffres a été envoyé par e-mail. Saisissez-le pour confirmer le changement (valable 15 min).</p>
+       ${passwordError ? `<p class="param-banner param-banner-error">${escapeHtml(passwordError)}</p>` : ''}
        <form method="POST">
          <input type="hidden" name="action" value="password-confirm">
          <div class="form-field" style="margin-bottom:16px;">
@@ -34,8 +34,8 @@ function page({ notificationEmail, passwordError, passwordOk, emailError, emailO
          <input type="hidden" name="action" value="password-cancel">
          <button type="submit" class="btn btn-dark btn-sm">Annuler</button>
        </form>`
-    : `${passwordOk ? '<p style="color:var(--maroon-900);margin-bottom:12px;">Mot de passe mis à jour.</p>' : ''}
-       ${passwordError ? `<p style="color:var(--color-error, #b3261e);margin-bottom:12px;">${escapeHtml(passwordError)}</p>` : ''}
+    : `${passwordOk ? '<p class="param-banner param-banner-ok">Mot de passe mis à jour.</p>' : ''}
+       ${passwordError ? `<p class="param-banner param-banner-error">${escapeHtml(passwordError)}</p>` : ''}
        <form method="POST">
          <input type="hidden" name="action" value="password">
          <div class="form-field" style="margin-bottom:12px;">
@@ -68,6 +68,9 @@ function page({ notificationEmail, passwordError, passwordOk, emailError, emailO
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:480px;}
+  .param-banner{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:12px;font-size:.9rem;}
+  .param-banner-error{background:#fbe9e7;color:var(--color-error, #b3261e);}
+  .param-banner-ok{background:var(--gold-100);color:var(--maroon-900);}
 </style>
 </head><body>
   <div class="admin-layout">
@@ -76,8 +79,8 @@ function page({ notificationEmail, passwordError, passwordOk, emailError, emailO
       <h1 style="font-size:1.3rem;margin-bottom:24px;">Paramètres</h1>
 
       <h2 style="font-size:1rem;margin-bottom:8px;">Notification des nouvelles inscriptions</h2>
-      ${emailOk ? '<p style="color:var(--maroon-900);margin-bottom:12px;">Adresse mise à jour.</p>' : ''}
-      ${emailError ? `<p style="color:var(--color-error, #b3261e);margin-bottom:12px;">${escapeHtml(emailError)}</p>` : ''}
+      ${emailOk ? '<p class="param-banner param-banner-ok">Adresse mise à jour.</p>' : ''}
+      ${emailError ? `<p class="param-banner param-banner-error">${escapeHtml(emailError)}</p>` : ''}
       <form method="POST" style="margin-bottom:32px;">
         <input type="hidden" name="action" value="notification-email">
         <div class="form-field" style="margin-bottom:12px;">

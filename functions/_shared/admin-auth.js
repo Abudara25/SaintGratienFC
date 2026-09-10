@@ -53,9 +53,9 @@ export function loginPage({ error } = {}) {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Admin SGFC">
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
-</head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-50);">
+</head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--cream-100);">
 <form method="POST" action="/admin/inscriptions" style="background:var(--white);padding:32px;border-radius:var(--radius-lg);box-shadow:var(--shadow-md);max-width:340px;width:100%;">
-  <h1 style="font-size:1.2rem;margin-bottom:16px;">Espace inscriptions</h1>
+  <h1 style="font-size:1.2rem;margin-bottom:16px;">Administration</h1>
   ${error ? '<p style="color:var(--color-error, #b3261e);margin-bottom:12px;font-size:.9rem;">Mot de passe incorrect.</p>' : ''}
   <div class="form-field" style="margin-bottom:16px;">
     <label for="password">Mot de passe</label>

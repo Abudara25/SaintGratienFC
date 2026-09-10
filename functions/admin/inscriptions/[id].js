@@ -54,6 +54,7 @@ function editPage(row, categories, { error } = {}) {
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260909g">
 <style>
   .admin-main{max-width:640px;}
+  .edit-banner-error{padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:16px;font-size:.9rem;background:#fbe9e7;color:var(--color-error, #b3261e);}
 </style>
 </head><body>
   <div class="admin-layout">
@@ -66,7 +67,7 @@ function editPage(row, categories, { error } = {}) {
       ? `<a href="/admin/inscriptions/${row.id}/dossier" target="_blank" rel="noopener">✓ Reçu — voir le fichier</a>`
       : '— pas encore reçu'
   }</p>
-  ${error ? `<p style="color:var(--color-error, #b3261e);margin-bottom:16px;">${escapeHtml(error)}</p>` : ''}
+  ${error ? `<p class="edit-banner-error">${escapeHtml(error)}</p>` : ''}
   <form method="POST">
     <div class="form-row">
       <div class="form-field">
@@ -248,5 +249,5 @@ export async function onRequestPost({ request, env, params }) {
     )
     .run();
 
-  return new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } });
+  return new Response('', { status: 302, headers: { Location: '/admin/inscriptions?savedOk=1' } });
 }

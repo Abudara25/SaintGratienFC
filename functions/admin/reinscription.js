@@ -86,7 +86,7 @@ function page({ rows, saison, q, bulkOk, total, siteUrl, returnTo, dateLimiteRei
   .reinsc-stat strong{display:block;font-family:var(--font-display);font-size:1.5rem;color:var(--maroon-900);}
   .reinsc-stat span{font-size:.78rem;color:var(--color-text-muted);}
   .reinsc-search{display:flex;gap:10px;margin-bottom:16px;}
-  .reinsc-search input{flex:1;padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.9rem;min-height:44px;}
+  .reinsc-search input{flex:1;padding:10px 12px;border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:1rem;min-height:44px;}
   .insc-select{width:20px;height:20px;flex-shrink:0;cursor:pointer;}
   .insc-select:disabled{cursor:not-allowed;opacity:.35;}
   .insc-bulk-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;margin-bottom:16px;background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);font-size:.85rem;}
