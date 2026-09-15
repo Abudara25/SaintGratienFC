@@ -7,13 +7,15 @@
 // (dossiers/<upload_token>) pour que les deux chemins de dépôt restent interchangeables.
 import { ensureInscriptionsTable } from '../../../_shared/inscriptions-db.js';
 import { isAuthed, loginPage } from '../../../_shared/admin-auth.js';
+import { afterInscriptionChange } from '../../../_shared/automations.js';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
-// N'autorise que des redirections internes vers /admin/inscriptions (avec filtres éventuels), pour
-// ramener l'admin sur la liste exactement là où il était — jamais une redirection ouverte.
-const safeRedirect = (value) => (/^\/admin\/inscriptions(\?[^\s]*)?$/.test(value || '') ? value : '/admin/inscriptions');
+// N'autorise que des redirections internes vers /admin/inscriptions (avec filtres éventuels) ou vers
+// une fiche /admin/inscriptions/<id>, pour ramener l'admin exactement là où il était — jamais une
+// redirection ouverte.
+const safeRedirect = (value) => (/^\/admin\/inscriptions(\/\d+)?(\?[^\s]*)?$/.test(value || '') ? value : '/admin/inscriptions');
 
 export async function onRequestGet({ request, env, params }) {
   if (!(await isAuthed(request, env))) {
@@ -51,7 +53,7 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
 
   await ensureInscriptionsTable(env.DB);
   const id = Number(params.id);
-  const row = await env.DB.prepare('SELECT upload_token FROM inscriptions WHERE id = ?').bind(id).first();
+  const row = await env.DB.prepare('SELECT * FROM inscriptions WHERE id = ?').bind(id).first();
   if (!row) {
     return new Response('Inscription introuvable.', { status: 404 });
   }
@@ -104,5 +106,6 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
   }
 
+  waitUntil(afterInscriptionChange(env, { id, before: row, step: 'dossier', source: 'admin', siteUrl: new URL(request.url).origin }));
   return new Response('', { status: 302, headers: { Location: `${redirectTo}${redirectTo.includes('?') ? '&' : '?'}dossierOk=1` } });
 }

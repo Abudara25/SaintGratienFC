@@ -2,7 +2,35 @@
 // à la soumission du formulaire) et functions/admin/inscriptions.js (regénéré par un responsable
 // du club, ex. si la famille n'a pas reçu le mail de confirmation et souhaite le renvoyer). Script
 // classique (pas de module), les fonctions sont globales comme le reste de assets/js/*.js.
-// Dépend de window.jspdf (cdnjs.cloudflare.com/ajax/libs/jspdf), à charger avant ce fichier.
+// Dépend de window.jspdf (cdnjs.cloudflare.com/ajax/libs/jspdf) : balise <script> sur la fiche admin,
+// chargement à la demande via loadJsPdf() sur les formulaires publics.
+
+// jsPDF pèse lourd : le charger d'emblée sur inscription.html bloquait le navigateur pendant que la
+// famille commençait à remplir le formulaire (INP de 560 ms relevé par Cloudflare Web Analytics sur
+// le champ « Nom de l'enfant »). Il n'est donc chargé qu'au moment de générer le PDF.
+const JSPDF_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js';
+const JSPDF_INTEGRITY = 'sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==';
+let jsPdfLoading = null;
+
+function loadJsPdf() {
+  if (window.jspdf) return Promise.resolve();
+  if (!jsPdfLoading) {
+    jsPdfLoading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = JSPDF_SRC;
+      script.integrity = JSPDF_INTEGRITY;
+      script.crossOrigin = 'anonymous';
+      script.referrerPolicy = 'no-referrer';
+      script.onload = () => resolve();
+      script.onerror = () => {
+        jsPdfLoading = null;
+        reject(new Error('jsPDF indisponible'));
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return jsPdfLoading;
+}
 
 function buildInscriptionPdfDoc(data, depotUrl) {
   const { jsPDF } = window.jspdf;
@@ -53,6 +81,10 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   line(`E-mail : ${data.email}`);
   line(`Téléphone : ${data.telephone || '—'}`);
   line(`Adresse : ${data.adresse || '—'}, ${data.codePostal || ''} ${data.ville || ''}`.trim());
+  if (data.parent2Prenom || data.parent2Nom) {
+    line(`2e responsable légal : ${data.parent2Prenom || ''} ${data.parent2Nom || ''}`.trim());
+    line(`E-mail : ${data.parent2Email || '—'}  ·  Téléphone : ${data.parent2Telephone || '—'}`);
+  }
   y += 4;
 
   heading('Offre choisie');
@@ -76,7 +108,7 @@ function buildInscriptionPdfDoc(data, depotUrl) {
   if (depotUrl) {
     doc.setFontSize(10);
     doc.setTextColor(30, 30, 30);
-    doc.text('Une fois signé, déposez ce dossier ici :', 14, y);
+    doc.text('Suivez l\'inscription et déposez ce dossier signé et la photo de l\'enfant ici :', 14, y);
     y += 6;
     doc.setTextColor(58, 15, 16);
     doc.textWithLink(depotUrl, 14, y, { url: depotUrl });

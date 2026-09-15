@@ -164,16 +164,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (categorieSelect) {
         const previousValue = categorieSelect.value;
-        // Le libellé vient de /admin/categories (réservé au club, protégé par mot de passe) : le
-        // risque d'y trouver du HTML malveillant est faible, mais on échappe quand même par principe
-        // avant de l'injecter via innerHTML.
-        const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        categorieSelect.innerHTML = data.categories
-          .map((c) => {
+        // Options créées via le DOM (value/textContent) plutôt qu'en HTML : aucune donnée de
+        // /api/categories n'est jamais interprétée comme du code, quel que soit son contenu.
+        categorieSelect.replaceChildren(
+          ...data.categories.map((c) => {
             const annees = c.anneeMin === c.anneeMax ? c.anneeMin : `${c.anneeMin}-${c.anneeMax}`;
-            return `<option value="${escapeHtml(c.label)}">${escapeHtml(c.label)} (${annees})</option>`;
+            return new Option(`${c.label} (${annees})`, c.label);
           })
-          .join('');
+        );
         // Si une date de naissance est déjà renseignée (pré-remplie par functions/reinscription/
         // [token].js, ou déjà saisie par l'utilisateur avant que cette réponse n'arrive), on
         // recalcule la catégorie à partir des tranches d'âge à jour plutôt que de garder l'ancienne
@@ -259,6 +257,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   [form.enfantPrenom, form.enfantNom, form.email].forEach((el) => el.addEventListener('blur', checkDuplicateInline));
 
+  // Second responsable légal facultatif : dès qu'un de ses champs est rempli, son prénom et son nom
+  // deviennent obligatoires (validation native, comme les autres champs du formulaire).
+  const parent2Fields = ['parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'].map((name) => form[name]).filter(Boolean);
+  const syncParent2Required = () => {
+    const filled = parent2Fields.some((input) => input.value.trim());
+    if (form.parent2Prenom) form.parent2Prenom.required = filled;
+    if (form.parent2Nom) form.parent2Nom.required = filled;
+  };
+  parent2Fields.forEach((input) => input.addEventListener('input', syncParent2Required));
+  syncParent2Required();
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!form.checkValidity()) {
@@ -289,6 +298,10 @@ document.addEventListener('DOMContentLoaded', () => {
       parentNom: form.parentNom.value.trim(),
       email: form.email.value.trim(),
       telephone: form.telephone.value.trim(),
+      parent2Prenom: form.parent2Prenom?.value.trim() || '',
+      parent2Nom: form.parent2Nom?.value.trim() || '',
+      parent2Email: form.parent2Email?.value.trim() || '',
+      parent2Telephone: form.parent2Telephone?.value.trim() || '',
       adresse: form.adresse.value.trim(),
       codePostal: form.codePostal.value.trim(),
       ville: form.ville.value.trim(),
@@ -297,7 +310,15 @@ document.addEventListener('DOMContentLoaded', () => {
       rgpd: form.rgpd.checked,
     };
 
-    if (!window.jspdf) {
+    // Bouton mis à jour avant tout travail, pour que le navigateur affiche aussitôt « Génération… » ;
+    // jsPDF n'est chargé qu'ici (voir loadJsPdf dans pdf-inscription.js).
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Génération…';
+    try {
+      await loadJsPdf();
+    } catch {
+      submitBtn.disabled = false;
+      submitBtn.textContent = submitBtnDefaultLabel;
       alert("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou contactez-nous directement à contact@saintgratienfc.fr.");
       return;
     }
@@ -305,13 +326,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Le PDF (sans lien de dépôt, pas encore connu à ce stade) est joint en base64 à la requête
     // pour que le serveur puisse l'attacher à l'e-mail de confirmation (voir
     // functions/_shared/confirmation-email.js) — la famille reçoit ainsi sa fiche remplie par
-    // e-mail en plus du téléchargement local ci-dessous.
+    // e-mail en plus du téléchargement local ci-dessous. On attend ensuite la réponse du serveur
+    // avant de télécharger le PDF local : le lien de dépôt (uploadToken) est imprimé dedans.
     const pdfBase64 = getInscriptionPdfBase64(data);
-
-    // On attend la réponse du serveur avant de télécharger le PDF local : le lien de dépôt du
-    // dossier signé (uploadToken) est imprimé dedans, et il faut le token pour construire ce lien.
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Génération…';
     let uploadToken = null;
     let duplicateCreatedAt = null;
     try {

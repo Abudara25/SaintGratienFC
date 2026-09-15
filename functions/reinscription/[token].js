@@ -55,7 +55,7 @@ function shell({ title, intro, body }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260915a">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -110,9 +110,8 @@ function shell({ title, intro, body }) {
 </footer>
 
 <script src="/assets/js/main.js?v=20260909c"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="/assets/js/pdf-inscription.js?v=20260909b"></script>
-<script src="/assets/js/inscription.js?v=20260910a"></script>
+<script src="/assets/js/pdf-inscription.js?v=20260915a"></script>
+<script src="/assets/js/inscription.js?v=20260915a"></script>
 </body>
 </html>
 `;
@@ -193,6 +192,31 @@ function formPage(row) {
           </div>
         </div>
 
+        <details class="form-parent2"${row.parent2_prenom || row.parent2_nom ? ' open' : ''}>
+          <summary>Ajouter un second responsable légal <span>(facultatif)</span></summary>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="parent2-prenom">Prénom du 2e responsable</label>
+              <input type="text" id="parent2-prenom" name="parent2Prenom" value="${escapeHtml(row.parent2_prenom || '')}">
+            </div>
+            <div class="form-field">
+              <label for="parent2-nom">Nom du 2e responsable</label>
+              <input type="text" id="parent2-nom" name="parent2Nom" value="${escapeHtml(row.parent2_nom || '')}">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="parent2-email">E-mail (2e responsable)</label>
+              <input type="email" id="parent2-email" name="parent2Email" value="${escapeHtml(row.parent2_email || '')}">
+            </div>
+            <div class="form-field">
+              <label for="parent2-telephone">Téléphone (2e responsable)</label>
+              <input type="tel" id="parent2-telephone" name="parent2Telephone" value="${escapeHtml(row.parent2_telephone || '')}">
+            </div>
+          </div>
+          <p class="form-parent2-hint">Il recevra aussi les e-mails de suivi de l'inscription.</p>
+        </details>
+
         <p id="inscription-duplicate-warning" hidden style="font-size:.85rem;color:var(--color-error, #b3261e);background:#fbe9e7;padding:10px 14px;border-radius:var(--radius-sm);">
           Un enfant portant ce nom et prénom semble déjà réinscrit avec cette adresse e-mail. Si c'est une erreur, vérifiez l'orthographe — sinon consultez vos e-mails ou contactez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a>.
         </p>
@@ -256,7 +280,7 @@ function formPage(row) {
         <div class="card" style="background:var(--gold-100);box-shadow:none;">
           <div class="card-body" style="gap:14px;">
             <h3 style="margin-bottom:0;">Dossier généré : encore 2 étapes</h3>
-            <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, puis déposez-le en ligne (photo ou scan). 2. Réglez l'adhésion selon le mode choisi.</p>
+            <p style="margin-bottom:0;color:var(--color-text-muted);">1. Imprimez le dossier téléchargé, faites-le signer, puis déposez-le en ligne (photo ou scan), avec une photo de votre enfant de face sur fond blanc. 2. Réglez l'adhésion selon le mode choisi.</p>
             <div style="display:flex;gap:12px;flex-wrap:wrap;">
               <a id="depot-btn" target="_blank" rel="noopener" class="btn btn-dark">1. Déposer mon dossier signé</a>
             </div>

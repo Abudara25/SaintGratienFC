@@ -575,6 +575,16 @@ tbody tr:hover { background: var(--gold-100); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 @media (max-width: 620px) { .form-row { grid-template-columns: 1fr; } }
 
+/* Second responsable légal facultatif (inscription.html, functions/reinscription/[token].js). */
+.form-parent2 { margin: 0 0 20px; border: 1.5px dashed var(--gold-300); border-radius: var(--radius-sm); background: var(--cream-100); }
+.form-parent2 > summary { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 16px; cursor: pointer; list-style: none; font-weight: 600; font-size: .95rem; color: var(--maroon-700); }
+.form-parent2 > summary::-webkit-details-marker { display: none; }
+.form-parent2 > summary::before { content: '+'; display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--gold-100); font-weight: 700; }
+.form-parent2[open] > summary::before { content: '−'; }
+.form-parent2 > summary span { font-weight: 400; color: var(--color-text-muted); }
+.form-parent2 > .form-row, .form-parent2 > .form-parent2-hint { padding-inline: 16px; }
+.form-parent2-hint { margin: -6px 0 14px; font-size: .82rem; color: var(--color-text-muted); }
+
 /* ---------- Practical info list ---------- */
 .info-list { display: grid; gap: 18px; }
 .info-item { display: flex; gap: 16px; align-items: flex-start; }
@@ -722,69 +732,8 @@ article.card { cursor: zoom-in; }
 }
 .lightbox-close:hover { background: var(--gold-100); }
 
-/* Sidebar de navigation /admin/* (voir _shared/admin-auth.js, adminSidebar()) — remplace les
-   liens de retour/déconnexion dispersés en haut de chaque page admin par une navigation commune
-   (Inscriptions, Corbeille, Événements, Paramètres, Déconnexion). Un seul bloc CSS partagé plutôt
-   que dupliqué dans le <style> inline de chaque page admin (elles chargent déjà ce fichier). */
-.admin-layout { display: flex; min-height: 100vh; }
-.admin-sidebar {
-  flex-shrink: 0; width: 220px; background: var(--maroon-900); color: var(--cream-100);
-  display: flex; flex-direction: column; gap: 20px; padding: 24px 16px;
-}
-.admin-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.admin-sidebar-brand { font-family: var(--font-display); font-size: 1rem; font-weight: 700; letter-spacing: .02em; }
-.admin-nav-toggle {
-  display: none; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 44px; height: 44px; padding: 0; border: none; border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, .1); color: var(--cream-100); font-size: 1.3rem; line-height: 1; cursor: pointer;
-}
-.admin-nav-toggle:hover { background: rgba(255, 255, 255, .18); }
-.admin-sidebar-links { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.admin-nav-link {
-  display: flex; align-items: center; min-height: 44px; padding: 8px 12px;
-  border-radius: var(--radius-sm); color: var(--cream-100); font-size: .92rem; text-decoration: none;
-}
-.admin-nav-link:hover { background: rgba(255, 255, 255, .1); }
-.admin-nav-link.admin-nav-active { background: var(--gold-500); color: var(--maroon-950); font-weight: 600; }
-.admin-nav-logout { font-size: .85rem; opacity: .8; }
-.admin-main { flex: 1; min-width: 0; padding: 16px; }
-@media (min-width: 600px) { .admin-main { padding: 24px; } }
-/* Sous 760px : sidebar repliée en simple barre (marque + bouton burger) — les liens et la
-   déconnexion restent dans le DOM mais masqués (display:none) tant que .admin-sidebar n'a pas la
-   classe admin-nav-open, basculée par assets/js/admin-nav.js (script externe : le CSP du site
-   bloque les attributs onclick/<script> inline, voir la note dans admin-inscriptions.js). Choisi
-   plutôt que la rangée de liens qui wrappait avant (repérée en débordement à 360px) : avec 5 liens,
-   un menu replié est plus compact et plus net sur petit écran qu'une rangée qui wrappe. */
-@media (max-width: 760px) {
-  .admin-layout { flex-direction: column; }
-  .admin-sidebar { width: auto; padding: 12px 16px; gap: 12px; }
-  .admin-nav-toggle { display: inline-flex; }
-  .admin-sidebar-links, .admin-nav-logout { display: none; }
-  .admin-sidebar.admin-nav-open .admin-sidebar-links { display: flex; }
-  .admin-sidebar.admin-nav-open .admin-nav-logout { display: flex; }
-}
-
-/* ---------- Composants admin partagés ---------- */
-/* Bannière de message (succès/erreur) — reprise à l'identique sur chaque page /admin/* qui en a
-   besoin (inscriptions, catégories, réinscription, paramètres, édition d'une fiche) : centralisée
-   ici le 2026-09-10 plutôt que redéfinie dans le <style> inline de chaque page. */
-.admin-banner { padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: .9rem; }
-.admin-banner-error { background: #fbe9e7; color: var(--color-error, #b3261e); }
-.admin-banner-ok { background: var(--gold-100); color: var(--maroon-900); }
-
-/* Sélection multiple (cases à cocher + barre d'actions groupées) — partagée par
-   /admin/inscriptions et /admin/reinscription (même markup/JS, voir assets/js/admin-inscriptions.js).
-   .insc-select-wrap porte la case à 44px de zone cliquable ; la case elle-même reste visuellement
-   petite (20px), voir la règle des cibles tactiles du projet. */
-.insc-select-wrap { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; cursor: pointer; }
-.insc-select { width: 20px; height: 20px; flex-shrink: 0; cursor: pointer; }
-.insc-select:disabled { cursor: not-allowed; opacity: .35; }
-.insc-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; margin-bottom: 16px; background: var(--white); border: 1px solid var(--cream-200); border-radius: var(--radius-sm); font-size: .85rem; }
-.insc-bulk-select-all { display: flex; align-items: center; gap: 8px; cursor: pointer; white-space: nowrap; }
-.insc-bulk-count { color: var(--color-text-muted); white-space: nowrap; }
-.insc-bulk-bar .btn[disabled] { opacity: .45; cursor: not-allowed; }
-
-/* Badge "dossier reçu/manquant" — partagé par les mêmes deux pages. */
+/* Badge "document reçu / en attente" — page publique de suivi d'inscription (functions/depot/[token].js).
+   Les styles de l'espace admin sont dans assets/css/admin.css, chargé uniquement par /admin/*. */
 .insc-dossier-badge { font-size: .66rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; white-space: nowrap; text-transform: uppercase; letter-spacing: .03em; flex-shrink: 0; }
 .insc-dossier-ok { background: var(--gold-100); color: var(--maroon-900); }
 .insc-dossier-missing { background: var(--cream-200); color: var(--color-text-muted); }

@@ -52,6 +52,17 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     return new Response(JSON.stringify({ error: 'E-mail invalide' }), { status: 400 });
   }
+  // Second responsable légal facultatif : s'il est renseigné, prénom et nom sont requis, et son
+  // e-mail (lui aussi facultatif) doit être valide puisqu'il reçoit les e-mails de suivi.
+  const parent2 = ['parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'].map((key) => String(data[key] ?? '').trim());
+  if (parent2.some(Boolean)) {
+    if (!parent2[0] || !parent2[1]) {
+      return new Response(JSON.stringify({ error: 'Prénom et nom du second responsable légal requis' }), { status: 400 });
+    }
+    if (parent2[2] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent2[2])) {
+      return new Response(JSON.stringify({ error: 'E-mail du second responsable légal invalide' }), { status: 400 });
+    }
+  }
   // Format contrôlé (pas juste "non vide") : ce champ est ensuite utilisé tel quel pour dériver
   // la liste des années de naissance affichée dans les filtres de /admin/inscriptions.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance)) {
@@ -120,8 +131,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
   try {
     await env.DB.prepare(
       `INSERT INTO inscriptions
-        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison, parent2_prenom, parent2_nom, parent2_email, parent2_telephone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         data.enfantPrenom.trim(),
@@ -142,7 +153,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.rgpd ? 1 : 0,
         uploadToken,
         dedupKey,
-        saison
+        saison,
+        parent2[0] || null,
+        parent2[1] || null,
+        parent2[2] || null,
+        parent2[3] || null
       )
       .run();
   } catch (e) {

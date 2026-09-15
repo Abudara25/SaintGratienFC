@@ -1,10 +1,14 @@
-// Page publique de dépôt du dossier signé, liée depuis un lien unique par famille (voir
-// assets/js/inscription.js — le lien est construit avec l'upload_token renvoyé par
-// functions/api/inscriptions.js à la création de l'inscription). Remplace l'ancien "1. Envoyer
-// par e-mail" (mailto), qui ne pouvait de toute façon pas joindre le PDF automatiquement.
-// Le fichier est stocké dans le bucket R2 "DOSSIERS" (à créer manuellement sur le dashboard
-// Cloudflare Pages — voir CLAUDE.md), la base D1 ne garde que la référence (dossier_key).
-import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
+// Espace famille « Mon inscription », lié depuis l'e-mail de confirmation, le PDF et la page
+// d'inscription (lien unique par famille : upload_token, généré par functions/api/inscriptions.js).
+// Montre où en est l'inscription — dossier signé, photo de l'enfant, paiement, les trois requis (voir
+// isInscriptionComplete) — et permet de déposer le dossier signé (onRequestPost ci-dessous) et la
+// photo (functions/depot/[token]/photo.js). Les fichiers sont stockés dans le bucket R2 "DOSSIERS"
+// (à créer manuellement sur le dashboard Cloudflare Pages — voir CLAUDE.md), D1 ne garde que les
+// références. Le paiement, lui, est validé par un responsable du club depuis l'admin.
+import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { getCategoriesConfig } from '../_shared/settings-kv.js';
+import { PHOTO_ACCEPT } from '../_shared/photo-storage.js';
+import { afterInscriptionChange } from '../_shared/automations.js';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
@@ -14,34 +18,157 @@ const escapeHtml = (str = '') =>
 
 // `datetime('now')` (SQLite) renvoie "YYYY-MM-DD HH:MM:SS" en UTC, sans "T" ni "Z" — il faut les
 // ajouter pour que `new Date(...)` le reconnaisse de façon fiable dans tous les moteurs JS.
-const formatDateTime = (sqliteDatetime) => {
+const formatDate = (sqliteDatetime) => {
   try {
-    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(
-      new Date(`${sqliteDatetime.replace(' ', 'T')}Z`)
-    );
+    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeZone: 'Europe/Paris' }).format(new Date(`${sqliteDatetime.replace(' ', 'T')}Z`));
   } catch {
-    return sqliteDatetime;
+    return escapeHtml(sqliteDatetime);
   }
 };
 
-function page({ siteUrl, inscription, error, success }) {
-  const nomEnfant = `${escapeHtml(inscription.enfant_prenom)} ${escapeHtml(inscription.enfant_nom)}`;
+const ICONS = {
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  alert: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
+};
+const icon = (name) =>
+  `<svg class="suivi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
-  const status =
-    success
-      ? `<div class="card" style="background:var(--gold-100);box-shadow:none;margin-bottom:24px;"><div class="card-body"><strong style="color:var(--maroon-950);">Dossier bien reçu, merci !</strong><p style="margin-bottom:0;color:var(--color-text-muted);">Nous avons bien reçu le dossier signé de ${nomEnfant}. Vous pouvez déposer un nouveau fichier ci-dessous si besoin (il remplacera celui-ci).</p></div></div>`
-      : inscription.dossier_uploaded_at
-      ? `<div class="card" style="background:var(--gold-100);box-shadow:none;margin-bottom:24px;"><div class="card-body"><strong style="color:var(--maroon-950);">Dossier déjà reçu</strong><p style="margin-bottom:0;color:var(--color-text-muted);">Nous avons reçu un dossier le ${formatDateTime(inscription.dossier_uploaded_at)}. Vous pouvez le remplacer ci-dessous si besoin.</p></div></div>`
-      : '';
+const tag = (ok) => (ok ? '<span class="suivi-tag is-ok">Validé</span>' : '<span class="suivi-tag is-todo">En attente</span>');
+const flash = (type, message) =>
+  `<p class="suivi-flash is-${type}" role="${type === 'error' ? 'alert' : 'status'}">${icon(type === 'error' ? 'alert' : 'check')}<span>${escapeHtml(message)}</span></p>`;
 
-  const errorHtml = error ? `<p style="color:var(--color-error, #b3261e);margin-bottom:16px;">${escapeHtml(error)}</p>` : '';
+// Exemples illustrés (pas de vraie photo d'enfant) : le même portrait sur fond blanc et sur fond chargé.
+const PORTRAIT = '<circle cx="60" cy="60" r="24" fill="#c4b3a0"/><path d="M20 150c4-34 21-52 40-52s36 18 40 52z" fill="#c4b3a0"/>';
+const EXAMPLES = `<div class="suivi-examples" aria-hidden="true">
+  <figure class="suivi-example is-good">
+    <svg viewBox="0 0 120 150"><rect x=".5" y=".5" width="119" height="149" rx="10" fill="#fff" stroke="#e3dccb"/>${PORTRAIT}</svg>
+    <figcaption>${icon('check')}Fond blanc</figcaption>
+  </figure>
+  <figure class="suivi-example is-bad">
+    <svg viewBox="0 0 120 150"><rect width="120" height="150" fill="#8fbf95"/><rect width="48" height="92" fill="#7aa6d4"/><circle cx="96" cy="28" r="15" fill="#f0c36b"/><rect x="74" y="66" width="46" height="84" fill="#b8896a"/>${PORTRAIT}</svg>
+    <figcaption>${icon('x')}Fond chargé</figcaption>
+  </figure>
+</div>`;
+
+function helloAssoUrlFor(categories, label) {
+  const categorie = categories.find((c) => c.label === label);
+  return categorie && /^https:\/\//.test(categorie.helloAssoUrl || '') ? categorie.helloAssoUrl : '';
+}
+
+function page({ inscription, saison, helloAssoUrl, messages }) {
+  const token = escapeHtml(inscription.upload_token);
+  const prenom = escapeHtml(inscription.enfant_prenom);
+  const nomEnfant = `${prenom} ${escapeHtml(inscription.enfant_nom)}`;
+  const docOk = Boolean(inscription.dossier_uploaded_at);
+  const payOk = Boolean(inscription.paye);
+  const photoOk = Boolean(inscription.photo_uploaded_at);
+  const complete = isInscriptionComplete(inscription);
+  const done = [docOk, photoOk, payOk].filter(Boolean).length;
+  const remaining = 3 - done;
+  const percent = Math.round((done / 3) * 100);
+  const mode = inscription.mode_paiement || '';
+  const photoSrc = photoOk ? `/depot/${token}/photo?v=${encodeURIComponent(inscription.photo_uploaded_at)}` : '';
+  const initials = escapeHtml(`${String(inscription.enfant_prenom || '').charAt(0)}${String(inscription.enfant_nom || '').charAt(0)}`.toUpperCase());
+
+  const step = (iconName, title, detail, ok) => `<li class="suivi-step${ok ? ' is-ok' : ''}">
+        <span class="suivi-step-ico">${icon(ok ? 'check' : iconName)}</span>
+        <span class="suivi-step-text"><strong>${title}</strong><small>${detail}</small></span>
+        ${tag(ok)}
+      </li>`;
+
+  const summary = `<div class="suivi-card suivi-summary${complete ? ' is-complete' : ''}">
+    <div class="suivi-id">
+      ${photoOk ? `<img class="suivi-avatar" src="${photoSrc}" alt="Photo de ${prenom}">` : `<span class="suivi-avatar" aria-hidden="true">${initials}</span>`}
+      <div>
+        <h2>${nomEnfant}</h2>
+        <p>${escapeHtml(inscription.categorie)} · saison ${escapeHtml(saison)}</p>
+      </div>
+    </div>
+    <div class="suivi-progress">
+      <div class="suivi-progress-head"><strong>${done} étape${done > 1 ? 's' : ''} validée${done > 1 ? 's' : ''} sur 3</strong><span>${percent} %</span></div>
+      <span class="suivi-bar"><span style="width:${percent}%"></span></span>
+    </div>
+    ${
+      complete
+        ? `<div class="suivi-banner is-complete">${icon('check')}<div><strong>Dossier complet, merci !</strong><p>Tout est validé de notre côté. Le club enregistre maintenant la licence de ${prenom} auprès de la Fédération Française de Football, généralement sous quelques jours.</p></div></div>`
+        : `<div class="suivi-banner">${icon('clock')}<div><strong>Encore ${remaining} étape${remaining > 1 ? 's' : ''} à valider</strong><p>Chaque étape passe au vert dès qu'elle est validée par le club.</p></div></div>`
+    }
+    <ul class="suivi-steps">
+      ${step('file', 'Dossier signé', docOk ? `Reçu le ${formatDate(inscription.dossier_uploaded_at)}` : '<a href="#dossier">À déposer ci-dessous</a>', docOk)}
+      ${step('camera', `Photo de ${prenom}`, photoOk ? `Reçue le ${formatDate(inscription.photo_uploaded_at)}` : '<a href="#photo">À ajouter ci-dessous</a>', photoOk)}
+      ${step('card', 'Paiement', payOk ? `Reçu${mode ? ` (${escapeHtml(mode)})` : ''}` : `${mode ? `${escapeHtml(mode)} · ` : ''}<a href="#paiement">en attente de réception</a>`, payOk)}
+    </ul>
+  </div>`;
+
+  const dossierCard = `<div class="suivi-card" id="dossier">
+    <div class="suivi-card-head"><h2>${icon('file')}Dossier signé</h2>${tag(docOk)}</div>
+    ${messages.dossierOk ? flash('ok', 'Dossier bien reçu, merci !') : ''}
+    ${messages.error ? flash('error', messages.error) : ''}
+    <p class="suivi-help">${
+      docOk
+        ? `Nous avons bien reçu votre dossier le ${formatDate(inscription.dossier_uploaded_at)}. Vous pouvez le remplacer ci-dessous si besoin.`
+        : 'Imprimez le dossier reçu par e-mail, faites-le signer, puis déposez-le ici : un scan ou une simple photo du document suffit.'
+    }</p>
+    <form method="POST" action="/depot/${token}" enctype="multipart/form-data" class="suivi-upload">
+      <label for="dossier">Fiche d'inscription signée (PDF ou photo)</label>
+      <input type="file" id="dossier" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
+      <small>PDF, JPG ou PNG, 10 Mo maximum.</small>
+      <button type="submit" class="btn btn-primary">${docOk ? 'Remplacer mon dossier' : 'Envoyer mon dossier'}</button>
+    </form>
+  </div>`;
+
+  const photoCard = `<div class="suivi-card" id="photo">
+    <div class="suivi-card-head"><h2>${icon('camera')}Photo de ${prenom}</h2>${tag(photoOk)}</div>
+    ${messages.photoOk ? flash('ok', 'Photo bien reçue, merci !') : ''}
+    ${messages.photoError ? flash('error', messages.photoError) : ''}
+    <div class="suivi-photo-grid">
+      <div class="suivi-photo-preview">${photoOk ? `<img src="${photoSrc}" alt="Photo de ${prenom}">` : `<span>${icon('camera')}Pas encore de photo</span>`}</div>
+      <div>
+        <p class="suivi-help">Elle sert notamment à la licence de ${prenom} et reste réservée au club. Pour une photo réussie :</p>
+        <ul class="suivi-tips">
+          <li>${icon('check')}<span><strong>Sur un fond blanc</strong> ou très clair : un mur blanc fait parfaitement l'affaire.</span></li>
+          <li>${icon('check')}<span><strong>De face</strong>, le visage bien visible et centré, les épaules dans le cadre.</span></li>
+          <li>${icon('check')}<span><strong>Bien éclairée</strong>, idéalement à la lumière du jour, sans ombre sur le visage.</span></li>
+          <li>${icon('check')}<span><strong>Sans casquette</strong> ni lunettes de soleil.</span></li>
+        </ul>
+        ${EXAMPLES}
+      </div>
+    </div>
+    <form method="POST" action="/depot/${token}/photo" enctype="multipart/form-data" class="suivi-upload">
+      <label for="photo">Photo de ${prenom}</label>
+      <input type="file" id="photo" name="photo" accept="${PHOTO_ACCEPT}" required>
+      <small>JPG, PNG ou WebP, 10 Mo maximum. Une photo prise avec un téléphone convient très bien.</small>
+      <button type="submit" class="btn btn-primary">${photoOk ? 'Remplacer la photo' : 'Envoyer la photo'}</button>
+    </form>
+  </div>`;
+
+  const paiementCard = payOk
+    ? ''
+    : `<div class="suivi-card" id="paiement">
+    <div class="suivi-card-head"><h2>${icon('card')}Paiement de l'adhésion</h2>${tag(false)}</div>
+    ${
+      mode === 'HelloAsso'
+        ? `<p class="suivi-help">Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire).</p>${
+            helloAssoUrl ? `<a href="${escapeHtml(helloAssoUrl)}" class="btn btn-primary" target="_blank" rel="noopener">Payer sur HelloAsso</a>` : ''
+          }`
+        : `<p class="suivi-help">${
+            mode ? `Vous avez choisi de régler par <strong>${escapeHtml(mode.toLowerCase())}</strong> : ` : ''
+          }à remettre à un responsable du club, par exemple lors d'un entraînement (le jeudi de 17h à 18h, au Stade Robert Lemoine).</p>`
+    }
+    <p class="suivi-note">Dès que le club a bien reçu votre règlement, il le valide et cette étape passe au vert — cela peut prendre quelques jours.</p>
+  </div>`;
 
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Déposer le dossier signé — Saint-Gratien FC</title>
+<title>Mon inscription — Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="/assets/images/favicon.ico">
 <link rel="manifest" href="/manifest.json">
@@ -52,7 +179,8 @@ function page({ siteUrl, inscription, error, success }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260915a">
+<link rel="stylesheet" href="/assets/css/suivi.css?v=20260915a">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -84,25 +212,19 @@ function page({ siteUrl, inscription, error, success }) {
 <main id="main">
   <div class="page-header">
     <div class="container">
-      <span class="eyebrow">Inscription</span>
-      <h1>Déposer le dossier signé</h1>
-      <p>Dossier de ${nomEnfant}</p>
+      <span class="eyebrow">Espace famille</span>
+      <h1>Mon inscription</h1>
+      <p>Suivez le dossier de ${nomEnfant} étape par étape.</p>
     </div>
   </div>
 
-  <section class="bg-surface">
-    <div class="container" style="max-width:560px;">
-      ${status}
-      ${errorHtml}
-      <form method="POST" enctype="multipart/form-data">
-        <div class="form-field">
-          <label for="dossier">Fiche d'inscription signée (PDF ou photo)</label>
-          <input type="file" id="dossier" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
-          <small style="font-size:.82rem;color:var(--color-text-muted);">PDF, JPG ou PNG, 10 Mo maximum.</small>
-        </div>
-        <button type="submit" class="btn btn-primary btn-block">Envoyer mon dossier signé</button>
-      </form>
-      <p style="margin-top:20px;font-size:.85rem;color:var(--color-text-muted);">Un problème ? Écrivez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a>.</p>
+  <section class="bg-cream">
+    <div class="container suivi-wrap">
+      ${summary}
+      ${dossierCard}
+      ${photoCard}
+      ${paiementCard}
+      <p class="suivi-contact">Une question ? Écrivez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a>.</p>
     </div>
   </section>
 </main>
@@ -133,28 +255,37 @@ async function notFound(request, env) {
   return new Response(res.body, { status: 404, headers: res.headers });
 }
 
+async function render(env, inscription, messages, status = 200) {
+  const { saison, categories } = await getCategoriesConfig(env);
+  return new Response(
+    page({ inscription, saison: inscription.saison || saison, helloAssoUrl: helloAssoUrlFor(categories, inscription.categorie), messages }),
+    { status, headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+  );
+}
+
 export async function onRequestGet({ request, env, params }) {
   const inscription = await loadInscription(env, params.token);
   if (!inscription) return notFound(request, env);
 
-  const siteUrl = new URL(request.url).origin;
-  const success = new URL(request.url).searchParams.get('ok') === '1';
-  return new Response(page({ siteUrl, inscription, success }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  const { searchParams } = new URL(request.url);
+  return render(env, inscription, {
+    dossierOk: searchParams.get('ok') === '1',
+    photoOk: searchParams.get('photoOk') === '1',
+    photoError: searchParams.get('photoError'),
+  });
 }
 
 export async function onRequestPost({ request, env, params, waitUntil }) {
   const inscription = await loadInscription(env, params.token);
   if (!inscription) return notFound(request, env);
 
-  const siteUrl = new URL(request.url).origin;
-  const renderError = (error) =>
-    new Response(page({ siteUrl, inscription, error }), { status: 400, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  const renderError = (error) => render(env, inscription, { error }, 400);
 
   let form;
   try {
     form = await request.formData();
   } catch {
-    return renderError("Envoi invalide, réessayez.");
+    return renderError('Envoi invalide, réessayez.');
   }
 
   const file = form.get('dossier');
@@ -180,7 +311,6 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     // CLAUDE.md — aucun mécanisme de backup natif pour R2, contrairement à D1/Time Travel).
     buffer = await file.arrayBuffer();
     await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
-    await ensureInscriptionsTable(env.DB);
     await env.DB.prepare('UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime(\'now\') WHERE upload_token = ?')
       .bind(key, file.type, params.token)
       .run();
@@ -194,5 +324,6 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
   }
 
-  return new Response('', { status: 302, headers: { Location: `/depot/${params.token}?ok=1` } });
+  waitUntil(afterInscriptionChange(env, { id: inscription.id, before: inscription, step: 'dossier', source: 'famille', siteUrl: new URL(request.url).origin }));
+  return new Response('', { status: 302, headers: { Location: `/depot/${inscription.upload_token}?ok=1#dossier` } });
 }

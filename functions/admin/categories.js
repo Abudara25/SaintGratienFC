@@ -3,16 +3,16 @@
 // club puisse ouvrir une nouvelle saison (nouvelles tranches de naissance, nouveaux liens HelloAsso)
 // ou créer une nouvelle catégorie sans session Claude Code — voir CLAUDE.md. Consommée par :
 // - functions/api/categories.js (public, alimente le <select> d'inscription.html) ;
-// - functions/admin/inscriptions/[id].js (select catégorie du formulaire d'édition) ;
-// - functions/_shared/confirmation-email.js (libellé de saison dans l'e-mail de confirmation) ;
-// - functions/admin/inscriptions.js (libellé de saison injecté dans le PDF régénéré depuis l'admin).
+// - functions/admin/inscriptions/[id].js (select catégorie du formulaire d'édition, libellé de
+//   saison et tarif injectés dans le PDF régénéré depuis la fiche) ;
+// - functions/_shared/confirmation-email.js (libellé de saison dans l'e-mail de confirmation).
 // L'action "Archiver les saisons précédentes" (onRequestPost, archive-previous-seasons) compare le
 // libellé de saison courant à la colonne D1 "saison" (_shared/inscriptions-db.js), écrite à
 // l'inscription par functions/api/inscriptions.js.
 // Le champ "categorie" stocké en base D1 reste le libellé texte (ex. "U6 - U7"), pas l'id interne
 // ci-dessous : renommer une catégorie ne modifie donc pas les inscriptions déjà enregistrées (comme
 // pour le filtre "année de naissance", dérivé des données existantes plutôt que d'une liste figée).
-import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
+import { isAuthed, loginPage, escapeHtml, adminHead, adminShell, adminScripts, icon, flash } from '../_shared/admin-auth.js';
 import { getCategoriesConfig, setCategoriesConfig } from '../_shared/settings-kv.js';
 import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
 
@@ -55,182 +55,194 @@ function uniqueId(base, existingIds) {
 }
 
 function categoryCard(c, { isFirst, isLast }) {
-  return `<div class="cat-card">
-    <form method="POST" class="cat-form">
-      <input type="hidden" name="id" value="${escapeHtml(c.id)}">
+  const id = escapeHtml(c.id);
+  return `<section class="adm-surface">
+    <div class="adm-surface-head">
+      <h3 class="adm-h3">${escapeHtml(c.label)}</h3>
+      <span class="adm-tag ${c.active ? 'is-yes' : 'is-neutral'}">${c.active ? `${icon('check')}Active` : 'Inactive'}</span>
+    </div>
+    <form method="POST">
+      <input type="hidden" name="id" value="${id}">
       <div class="form-row">
         <div class="form-field">
-          <label for="label-${escapeHtml(c.id)}">Nom de la catégorie</label>
-          <input type="text" id="label-${escapeHtml(c.id)}" name="label" value="${escapeHtml(c.label)}" required maxlength="40">
+          <label for="label-${id}">Nom de la catégorie</label>
+          <input type="text" id="label-${id}" name="label" value="${escapeHtml(c.label)}" required maxlength="40">
         </div>
-        <div class="form-field">
-          <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:26px;">
-            <input type="checkbox" name="active" ${c.active ? 'checked' : ''}>
-            Catégorie active (visible sur le formulaire d'inscription)
-          </label>
+        <div class="form-field adm-check-field">
+          <label class="adm-check"><input type="checkbox" name="active" ${c.active ? 'checked' : ''}><span>Catégorie active (visible sur le formulaire d'inscription)</span></label>
         </div>
       </div>
       <div class="form-row">
         <div class="form-field">
-          <label for="annee-min-${escapeHtml(c.id)}">Naissance — année la plus ancienne</label>
-          <input type="number" id="annee-min-${escapeHtml(c.id)}" name="anneeMin" value="${c.anneeMin ?? ''}" required min="2000" max="2100">
+          <label for="annee-min-${id}">Naissance — année la plus ancienne</label>
+          <input type="number" id="annee-min-${id}" name="anneeMin" value="${c.anneeMin ?? ''}" required min="2000" max="2100">
         </div>
         <div class="form-field">
-          <label for="annee-max-${escapeHtml(c.id)}">Naissance — année la plus récente</label>
-          <input type="number" id="annee-max-${escapeHtml(c.id)}" name="anneeMax" value="${c.anneeMax ?? ''}" required min="2000" max="2100">
+          <label for="annee-max-${id}">Naissance — année la plus récente</label>
+          <input type="number" id="annee-max-${id}" name="anneeMax" value="${c.anneeMax ?? ''}" required min="2000" max="2100">
         </div>
       </div>
       <div class="form-field">
-        <label for="ha-url-${escapeHtml(c.id)}">Lien de paiement HelloAsso (onglet « Diffuser » → Bouton &amp; widget → lien classique)</label>
-        <input type="url" id="ha-url-${escapeHtml(c.id)}" name="helloAssoUrl" value="${escapeHtml(c.helloAssoUrl || '')}" placeholder="https://www.helloasso.com/beta/associations/...">
+        <label for="ha-url-${id}">Lien de paiement HelloAsso (onglet « Diffuser » → Bouton &amp; widget → lien classique)</label>
+        <input type="url" id="ha-url-${id}" name="helloAssoUrl" value="${escapeHtml(c.helloAssoUrl || '')}" placeholder="https://www.helloasso.com/beta/associations/...">
       </div>
       <div class="form-field">
-        <label for="ha-widget-${escapeHtml(c.id)}">Lien widget HelloAsso (même onglet, sans « /beta », se terminant par « /widget »)</label>
-        <input type="url" id="ha-widget-${escapeHtml(c.id)}" name="helloAssoWidgetUrl" value="${escapeHtml(c.helloAssoWidgetUrl || '')}" placeholder="https://www.helloasso.com/associations/.../widget">
+        <label for="ha-widget-${id}">Lien widget HelloAsso (même onglet, sans « /beta », se terminant par « /widget »)</label>
+        <input type="url" id="ha-widget-${id}" name="helloAssoWidgetUrl" value="${escapeHtml(c.helloAssoWidgetUrl || '')}" placeholder="https://www.helloasso.com/associations/.../widget">
       </div>
-      <div class="cat-actions">
-        <button type="submit" name="action" value="update" class="btn btn-dark btn-sm">Enregistrer</button>
-        ${!isFirst ? `<button type="submit" name="action" value="move-up" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" formnovalidate>&uarr; Monter</button>` : ''}
-        ${!isLast ? `<button type="submit" name="action" value="move-down" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" formnovalidate>&darr; Descendre</button>` : ''}
+      <div class="adm-form-actions">
+        <button type="submit" name="action" value="update" class="adm-btn adm-btn-sm adm-btn-primary">${icon('check')}Enregistrer</button>
+        ${!isFirst ? '<button type="submit" name="action" value="move-up" class="adm-btn adm-btn-sm adm-btn-ghost" formnovalidate>&uarr; Monter</button>' : ''}
+        ${!isLast ? '<button type="submit" name="action" value="move-down" class="adm-btn adm-btn-sm adm-btn-ghost" formnovalidate>&darr; Descendre</button>' : ''}
       </div>
     </form>
+    <hr class="adm-divider">
     <form method="POST" class="admin-confirm-form">
       <input type="hidden" name="action" value="delete">
-      <input type="hidden" name="id" value="${escapeHtml(c.id)}">
-      <button type="submit" class="btn btn-sm" data-confirm="Supprimer la catégorie « ${escapeHtml(c.label)} » ? Les inscriptions déjà enregistrées avec cette catégorie ne seront pas modifiées, mais elle disparaîtra du formulaire d'inscription et des filtres." style="background:var(--color-error, #b3261e);color:#fff;">Supprimer la catégorie</button>
+      <input type="hidden" name="id" value="${id}">
+      <button type="submit" class="adm-btn adm-btn-sm adm-btn-danger" data-confirm="Supprimer la catégorie « ${escapeHtml(c.label)} » ? Les inscriptions déjà enregistrées avec cette catégorie ne seront pas modifiées, mais elle disparaîtra du formulaire d'inscription et des filtres.">${icon('trash')}Supprimer la catégorie</button>
     </form>
-  </div>`;
+  </section>`;
 }
 
 function page({ config, error, ok, archivedMessage }) {
-  const cards = config.categories
-    .map((c, i) => categoryCard(c, { isFirst: i === 0, isLast: i === config.categories.length - 1 }))
-    .join('');
+  const cards = config.categories.map((c, i) => categoryCard(c, { isFirst: i === 0, isLast: i === config.categories.length - 1 })).join('');
 
-  return `<!doctype html><html lang="fr"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catégories — Admin Saint-Gratien FC</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
-<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="manifest" href="/manifest-admin.json">
-<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon-admin.png">
-<meta name="theme-color" content="#4f1414">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
-<style>
-  .admin-main{max-width:640px;}
-  .cat-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:16px 18px;margin-bottom:16px;}
-  .cat-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
-  .admin-confirm-form{margin-top:10px;}
-</style>
-</head><body>
-  <div class="admin-layout">
-    ${adminSidebar('categories')}
-    <main class="admin-main">
-      <h1 style="font-size:1.3rem;margin-bottom:8px;">Catégories</h1>
-      <p style="margin-bottom:20px;color:var(--color-text-muted);font-size:.9rem;">Gérez ici les catégories d'âge affichées sur le formulaire d'inscription, leurs tranches de naissance et leurs liens de paiement HelloAsso — pratique pour préparer la saison suivante dès la fin de la saison en cours, sans coder.</p>
+  return `${adminHead('Catégories')}
+${adminShell({
+  active: 'categories',
+  eyebrow: `Saison ${escapeHtml(config.saison)}`,
+  title: 'Catégories',
+  subtitle: "Catégories d'âge, tranches de naissance et liens de paiement HelloAsso du formulaire d'inscription — pour préparer la saison suivante sans coder.",
+})}
+<main id="adm-main" class="adm-wrap adm-main adm-main-narrow">
+  ${
+    showSeasonReminder(config.saison)
+      ? `<p class="adm-flash adm-flash-info" role="status">${icon('calendar')}<span>La saison <strong>${escapeHtml(config.saison)}</strong> touche à sa fin — c'est le bon moment pour préparer la suivante : mettre à jour le libellé de saison et le tarif ci-dessous, ajuster les tranches de naissance de chaque catégorie, demander les nouveaux liens HelloAsso au club si besoin, puis utiliser « Archiver les inscriptions des saisons précédentes » une fois la nouvelle saison enregistrée.</span></p>`
+      : ''
+  }
+  ${error ? flash('error', error) : ''}
+  ${archivedMessage ? flash('ok', archivedMessage) : ok ? flash('ok', 'Modifications enregistrées.') : ''}
+
+  <section class="adm-surface">
+    <h2 class="adm-h2">${icon('calendar')}Saison et tarif</h2>
+    <form method="POST" id="saison-form">
+      <input type="hidden" name="action" value="save-saison">
+      <div class="form-row" style="margin-top:12px;">
+        <div class="form-field">
+          <label for="saison">Libellé de saison (ex. « 2026-2027 »)</label>
+          <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" data-current-saison="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
+        </div>
+        <div class="form-field">
+          <label for="prix">Tarif de l'adhésion (€)</label>
+          <input type="number" id="prix" name="prix" value="${config.prix ?? 180}" required min="0" max="9999" step="1">
+        </div>
+      </div>
+      <p class="adm-help">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Changer le libellé de saison fait automatiquement basculer tous les adhérents actuels dans <a href="/admin/reinscription">Réinscription</a> — une confirmation vous sera demandée. Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
+      <div class="adm-form-actions"><button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('check')}Enregistrer</button></div>
+    </form>
+    ${
+      config.previousSaison && config.previousSaison !== config.saison
+        ? `<hr class="adm-divider">
+    <form method="POST" class="admin-confirm-form">
+      <input type="hidden" name="action" value="revert-saison">
+      <button type="submit" class="adm-btn adm-btn-sm adm-btn-ghost" data-confirm="Revenir à la saison « ${escapeHtml(config.previousSaison)} » ? La saison actuelle (« ${escapeHtml(config.saison)} ») redeviendra « saison précédente » — vous pourrez y revenir de la même façon. Le tarif et les tranches de naissance déjà modifiés depuis ne sont pas annulés.">${icon('arrowLeft')}Revenir à la saison « ${escapeHtml(config.previousSaison)} »</button>
+    </form>`
+        : ''
+    }
+  </section>
+
+  <section class="adm-surface">
+    <h2 class="adm-h2">${icon('refresh')}Réinscription prioritaire</h2>
+    <p class="adm-help" style="margin-top:8px;">Une fois la nouvelle saison et la date limite enregistrées, tout le pilotage de la campagne (liste des familles à contacter, envoi du lien, rappels) se fait sur la page <a href="/admin/reinscription">Réinscription</a> — pas ici. Tant que la date limite n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir » dans Inscriptions, sauf pour rouvrir plus tôt.</p>
+    <div class="adm-inline-forms">
+      <form method="POST">
+        <input type="hidden" name="action" value="save-deadline">
+        <div class="form-field">
+          <label for="date-limite">Date limite de réinscription prioritaire</label>
+          <input type="date" id="date-limite" name="dateLimiteReinscription" value="${escapeHtml(config.dateLimiteReinscription || '')}">
+        </div>
+        <button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('check')}Enregistrer la date</button>
+      </form>
       ${
-        showSeasonReminder(config.saison)
-          ? `<p class="admin-banner" style="background:var(--gold-100);color:var(--maroon-900);border-left:4px solid var(--gold-500);">La saison <strong>${escapeHtml(config.saison)}</strong> touche à sa fin — c'est le bon moment pour préparer la suivante : mettre à jour le libellé de saison et le tarif ci-dessous, ajuster les tranches de naissance de chaque catégorie, demander les nouveaux liens HelloAsso au club si besoin, puis utiliser « Archiver les inscriptions des saisons précédentes » une fois la nouvelle saison enregistrée.</p>`
+        config.dateLimiteReinscription
+          ? `<form method="POST">
+        <input type="hidden" name="action" value="save-deadline">
+        <input type="hidden" name="dateLimiteReinscription" value="">
+        <button type="submit" class="adm-btn adm-btn-sm adm-btn-ghost">Retirer la date</button>
+      </form>`
           : ''
       }
-      ${error ? `<p class="admin-banner admin-banner-error">${escapeHtml(error)}</p>` : ''}
-      ${archivedMessage ? `<p class="admin-banner admin-banner-ok">${escapeHtml(archivedMessage)}</p>` : ok ? '<p class="admin-banner admin-banner-ok">Modifications enregistrées.</p>' : ''}
+    </div>
+    <hr class="adm-divider">
+    <a href="/admin/reinscription" class="adm-btn adm-btn-sm adm-btn-ghost">Aller à la réinscription →</a>
+  </section>
 
-      <h2 style="font-size:1rem;margin-bottom:8px;">Saison et tarif</h2>
-      <form method="POST" id="saison-form" style="margin-bottom:12px;">
-        <input type="hidden" name="action" value="save-saison">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="saison">Libellé de saison (ex. « 2026-2027 »)</label>
-            <input type="text" id="saison" name="saison" value="${escapeHtml(config.saison)}" data-current-saison="${escapeHtml(config.saison)}" required maxlength="20" placeholder="2026-2027">
-          </div>
-          <div class="form-field">
-            <label for="prix">Tarif de l'adhésion (€)</label>
-            <input type="number" id="prix" name="prix" value="${config.prix ?? 180}" required min="0" max="9999" step="1">
-          </div>
+  <section class="adm-surface">
+    <h2 class="adm-h2">${icon('lock')}Fermeture automatique des inscriptions</h2>
+    <p class="adm-help" style="margin-top:8px;">À partir de la date choisie, le formulaire d'inscription public se ferme tout seul — même si les inscriptions sont « ouvertes » dans Inscriptions. Pour rouvrir ensuite, retirez ou repoussez la date.</p>
+    <div class="adm-inline-forms">
+      <form method="POST">
+        <input type="hidden" name="action" value="save-fermeture">
+        <div class="form-field">
+          <label for="date-fermeture">Date de fermeture automatique</label>
+          <input type="date" id="date-fermeture" name="dateFermetureInscriptions" value="${escapeHtml(config.dateFermetureInscriptions || '')}">
         </div>
-        <p style="margin:8px 0 12px;font-size:.8rem;color:var(--color-text-muted);">Utilisés dans le formulaire d'inscription, le PDF et l'e-mail de confirmation (le tarif est unique pour toutes les catégories). Changer le libellé de saison fait automatiquement basculer tous les adhérents actuels dans <a href="/admin/reinscription">/admin/reinscription</a> — une confirmation vous sera demandée. Les pages « Entraînements » et « Le Club » (equipe.html) contiennent aussi des tranches de naissance et la saison en toutes lettres dans leur texte — ce contenu éditorial reste à mettre à jour à la main chaque saison, il n'est pas piloté par cette page.</p>
-        <button type="submit" class="btn btn-primary btn-sm">Enregistrer</button>
+        <button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('check')}Enregistrer la date</button>
       </form>
       ${
-        config.previousSaison && config.previousSaison !== config.saison
-          ? `<form method="POST" class="admin-confirm-form" style="margin-bottom:32px;">
-        <input type="hidden" name="action" value="revert-saison">
-        <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);" data-confirm="Revenir à la saison « ${escapeHtml(config.previousSaison)} » ? La saison actuelle (« ${escapeHtml(config.saison)}») redeviendra « saison précédente » — vous pourrez y revenir de la même façon. Le tarif et les tranches de naissance déjà modifiés depuis ne sont pas annulés.">&larr; Revenir à la saison précédente (« ${escapeHtml(config.previousSaison)} »)</button>
+        config.dateFermetureInscriptions
+          ? `<form method="POST">
+        <input type="hidden" name="action" value="save-fermeture">
+        <input type="hidden" name="dateFermetureInscriptions" value="">
+        <button type="submit" class="adm-btn adm-btn-sm adm-btn-ghost">Retirer la date</button>
       </form>`
-          : '<div style="margin-bottom:32px;"></div>'
+          : ''
       }
+    </div>
+  </section>
 
-      <h2 style="font-size:1rem;margin-bottom:8px;">Réinscription prioritaire — étape suivante</h2>
-      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Une fois la nouvelle saison et la date limite enregistrées ci-dessous, tout le pilotage de la campagne (liste des familles à contacter, envoi du lien, rappels) se fait sur <a href="/admin/reinscription"><strong>/admin/reinscription</strong></a> — pas ici. Tant que la date limite n'est pas atteinte et que les inscriptions sont fermées, le site public affiche « réinscription prioritaire en cours » plutôt qu'un simple « fermé ». Une fois la date atteinte, <strong>le formulaire public se rouvre automatiquement</strong> — inutile de cliquer sur « Rouvrir les inscriptions » dans /admin/inscriptions, sauf pour rouvrir plus tôt.</p>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
-        <form method="POST">
-          <input type="hidden" name="action" value="save-deadline">
-          <div class="form-field" style="margin-bottom:12px;">
-            <label for="date-limite">Date limite de réinscription prioritaire</label>
-            <input type="date" id="date-limite" name="dateLimiteReinscription" value="${escapeHtml(config.dateLimiteReinscription || '')}">
-          </div>
-          <button type="submit" class="btn btn-primary btn-sm">Enregistrer la date</button>
-        </form>
-        ${
-          config.dateLimiteReinscription
-            ? `<form method="POST">
-          <input type="hidden" name="action" value="save-deadline">
-          <input type="hidden" name="dateLimiteReinscription" value="">
-          <button type="submit" class="btn btn-sm" style="background:var(--cream-200);color:var(--maroon-950);">Retirer la date</button>
-        </form>`
-            : ''
-        }
+  <section class="adm-surface">
+    <h2 class="adm-h2">${icon('archive')}Fin de saison</h2>
+    <p class="adm-help" style="margin-top:8px;">Dernière étape, une fois la campagne de réinscription bien avancée (pas besoin d'attendre que 100% aient répondu — les retardataires restent visibles sur la page Réinscription même après archivage) : cette action déplace vers la corbeille (récupérable) toutes les inscriptions actives rattachées à une saison différente de « ${escapeHtml(config.saison)} » — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
+    <form method="POST" class="admin-confirm-form">
+      <input type="hidden" name="action" value="archive-previous-seasons">
+      <button type="submit" class="adm-btn adm-btn-sm adm-btn-ghost" data-confirm="Archiver toutes les inscriptions actives d'une saison autre que ${escapeHtml(config.saison)} ? Elles resteront consultables et récupérables depuis la Corbeille.">${icon('archive')}Archiver les inscriptions des saisons précédentes</button>
+    </form>
+  </section>
+
+  <div class="adm-section-head"><h2 class="adm-h2">${icon('tag')}Catégories <span class="adm-count">${config.categories.length}</span></h2></div>
+  ${cards}
+
+  <form method="POST" class="adm-surface">
+    <h2 class="adm-h2">${icon('plus')}Ajouter une catégorie</h2>
+    <input type="hidden" name="action" value="add">
+    <div class="form-field" style="margin-top:12px;">
+      <label for="new-label">Nom de la catégorie</label>
+      <input type="text" id="new-label" name="label" placeholder="U10 - U11" required maxlength="40">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label for="new-annee-min">Naissance — année la plus ancienne</label>
+        <input type="number" id="new-annee-min" name="anneeMin" required min="2000" max="2100" placeholder="2016">
       </div>
-      <p style="margin-bottom:32px;"><a href="/admin/reinscription" class="btn btn-dark btn-sm">Aller à la réinscription →</a></p>
-
-      <h2 style="font-size:1rem;margin-bottom:8px;">Fin de saison</h2>
-      <p style="margin-bottom:12px;color:var(--color-text-muted);font-size:.9rem;">Dernière étape, une fois la campagne de réinscription bien avancée sur <a href="/admin/reinscription">/admin/reinscription</a> (pas besoin d'attendre que 100% aient répondu — les retardataires restent visibles là-bas même après archivage) : cette action déplace vers la corbeille (récupérable, voir « Corbeille » dans le menu) toutes les inscriptions actives rattachées à une saison différente de « ${escapeHtml(config.saison)} » — pratique pour repartir propre sur le tableau de bord et les filtres sans perdre l'historique. Les inscriptions créées avant l'ajout de cette fonctionnalité (sans saison enregistrée) sont considérées comme faisant partie de la saison en cours et ne sont jamais touchées.</p>
-      <form method="POST" class="admin-confirm-form" style="margin-bottom:32px;">
-        <input type="hidden" name="action" value="archive-previous-seasons">
-        <button type="submit" class="btn btn-dark btn-sm" data-confirm="Archiver toutes les inscriptions actives d'une saison autre que ${escapeHtml(config.saison)} ? Elles resteront consultables et récupérables depuis la Corbeille.">Archiver les inscriptions des saisons précédentes</button>
-      </form>
-
-      <h2 style="font-size:1rem;margin-bottom:8px;">Catégories (${config.categories.length})</h2>
-      ${cards}
-
-      <h2 style="font-size:1rem;margin:24px 0 8px;">Ajouter une catégorie</h2>
-      <form method="POST" class="cat-card">
-        <input type="hidden" name="action" value="add">
-        <div class="form-row">
-          <div class="form-field">
-            <label for="new-label">Nom de la catégorie</label>
-            <input type="text" id="new-label" name="label" placeholder="U10 - U11" required maxlength="40">
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-field">
-            <label for="new-annee-min">Naissance — année la plus ancienne</label>
-            <input type="number" id="new-annee-min" name="anneeMin" required min="2000" max="2100" placeholder="2016">
-          </div>
-          <div class="form-field">
-            <label for="new-annee-max">Naissance — année la plus récente</label>
-            <input type="number" id="new-annee-max" name="anneeMax" required min="2000" max="2100" placeholder="2017">
-          </div>
-        </div>
-        <div class="form-field">
-          <label for="new-ha-url">Lien de paiement HelloAsso (facultatif, à compléter dès qu'il existe)</label>
-          <input type="url" id="new-ha-url" name="helloAssoUrl" placeholder="https://www.helloasso.com/beta/associations/...">
-        </div>
-        <div class="form-field">
-          <label for="new-ha-widget">Lien widget HelloAsso (facultatif)</label>
-          <input type="url" id="new-ha-widget" name="helloAssoWidgetUrl" placeholder="https://www.helloasso.com/associations/.../widget">
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm">Ajouter la catégorie</button>
-      </form>
-    </main>
-  </div>
-  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
-  <script src="/assets/js/admin-categories.js?v=20260910a"></script>
+      <div class="form-field">
+        <label for="new-annee-max">Naissance — année la plus récente</label>
+        <input type="number" id="new-annee-max" name="anneeMax" required min="2000" max="2100" placeholder="2017">
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="new-ha-url">Lien de paiement HelloAsso (facultatif, à compléter dès qu'il existe)</label>
+      <input type="url" id="new-ha-url" name="helloAssoUrl" placeholder="https://www.helloasso.com/beta/associations/...">
+    </div>
+    <div class="form-field">
+      <label for="new-ha-widget">Lien widget HelloAsso (facultatif)</label>
+      <input type="url" id="new-ha-widget" name="helloAssoWidgetUrl" placeholder="https://www.helloasso.com/associations/.../widget">
+    </div>
+    <div class="adm-form-actions"><button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('plus')}Ajouter la catégorie</button></div>
+  </form>
+</main>
+${adminScripts('admin-nav', 'admin-categories')}
 </body></html>`;
 }
 
@@ -305,6 +317,14 @@ export async function onRequestPost({ request, env }) {
     const value = String(form.get('dateLimiteReinscription') || '').trim();
     if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return withError('Date invalide.');
     const nextConfig = { ...config, dateLimiteReinscription: value || null };
+    await setCategoriesConfig(env, nextConfig);
+    return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  }
+
+  if (action === 'save-fermeture') {
+    const value = String(form.get('dateFermetureInscriptions') || '').trim();
+    if (value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return withError('Date invalide.');
+    const nextConfig = { ...config, dateFermetureInscriptions: value || null };
     await setCategoriesConfig(env, nextConfig);
     return new Response(page({ config: nextConfig, ok: true }), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
   }

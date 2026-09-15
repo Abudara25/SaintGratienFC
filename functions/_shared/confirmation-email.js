@@ -12,6 +12,7 @@
 // flexbox/grid). Ne jamais utiliser de <style> externe ni de classes CSS ici : tout doit être en
 // attributs/style inline directement sur chaque balise.
 import { getNotificationEmail, getCategoriesConfig } from './settings-kv.js';
+import { isInscriptionComplete } from './inscriptions-db.js';
 
 const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -20,6 +21,26 @@ const escapeHtml = (str = '') =>
 // autour du tiret, ex. "U6 - U7" → "U6-U7") — pas besoin d'aller chercher le libellé exact d'une
 // catégorie potentiellement renommée/supprimée depuis, contrairement à la saison (voir buildEmail).
 const formatCategorie = (c = '') => c.replace(/\s*-\s*/g, '-');
+
+// Second responsable légal facultatif (colonnes parent2_*) : il reçoit les mêmes e-mails que le
+// premier, et le message s'adresse aux deux. `row` en snake_case, comme en base.
+function familyRecipients(row) {
+  const recipients = [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }];
+  const second = String(row.parent2_email || '').trim();
+  if (second && second.toLowerCase() !== String(row.email).trim().toLowerCase()) {
+    recipients.push({ email: second, name: `${row.parent2_prenom || ''} ${row.parent2_nom || ''}`.trim() || undefined });
+  }
+  return recipients;
+}
+const greetingName = (row) => (row.parent2_prenom ? `${row.parent_prenom} et ${row.parent2_prenom}` : row.parent_prenom);
+const rowFromData = (data) => ({
+  email: data.email,
+  parent_prenom: data.parentPrenom,
+  parent_nom: data.parentNom,
+  parent2_prenom: data.parent2Prenom,
+  parent2_nom: data.parent2Nom,
+  parent2_email: data.parent2Email,
+});
 
 // Palette reprise de assets/css/styles.css (:root) pour rester cohérent avec le site.
 const MAROON_950 = '#3a0f10';
@@ -42,16 +63,17 @@ function buildEmail(data, uploadToken, siteUrl, saison) {
   // déjà acquise. Elle ne l'est qu'une fois le dossier signé déposé, l'adhésion réglée, ET la
   // licence enregistrée par le club auprès de la FFF via Footclubs (démarche faite par le club,
   // pas par la famille, une fois le dossier complet — délai habituel de quelques jours).
-  const text = `Bonjour ${data.parentPrenom},
+  const text = `Bonjour ${greetingName(rowFromData(data))},
 
 Nous avons bien reçu la demande d'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC pour la saison ${saison}.
 
 Important : cette inscription n'est pas encore définitive. Elle sera confirmée une fois :
 1. le dossier signé déposé (lien ci-dessous),
-2. l'adhésion réglée (${data.modePaiement}),
-3. et la licence de votre enfant enregistrée par le club auprès de la Fédération Française de Football (FFF) via la plateforme Footclubs — cette dernière étape est effectuée par le club une fois le dossier complet, généralement sous quelques jours.
+2. une photo de votre enfant ajoutée depuis le même lien (de face, sur fond blanc — un mur blanc suffit),
+3. l'adhésion réglée (${data.modePaiement}),
+4. et la licence de votre enfant enregistrée par le club auprès de la Fédération Française de Football (FFF) via la plateforme Footclubs — cette dernière étape est effectuée par le club une fois le dossier complet, généralement sous quelques jours.
 
-Prochaine étape : déposez le dossier signé ici :
+Suivez l'avancement de l'inscription (dossier, photo, paiement) et déposez vos documents ici :
 ${depotUrl}
 
 Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
@@ -79,7 +101,7 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 </head>
 <body style="margin:0;padding:0;background-color:${CREAM_100};">
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
-    Inscription de ${escapeHtml(nomEnfant)} bien reçue — prochaine étape : déposer le dossier signé.
+    Inscription de ${escapeHtml(nomEnfant)} bien reçue — prochaine étape : déposer le dossier signé et une photo.
   </div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
     <tr>
@@ -94,24 +116,25 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
           </tr>
           <tr>
             <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
-              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(data.parentPrenom)},</p>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(rowFromData(data)))},</p>
               <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Nous avons bien reçu la demande d'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) au Saint-Gratien FC pour la saison ${escapeHtml(saison)}.</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;">
                 <tr>
                   <td style="padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${INK_900};">
-                    <strong style="color:${MAROON_900};">Important :</strong> cette inscription n'est pas encore définitive. Elle sera confirmée une fois les 3 étapes ci-dessous complétées.
+                    <strong style="color:${MAROON_900};">Important :</strong> cette inscription n'est pas encore définitive. Elle sera confirmée une fois les étapes ci-dessous complétées.
                   </td>
                 </tr>
               </table>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
                 ${step(1, `Déposer le <strong>dossier signé</strong> (bouton ci-dessous).`)}
-                ${step(2, `Régler l'adhésion — mode choisi : <strong>${escapeHtml(data.modePaiement)}</strong>.`)}
-                ${step(3, `La licence de votre enfant est enregistrée par le club auprès de la Fédération Française de Football (FFF) via la plateforme Footclubs, une fois le dossier complet — généralement sous quelques jours.`)}
+                ${step(2, `Ajouter une <strong>photo de votre enfant</strong>, de face et sur fond blanc (un mur blanc suffit), depuis le même lien.`)}
+                ${step(3, `Régler l'adhésion — mode choisi : <strong>${escapeHtml(data.modePaiement)}</strong>.`)}
+                ${step(4, `La licence de votre enfant est enregistrée par le club auprès de la Fédération Française de Football (FFF) via la plateforme Footclubs, une fois le dossier complet — généralement sous quelques jours.`)}
               </table>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 28px auto;">
                 <tr>
                   <td align="center" style="background-color:${GOLD_500};border-radius:8px;">
-                    <a href="${depotUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Déposer le dossier signé</a>
+                    <a href="${depotUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Suivre mon inscription</a>
                   </td>
                 </tr>
               </table>
@@ -160,7 +183,7 @@ export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
 
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
-    to: [{ email: data.email, name: `${data.parentPrenom} ${data.parentNom}` }],
+    to: familyRecipients(rowFromData(data)),
     subject,
     htmlContent: html,
     textContent: text,
@@ -204,7 +227,11 @@ Enfant : ${nomEnfant} (${categorie})
 Naissance : ${data.naissance}
 Parent : ${data.parentPrenom} ${data.parentNom}
 E-mail : ${data.email}
-Téléphone : ${data.telephone || '—'}
+Téléphone : ${data.telephone || '—'}${
+    data.parent2Prenom || data.parent2Nom
+      ? `\n2e responsable légal : ${data.parent2Prenom || ''} ${data.parent2Nom || ''} — ${data.parent2Email || 'pas d’e-mail'} — ${data.parent2Telephone || 'pas de téléphone'}`
+      : ''
+  }
 Mode de paiement : ${data.modePaiement}
 
 Voir le détail : ${siteUrl}/admin/inscriptions`;
@@ -233,7 +260,7 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
 // Relance manuelle envoyée depuis /admin/inscriptions (sélection multiple → "Envoyer une relance") :
 // contrairement à sendConfirmationEmail (déclenchée automatiquement à l'inscription), celle-ci est
 // déclenchée à la main par un responsable du club pour un ou plusieurs profils encore incomplets
-// (dossier et/ou paiement manquants). Reprend la même structure visuelle que buildEmail() ci-dessus
+// (dossier, photo et/ou paiement manquants). Reprend la même structure visuelle que buildEmail() ci-dessus
 // (dupliquée plutôt que factorisée : un changement de palette devrait de toute façon être répercuté
 // à la main dans chaque template e-mail, voir la note en tête de fichier).
 function buildReminderEmail(row, siteUrl) {
@@ -242,11 +269,17 @@ function buildReminderEmail(row, siteUrl) {
   const depotUrl = row.upload_token ? `${siteUrl}/depot/${row.upload_token}` : null;
   const missingDossier = !row.dossier_uploaded_at;
   const missingPaiement = !row.paye;
+  const missingPhoto = !row.photo_uploaded_at;
 
   const htmlItems = [];
   if (missingDossier) {
     htmlItems.push(
-      `déposer le <strong>dossier signé</strong>${depotUrl ? ` — <a href="${depotUrl}" style="color:${MAROON_900};">lien de dépôt</a>` : ' (contactez-nous si vous avez perdu le lien)'}`
+      `déposer le <strong>dossier signé</strong>${depotUrl ? ` — <a href="${depotUrl}#dossier" style="color:${MAROON_900};">lien de dépôt</a>` : ' (contactez-nous si vous avez perdu le lien)'}`
+    );
+  }
+  if (missingPhoto) {
+    htmlItems.push(
+      `ajouter une <strong>photo de votre enfant</strong>, de face et sur fond blanc (un mur blanc suffit)${depotUrl ? ` — <a href="${depotUrl}#photo" style="color:${MAROON_900};">ajouter la photo</a>` : ''}`
     );
   }
   if (missingPaiement) {
@@ -255,11 +288,13 @@ function buildReminderEmail(row, siteUrl) {
 
   const textItems = [];
   if (missingDossier) textItems.push(`- Déposer le dossier signé : ${depotUrl || '(contactez-nous si vous avez perdu le lien)'}`);
+  if (missingPhoto) textItems.push(`- Ajouter une photo de votre enfant, de face et sur fond blanc (un mur blanc suffit)${depotUrl ? ` : ${depotUrl}#photo` : ''}`);
   if (missingPaiement) textItems.push(`- Régler l'adhésion (mode choisi : ${row.mode_paiement})`);
+  const remaining = htmlItems.length > 1 ? 'il reste quelques étapes' : 'il reste une étape';
 
-  const text = `Bonjour ${row.parent_prenom},
+  const text = `Bonjour ${greetingName(row)},
 
-Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : il reste une étape pour la finaliser.
+Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : ${remaining} pour la finaliser.
 
 ${textItems.join('\n')}
 
@@ -302,8 +337,8 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
           </tr>
           <tr>
             <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
-              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(row.parent_prenom)},</p>
-              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Petit rappel concernant l'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) : il reste une étape pour la finaliser.</p>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Petit rappel concernant l'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) : ${remaining} pour la finaliser.</p>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;padding:14px 18px;">
                 ${itemsHtml}
               </table>
@@ -333,12 +368,12 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 // true/false comme sendPasswordChangeCode.
 export async function sendReminderEmail(env, row, siteUrl) {
   if (!env.BREVO_API_KEY) return false;
-  if (row.dossier_uploaded_at && row.paye) return false; // rien à relancer
+  if (isInscriptionComplete(row)) return false; // rien à relancer
 
   const { subject, html, text } = buildReminderEmail(row, siteUrl);
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
-    to: [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }],
+    to: familyRecipients(row),
     subject,
     htmlContent: html,
     textContent: text,
@@ -377,7 +412,7 @@ function buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription, isRappel
     ? `Petit rappel : la place de ${nomEnfant} au Saint-Gratien FC est toujours réservée en priorité pour la saison prochaine, mais nous n'avons pas encore reçu votre confirmation.`
     : `En tant que famille déjà inscrite, ${nomEnfant} bénéficie d'une place prioritaire pour la saison prochaine au Saint-Gratien FC — avant l'ouverture des inscriptions au public.`;
 
-  const text = `Bonjour ${row.parent_prenom},
+  const text = `Bonjour ${greetingName(row)},
 
 ${intro}
 
@@ -414,7 +449,7 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
           </tr>
           <tr>
             <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
-              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(row.parent_prenom)},</p>
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
               <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">${
                 isRappel
                   ? `Petit rappel : la place de <strong>${escapeHtml(nomEnfant)}</strong> est toujours réservée en priorité pour la saison prochaine, mais nous n'avons pas encore reçu votre confirmation.`
@@ -470,7 +505,7 @@ export async function sendReinscriptionEmail(env, row, siteUrl, dateLimiteReinsc
   const { subject, html, text } = buildReinscriptionEmail(row, siteUrl, dateLimiteReinscription, isRappel);
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
-    to: [{ email: row.email, name: `${row.parent_prenom} ${row.parent_nom}` }],
+    to: familyRecipients(row),
     subject,
     htmlContent: html,
     textContent: text,
@@ -516,4 +551,216 @@ export async function sendPasswordChangeCode(env, code) {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// E-mails des automatisations (déclenchés par _shared/automations.js et _shared/helloasso.js).
+
+async function brevoSend(env, body) {
+  if (!env.BREVO_API_KEY) return false;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': env.BREVO_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function clubRecipients(env) {
+  return (await getNotificationEmail(env))
+    .split(',')
+    .map((e) => ({ email: e.trim() }))
+    .filter((r) => r.email);
+}
+
+const GREEN_100 = '#e3f2e6';
+const GREEN_700 = '#2f6b3a';
+
+// Suivi famille : une étape validée par le club (dossier ou photo reçus par e-mail, paiement reçu),
+// ou le dossier complet. Récapitule les 3 étapes avec leur état et renvoie vers la page de suivi.
+function buildFollowUpEmail(row, siteUrl, { complete, step }) {
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const suiviUrl = `${siteUrl}/depot/${row.upload_token}`;
+  const steps = [
+    ['Dossier signé', Boolean(row.dossier_uploaded_at)],
+    [`Photo de ${row.enfant_prenom}`, Boolean(row.photo_uploaded_at)],
+    ["Paiement de l'adhésion", Boolean(row.paye)],
+  ];
+  const remaining = steps.filter(([, ok]) => !ok).map(([label]) => label);
+  const intro = complete
+    ? `Bonne nouvelle : toutes les étapes de l'inscription de ${nomEnfant} sont validées.`
+    : {
+        dossier: `Nous avons bien reçu le dossier signé de ${nomEnfant}.`,
+        photo: `Nous avons bien reçu la photo de ${nomEnfant}.`,
+        paiement: `Nous avons bien reçu le paiement de l'adhésion de ${nomEnfant}, merci !`,
+      }[step];
+  // Jamais "inscription définitive" avant la licence FFF (voir CLAUDE.md et buildEmail ci-dessus).
+  const next = complete
+    ? `Le club enregistre maintenant la licence de ${row.enfant_prenom} auprès de la Fédération Française de Football (FFF) via Footclubs, généralement sous quelques jours : l'inscription sera définitive à ce moment-là.`
+    : `Il reste : ${remaining.join(', ')}.`;
+  const subject = complete
+    ? `Dossier complet — ${nomEnfant} — Saint-Gratien FC`
+    : `Inscription de ${nomEnfant} : ${{ dossier: 'dossier signé reçu', photo: 'photo reçue', paiement: 'paiement reçu' }[step]}`;
+
+  const text = `Bonjour ${greetingName(row)},
+
+${intro}
+
+${steps.map(([label, ok]) => `- ${label} : ${ok ? 'validé' : 'en attente'}`).join('\n')}
+
+${next}
+
+Suivre l'inscription : ${suiviUrl}
+
+Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
+
+Sportivement,
+Saint-Gratien FC
+Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
+
+  const stepRows = steps
+    .map(
+      ([label, ok]) => `
+                <tr>
+                  <td style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK_900};">${escapeHtml(label)}</td>
+                  <td align="right" style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;background-color:${ok ? GREEN_100 : GOLD_100};color:${ok ? GREEN_700 : '#8a4b12'};">${ok ? 'Validé' : 'En attente'}</span></td>
+                </tr>`
+    )
+    .join('');
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${CREAM_100};">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
+    ${escapeHtml(intro)}
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
+          <tr>
+            <td style="background-color:${MAROON_900};padding:28px 32px;text-align:center;">
+              <img src="${siteUrl}/assets/images/logo-96.webp" width="48" height="48" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:.02em;">Saint-Gratien FC</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.12em;margin-top:2px;">Val-d'Oise · École de foot U6-U9</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
+              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">${escapeHtml(intro)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 20px 0;">${stepRows}
+              </table>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${complete ? GREEN_100 : GOLD_100};border-left:4px solid ${complete ? GREEN_700 : GOLD_500};border-radius:8px;margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:14px 18px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:${INK_900};">${escapeHtml(next)}</td>
+                </tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 28px auto;">
+                <tr>
+                  <td align="center" style="background-color:${GOLD_500};border-radius:8px;">
+                    <a href="${suiviUrl}" style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Suivre mon inscription</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:${INK_700};">Des questions ? Répondez directement à cet e-mail ou écrivez-nous à <a href="mailto:contact@saintgratienfc.fr" style="color:${MAROON_900};">contact@saintgratienfc.fr</a>.</p>
+              <p style="margin:24px 0 0 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:${CREAM_200};padding:20px 32px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:${INK_700};text-align:center;">
+              Saint-Gratien FC · Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise<br>
+              Cet e-mail vous est envoyé suite à votre demande d'inscription sur <a href="${siteUrl}" style="color:${INK_700};">saintgratienfc.fr</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, html, text };
+}
+
+// step : 'dossier' | 'photo' | 'paiement' (ignoré si complete)
+export async function sendFollowUpEmail(env, row, siteUrl, { complete = false, step } = {}) {
+  if (!row.upload_token) return false;
+  const { subject, html, text } = buildFollowUpEmail(row, siteUrl, { complete, step });
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+    to: familyRecipients(row),
+    subject,
+    htmlContent: html,
+    textContent: text,
+  });
+}
+
+// Alerte interne (texte brut, comme sendAdminNotification) : une famille vient de déposer son dossier
+// signé ou la photo de l'enfant depuis sa page de suivi.
+export async function sendClubUploadAlert(env, row, siteUrl, kind) {
+  const to = await clubRecipients(env);
+  if (!to.length) return false;
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to,
+    subject: `${kind === 'photo' ? 'Photo déposée' : 'Dossier signé déposé'} : ${nomEnfant}`,
+    textContent: `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) vient de déposer ${kind === 'photo' ? 'la photo de l’enfant' : 'le dossier signé'} en ligne.\n\nVoir la fiche : ${siteUrl}/admin/inscriptions/${row.id}`,
+  });
+}
+
+// Paiement HelloAsso reçu mais pas (ou pas entièrement) rattaché à une inscription : à traiter à la main.
+export async function sendHelloAssoAlert(env, siteUrl, { orderId, payer, participants, amount, reason }) {
+  const to = await clubRecipients(env);
+  if (!to.length) return false;
+  const montant = Number.isFinite(amount) ? `${(amount / 100).toFixed(2).replace('.', ',')} €` : '—';
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to,
+    subject: `Paiement HelloAsso à rattacher : ${payer?.firstName || ''} ${payer?.lastName || ''}`.trim(),
+    textContent: `Un paiement HelloAsso n'a pas pu être rattaché automatiquement à une inscription (${reason}).
+
+Commande n° ${orderId}
+Payeur : ${payer?.firstName || ''} ${payer?.lastName || ''} <${payer?.email || '—'}>
+Participant(s) : ${participants.join(', ') || '—'}
+Montant : ${montant}
+
+À faire : retrouver la fiche dans ${siteUrl}/admin/inscriptions et cliquer sur « Marquer payé ».`,
+  });
+}
+
+// Récapitulatif hebdomadaire envoyé au club (voir buildWeeklySummary dans _shared/automations.js).
+export async function sendWeeklySummary(env, siteUrl, summary) {
+  const to = await clubRecipients(env);
+  if (!to.length) return false;
+  const nouvelles = summary.nouvelles.length
+    ? summary.nouvelles.map((n) => `- ${n.name} (${formatCategorie(n.categorie)}) — ${n.complete ? 'complet' : 'à compléter'}`).join('\n')
+    : '- aucune';
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to,
+    subject: `Récapitulatif de la semaine — ${summary.nouvelles.length} nouvelle${summary.nouvelles.length > 1 ? 's' : ''} inscription${summary.nouvelles.length > 1 ? 's' : ''}`,
+    textContent: `Récapitulatif des inscriptions — saison ${summary.saison}
+
+Nouvelles inscriptions ces 7 derniers jours : ${summary.nouvelles.length}
+${nouvelles}
+
+Où en sont les ${summary.total} inscriptions actives :
+- Complètes : ${summary.complet}
+- Dossier signé manquant : ${summary.missingDossier}
+- Photo manquante : ${summary.missingPhoto}
+- Paiement en attente : ${summary.missingPaiement}
+
+Voir les dossiers à compléter : ${siteUrl}/admin/inscriptions?etat=incomplet`,
+  });
 }

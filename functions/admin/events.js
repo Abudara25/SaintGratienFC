@@ -1,9 +1,11 @@
 // Consultation des événements enregistrés par functions/api/track-event.js (clic téléphone,
 // soumission du formulaire de contact) — même garde d'authentification que le reste de /admin.
 import { ensureEventsTable } from '../_shared/events-db.js';
-import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
+import { isAuthed, loginPage, escapeHtml, adminHead, adminShell, adminScripts, icon, formatDateFr } from '../_shared/admin-auth.js';
 
 const LABELS = { phone_click: 'Clic sur le numéro de téléphone', contact_form_submit: 'Soumission du formulaire de contact' };
+const ICONS = { phone_click: 'phone', contact_form_submit: 'mail' };
+const when = (datetime) => formatDateFr(datetime, { dateStyle: 'short', timeStyle: 'short' }) || '—';
 
 export async function onRequestGet({ request, env }) {
   if (!(await isAuthed(request, env))) {
@@ -17,66 +19,42 @@ export async function onRequestGet({ request, env }) {
   const { results: recent } = await env.DB.prepare('SELECT event, page, created_at FROM events ORDER BY id DESC LIMIT 50').all();
 
   const totalsHtml = totals.length
-    ? totals
+    ? `<div class="adm-kpis adm-kpis-auto">${totals
         .map(
-          (t) =>
-            `<tr><td>${escapeHtml(LABELS[t.event] || t.event)}</td><td>${t.total}</td><td>${escapeHtml(t.derniere)}</td></tr>`
+          (t) => `<div class="adm-surface adm-kpi">
+      <span class="adm-kpi-label">${icon(ICONS[t.event] || 'activity')}${escapeHtml(LABELS[t.event] || t.event)}</span>
+      <span class="adm-kpi-value">${t.total}</span>
+      <span class="adm-kpi-sub">Dernier : ${when(t.derniere)}</span>
+    </div>`
         )
-        .join('')
-    : '<tr><td colspan="3">Aucun événement enregistré pour le moment.</td></tr>';
+        .join('')}</div>`
+    : `<div class="adm-surface adm-empty">${icon('activity')}<p>Aucun événement enregistré pour le moment.</p></div>`;
 
   const recentHtml = recent
-    .map(
-      (r) =>
-        `<tr><td>${escapeHtml(r.created_at)}</td><td>${escapeHtml(LABELS[r.event] || r.event)}</td><td>${escapeHtml(r.page || '—')}</td></tr>`
-    )
+    .map((r) => `<tr><td>${when(r.created_at)}</td><td>${escapeHtml(LABELS[r.event] || r.event)}</td><td>${escapeHtml(r.page || '—')}</td></tr>`)
     .join('');
 
   return new Response(
-    `<!doctype html><html lang="fr"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Événements — Admin Saint-Gratien FC</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
-<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="manifest" href="/manifest-admin.json">
-<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon-admin.png">
-<meta name="theme-color" content="#4f1414">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
-<style>
-  .admin-main{max-width:900px;}
-  .events-table-wrap{overflow-x:auto;margin-bottom:32px;}
-  table{width:100%;border-collapse:collapse;}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--cream-200);font-size:.9rem;white-space:nowrap;}
-  th{font-family:var(--font-display);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);}
-</style>
-</head><body>
-  <div class="admin-layout">
-    ${adminSidebar('events')}
-    <main class="admin-main">
-      <h1 style="font-size:1.3rem;margin-bottom:20px;">Événements suivis</h1>
-
-      <h2 style="font-size:1rem;">Totaux</h2>
-      <div class="events-table-wrap">
-        <table>
-          <thead><tr><th>Événement</th><th>Total</th><th>Dernier</th></tr></thead>
-          <tbody>${totalsHtml}</tbody>
-        </table>
-      </div>
-
-      <h2 style="font-size:1rem;">50 derniers événements</h2>
-      <div class="events-table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
-          <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
-        </table>
-      </div>
-    </main>
-  </div>
-  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
+    `${adminHead('Événements')}
+${adminShell({
+  active: 'events',
+  eyebrow: 'Suivi du site',
+  title: 'Événements',
+  subtitle: 'Clics sur le numéro de téléphone et envois du formulaire de contact.',
+})}
+<main id="adm-main" class="adm-wrap adm-main">
+  ${totalsHtml}
+  <section class="adm-surface">
+    <div class="adm-surface-head"><h2 class="adm-h2">${icon('activity')}50 derniers événements</h2></div>
+    <div class="adm-table-wrap">
+      <table class="adm-table">
+        <thead><tr><th>Date</th><th>Événement</th><th>Page</th></tr></thead>
+        <tbody>${recentHtml || '<tr><td colspan="3">Aucun événement.</td></tr>'}</tbody>
+      </table>
+    </div>
+  </section>
+</main>
+${adminScripts('admin-nav')}
 </body></html>`,
     { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );

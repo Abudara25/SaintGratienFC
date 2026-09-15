@@ -1,27 +1,25 @@
-// Page /admin/inscriptions (functions/admin/inscriptions.js) : ce fichier externe existe
-// uniquement parce que le CSP site-wide (_headers, script-src sans 'unsafe-inline') bloque les
-// attributs onchange/onsubmit et les <script> inline — un précédent inline sur cette page ne
-// s'exécutait donc jamais dans un vrai navigateur (filtres et bouton PDF muets, sans erreur visible
-// hors console devtools).
+// Pages /admin/inscriptions, /admin/inscriptions/<id> et /admin/reinscription : ce fichier externe
+// existe parce que le CSP site-wide (_headers, script-src sans 'unsafe-inline') bloque les attributs
+// onchange/onsubmit et les <script> inline. La confirmation des formulaires .admin-confirm-form est
+// gérée par assets/js/admin-nav.js, chargé sur les mêmes pages.
+
+// Menu « Filtres » de la liste : chaque changement de liste déroulante applique le filtre.
 document.querySelectorAll('.insc-filters select').forEach((select) => {
   select.addEventListener('change', () => select.form.submit());
 });
 
-// Bouton "Archiver"/"Supprimer définitivement"/"Marquer payé" d'une fiche (voir actionsHtml dans
-// functions/admin/inscriptions.js) : la confirmation avant envoi est gérée par le handler partagé
-// .admin-confirm-form dans assets/js/admin-nav.js (chargé sur cette page), pas ici.
-
-document.querySelectorAll('.insc-pdf-btn').forEach((btn) => {
+// Bouton « Télécharger le PDF » de la fiche : régénère côté client le PDF d'inscription
+// (assets/js/pdf-inscription.js, jsPDF chargé juste avant sur la fiche).
+document.querySelectorAll('.adm-pdf-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     downloadInscriptionPdf(JSON.parse(btn.dataset.pdf), btn.dataset.depotUrl || null);
   });
 });
 
-// Sélection multiple (case à cocher par carte, voir actionsHtml) + barre d'actions groupées
-// (#bulk-form). Les cases ne sont pas dans #bulk-form (une carte contient déjà plusieurs <form>
-// distincts — dossier/paiement/archivage/suppression — et imbriquer des <form> est invalide en
-// HTML) : #bulk-form reste vide de cases et reçoit, juste avant l'envoi, un <input type="hidden"
-// name="ids"> par case cochée.
+// Sélection multiple (case à cocher par carte/ligne) + barre d'actions groupées (#bulk-form). Les
+// cases ne sont pas dans #bulk-form (une carte contient déjà ses propres <form>, et imbriquer des
+// <form> est invalide en HTML) : #bulk-form reçoit, juste avant l'envoi, un
+// <input type="hidden" name="ids"> par case cochée.
 const bulkForm = document.getElementById('bulk-form');
 if (bulkForm) {
   const selectAllCb = document.getElementById('bulk-select-all');
@@ -44,17 +42,8 @@ if (bulkForm) {
     selectAllCb.checked = all.length > 0 && checked.length === all.length;
   }
 
-  // stopPropagation à la fois sur la case et sur son enveloppe .insc-select-wrap (qui agrandit la
-  // zone cliquable à 44px, voir styles.css) : sans ça, un clic dans cette zone élargie mais hors de
-  // la case elle-même (20px) déclencherait un click sur le <label>, qui bulle jusqu'au <summary
-  // class="insc-card-head"> et ouvrirait/replierait la carte au lieu de seulement cocher la case.
-  document.querySelectorAll('.insc-select-wrap').forEach((wrap) => wrap.addEventListener('click', (e) => e.stopPropagation()));
-  selectCheckboxes().forEach((cb) => {
-    cb.addEventListener('click', (e) => e.stopPropagation());
-    cb.addEventListener('change', syncBulkUI);
-  });
+  selectCheckboxes().forEach((cb) => cb.addEventListener('change', syncBulkUI));
 
-  selectAllCb.addEventListener('click', (e) => e.stopPropagation());
   selectAllCb.addEventListener('change', () => {
     selectCheckboxes().forEach((cb) => {
       cb.checked = selectAllCb.checked;

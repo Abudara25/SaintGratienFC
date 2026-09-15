@@ -69,6 +69,9 @@ export const DEFAULT_CATEGORIES_CONFIG = {
   // toujours possible, pas seulement l'annulation d'un seul changement. null tant qu'aucun changement
   // de saison n'a encore eu lieu depuis l'ajout de ce champ.
   previousSaison: null,
+  // Date (YYYY-MM-DD) à partir de laquelle le formulaire public se ferme tout seul — voir
+  // effectiveInscriptionStatus() ci-dessous et functions/admin/categories.js. null = pas de fermeture prévue.
+  dateFermetureInscriptions: null,
   categories: [
     {
       id: 'u6-u7',
@@ -115,11 +118,51 @@ export async function setCategoriesConfig(env, config) {
 // (voir dateLimiteReinscription ci-dessus) et dépassée, le site rouvre automatiquement au public sans
 // action de l'admin — pas besoin de Cron Trigger, juste une comparaison de date à chaque requête. Un
 // statut brut "open" reste toujours prioritaire (l'admin garde la main pour rouvrir plus tôt).
-export function effectiveInscriptionStatus(rawStatus, dateLimiteReinscription) {
+// Une date de fermeture automatique atteinte (dateFermetureInscriptions) prime sur tout le reste, y
+// compris un statut brut "open" : pour rouvrir, l'admin retire ou repousse cette date.
+export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+export function effectiveInscriptionStatus(rawStatus, dateLimiteReinscription, dateFermetureInscriptions) {
+  const today = todayIso();
+  if (dateFermetureInscriptions && today >= dateFermetureInscriptions) return 'closed';
   if (rawStatus === 'open') return 'open';
-  if (dateLimiteReinscription) {
-    const today = new Date().toISOString().slice(0, 10);
-    if (today >= dateLimiteReinscription) return 'open';
-  }
+  if (dateLimiteReinscription && today >= dateLimiteReinscription) return 'open';
   return 'closed';
+}
+
+// Automatisations (/admin/parametres, voir _shared/automations.js) : chacune peut être coupée sans
+// toucher au code. Activées par défaut, elles ne font rien tant que leur prérequis manque
+// (BREVO_API_KEY pour les e-mails, HELLOASSO_WEBHOOK_SECRET pour HelloAsso, service programmé
+// workers/cron + CRON_SECRET pour les relances et le récapitulatif).
+const KV_KEY_AUTOMATIONS = 'automations_config';
+export const DEFAULT_AUTOMATIONS = { familyEmails: true, clubUploadAlerts: true, helloassoAutoPay: true, autoReminders: true, weeklySummary: true };
+
+export async function getAutomationsConfig(env) {
+  try {
+    const stored = await env.INSCRIPTION_STATUS.get(KV_KEY_AUTOMATIONS);
+    if (stored) return { ...DEFAULT_AUTOMATIONS, ...JSON.parse(stored) };
+  } catch {
+    // KV indisponible ou JSON corrompu : valeurs par défaut.
+  }
+  return { ...DEFAULT_AUTOMATIONS };
+}
+
+export async function setAutomationsConfig(env, config) {
+  await env.INSCRIPTION_STATUS.put(KV_KEY_AUTOMATIONS, JSON.stringify(config));
+}
+
+// Dernier passage des tâches programmées (functions/api/cron.js) et date du dernier récapitulatif
+// hebdomadaire — affichés dans /admin/parametres pour savoir si le service programmé tourne bien.
+export async function getCronState(env) {
+  try {
+    const stored = await env.INSCRIPTION_STATUS.get('cron_state');
+    if (stored) return JSON.parse(stored);
+  } catch {
+    // KV indisponible : état vide.
+  }
+  return {};
+}
+
+export async function setCronState(env, state) {
+  await env.INSCRIPTION_STATUS.put('cron_state', JSON.stringify(state));
 }

@@ -1,59 +1,72 @@
-// Tableau de bord admin — première page de la sidebar (voir _shared/admin-auth.js). Vue
-// synthétique (effectifs par catégorie, % payés, % dossiers reçus) plutôt que d'obliger à parcourir
-// /admin/inscriptions carte par carte pour se faire une idée globale. Lecture seule, aucune action.
-import { ensureInscriptionsTable } from '../_shared/inscriptions-db.js';
-import { isAuthed, loginPage, escapeHtml, adminSidebar } from '../_shared/admin-auth.js';
+// Tableau de bord admin — première page de la navigation (voir _shared/admin-auth.js). Vue
+// synthétique (effectifs par catégorie, part des documents et paiements validés, fiches à compléter)
+// plutôt que d'obliger à parcourir /admin/inscriptions carte par carte. Lecture seule, aucune action.
+import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { isAuthed, loginPage, escapeHtml, adminHead, adminShell, adminScripts, icon } from '../_shared/admin-auth.js';
+import { getCategoriesConfig } from '../_shared/settings-kv.js';
 
-function statCard(label, value, sub) {
-  return `<div class="dash-card">
-    <div class="dash-card-value">${escapeHtml(String(value))}</div>
-    <div class="dash-card-label">${escapeHtml(label)}</div>
-    ${sub ? `<div class="dash-card-sub">${escapeHtml(sub)}</div>` : ''}
+const pct = (n, total) => (total ? Math.round((n / total) * 100) : 0);
+
+function kpi({ iconName, label, value, of, link }) {
+  return `<div class="adm-surface adm-kpi">
+    <span class="adm-kpi-label">${icon(iconName)}${label}</span>
+    <span class="adm-kpi-value">${value}${of != null ? ` <small>/ ${of}</small>` : ''}</span>
+    ${of != null ? `<span class="adm-bar" role="img" aria-label="${pct(value, of)} %"><span style="width:${pct(value, of)}%"></span></span>` : ''}
+    ${link ? `<a href="${link.href}" class="adm-kpi-link">${link.label} →</a>` : ''}
   </div>`;
 }
 
-function page({ total, archivedCount, payeCount, dossierCount, categorieCounts }) {
-  const pct = (n) => (total ? Math.round((n / total) * 100) : 0);
+const shortcut = (href, iconName, title, description) =>
+  `<a href="${href}" class="adm-shortcut">${icon(iconName)}<span><strong>${title}</strong><small>${description}</small></span></a>`;
 
-  const cards = [
-    statCard('Inscriptions actives', total),
-    statCard('Paiement reçu', `${payeCount} / ${total}`, total ? `${pct(payeCount)}%` : undefined),
-    statCard('Dossier signé reçu', `${dossierCount} / ${total}`, total ? `${pct(dossierCount)}%` : undefined),
-    ...Object.keys(categorieCounts).sort().map((c) => statCard(c, categorieCounts[c])),
-    statCard('Dans la corbeille', archivedCount),
-  ].join('');
+function page({ total, archivedCount, payeCount, dossierCount, photoCount, completCount, categorieCounts, saison }) {
+  const categories = Object.keys(categorieCounts).sort();
 
-  return `<!doctype html><html lang="fr"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tableau de bord — Admin Saint-Gratien FC</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
-<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
-<link rel="manifest" href="/manifest-admin.json">
-<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon-admin.png">
-<meta name="theme-color" content="#4f1414">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Admin SGFC">
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260910a">
-<style>
-  .admin-main{max-width:900px;}
-  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:16px;margin-top:20px;}
-  .dash-card{background:var(--white);border:1px solid var(--cream-200);border-radius:var(--radius-sm);padding:18px 20px;}
-  .dash-card-value{font-family:var(--font-display);font-size:1.9rem;font-weight:700;color:var(--maroon-900);line-height:1.1;}
-  .dash-card-label{font-size:.82rem;color:var(--color-text-muted);margin-top:4px;}
-  .dash-card-sub{display:inline-block;margin-top:8px;padding:2px 9px;border-radius:999px;background:var(--gold-100);color:var(--maroon-900);font-size:.72rem;font-weight:700;}
-</style>
-</head><body>
-  <div class="admin-layout">
-    ${adminSidebar('dashboard')}
-    <main class="admin-main">
-      <h1 style="font-size:1.3rem;">Tableau de bord</h1>
-      <p style="margin-top:6px;"><a href="/admin/inscriptions">Voir la liste des inscriptions &rarr;</a></p>
-      <div class="dash-grid">${cards}</div>
-    </main>
+  return `${adminHead('Tableau de bord')}
+${adminShell({
+  active: 'dashboard',
+  eyebrow: `Saison ${escapeHtml(saison)}`,
+  title: 'Tableau de bord',
+  subtitle: "Vue d'ensemble des inscriptions du club.",
+  actions: `<a href="/admin/inscriptions" class="adm-btn adm-btn-white">${icon('users')}Voir les inscriptions</a>`,
+})}
+<main id="adm-main" class="adm-wrap adm-main">
+  <div class="adm-kpis adm-kpis-5">
+    ${kpi({ iconName: 'users', label: 'Inscriptions actives', value: total, link: { href: '/admin/inscriptions', label: 'Voir la liste' } })}
+    ${kpi({ iconName: 'file', label: 'Documents validés', value: dossierCount, of: total })}
+    ${kpi({ iconName: 'camera', label: 'Photos validées', value: photoCount, of: total })}
+    ${kpi({ iconName: 'card', label: 'Paiements validés', value: payeCount, of: total })}
+    ${kpi({ iconName: 'send', label: 'À compléter', value: total - completCount, link: { href: '/admin/inscriptions?etat=incomplet', label: 'Voir et relancer' } })}
   </div>
-  <script src="/assets/js/admin-nav.js?v=20260910a"></script>
+  <div class="adm-dash-grid">
+    <section class="adm-surface">
+      <div class="adm-surface-head">
+        <h2 class="adm-h2">${icon('tag')}Répartition par catégorie</h2>
+        <a href="/admin/categories" class="adm-btn adm-btn-sm adm-btn-ghost">Gérer</a>
+      </div>
+      ${
+        categories.length
+          ? `<ul class="adm-bars">${categories
+              .map(
+                (c) =>
+                  `<li><span>${escapeHtml(c)}</span><span class="adm-bar" role="img" aria-label="${pct(categorieCounts[c], total)} %"><span style="width:${pct(categorieCounts[c], total)}%"></span></span><span class="adm-bars-value">${categorieCounts[c]}</span></li>`
+              )
+              .join('')}</ul>`
+          : '<p class="adm-help">Aucune inscription active pour le moment.</p>'
+      }
+    </section>
+    <section class="adm-surface">
+      <div class="adm-surface-head"><h2 class="adm-h2">${icon('dashboard')}Raccourcis</h2></div>
+      <div class="adm-shortcuts">
+        ${shortcut('/admin/reinscription', 'refresh', 'Réinscription', 'Campagne de réinscription prioritaire')}
+        ${shortcut('/admin/inscriptions?view=archive', 'trash', 'Corbeille', `${archivedCount} profil${archivedCount > 1 ? 's' : ''} archivé${archivedCount > 1 ? 's' : ''}`)}
+        ${shortcut('/admin/events', 'activity', 'Événements', 'Clics téléphone et formulaire de contact')}
+        ${shortcut('/admin/parametres', 'settings', 'Paramètres', 'Notifications et mot de passe')}
+      </div>
+    </section>
+  </div>
+</main>
+${adminScripts('admin-nav')}
 </body></html>`;
 }
 
@@ -65,14 +78,21 @@ export async function onRequestGet({ request, env }) {
   await ensureInscriptionsTable(env.DB);
   const { results } = await env.DB.prepare('SELECT * FROM inscriptions').all();
   const active = results.filter((r) => !r.archived_at);
-  const archivedCount = results.length - active.length;
-  const total = active.length;
-  const payeCount = active.filter((r) => r.paye).length;
-  const dossierCount = active.filter((r) => r.dossier_uploaded_at).length;
   const categorieCounts = {};
   for (const r of active) categorieCounts[r.categorie] = (categorieCounts[r.categorie] || 0) + 1;
+  const { saison } = await getCategoriesConfig(env);
 
-  return new Response(page({ total, archivedCount, payeCount, dossierCount, categorieCounts }), {
-    headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-  });
+  return new Response(
+    page({
+      total: active.length,
+      archivedCount: results.length - active.length,
+      payeCount: active.filter((r) => r.paye).length,
+      dossierCount: active.filter((r) => r.dossier_uploaded_at).length,
+      photoCount: active.filter((r) => r.photo_uploaded_at).length,
+      completCount: active.filter(isInscriptionComplete).length,
+      categorieCounts,
+      saison,
+    }),
+    { headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
+  );
 }

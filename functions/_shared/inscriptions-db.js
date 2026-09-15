@@ -70,6 +70,27 @@ export async function ensureInscriptionsTable(db) {
     // fiche pour créer celle de la saison suivante. NULL tant que la campagne n'a pas été lancée
     // pour cette famille.
     'reinscription_token TEXT',
+    // 2026-09-15 : photo de l'enfant, obligatoire pour que l'inscription soit complète (voir
+    // isInscriptionComplete ci-dessous) — déposée par la famille sur /depot/<token> ou par un
+    // responsable depuis la fiche admin, stockée dans le bucket R2 "DOSSIERS" (clé photos/…, voir
+    // _shared/photo-storage.js).
+    'photo_key TEXT',
+    'photo_content_type TEXT',
+    'photo_uploaded_at TEXT',
+    // 2026-09-15 : automatisations (_shared/automations.js) — complete_notified_at évite de renvoyer
+    // l'e-mail "Dossier complet" ; last_reminder_at/auto_reminders_sent espacent et limitent les
+    // relances automatiques (une relance manuelle compte aussi) ; helloasso_order_id garde la
+    // commande HelloAsso qui a validé le paiement (_shared/helloasso.js).
+    'complete_notified_at TEXT',
+    'last_reminder_at TEXT',
+    'auto_reminders_sent INTEGER NOT NULL DEFAULT 0',
+    'helloasso_order_id TEXT',
+    // 2026-09-15 : second responsable légal, facultatif (prénom + nom requis dès qu'un champ est
+    // rempli, voir functions/api/inscriptions.js). Reçoit les mêmes e-mails que le premier.
+    'parent2_prenom TEXT',
+    'parent2_nom TEXT',
+    'parent2_email TEXT',
+    'parent2_telephone TEXT',
   ];
   for (const column of addedColumns) {
     try {
@@ -90,9 +111,13 @@ export async function ensureInscriptionsTable(db) {
   await db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)').run();
 }
 
+// Inscription complète = dossier signé reçu + paiement reçu + photo de l'enfant reçue. Même définition
+// partout : page famille (/depot/<token>), liste et tableau de bord admin, relances par e-mail.
+export const isInscriptionComplete = (row) => Boolean(row.dossier_uploaded_at && row.paye && row.photo_uploaded_at);
+
 // Retire les accents et met en minuscules — SQLite LOWER() étant limité à l'ASCII (voir plus haut),
 // la normalisation se fait ici, côté JS, avant toute comparaison ou écriture.
-function normalize(str) {
+export function normalize(str) {
   return String(str || '')
     .trim()
     .normalize('NFD')
