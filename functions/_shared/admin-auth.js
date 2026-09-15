@@ -45,7 +45,7 @@ export const escapeHtml = (str = '') =>
 // Version (?v=) de tous les assets chargés par l'admin — Cloudflare Pages les met en cache 4h sans
 // possibilité de le changer (voir CLAUDE.md) : à modifier ici à chaque édition de styles.css,
 // admin.css ou d'un script chargé par l'admin, une seule fois pour toutes les pages.
-const ASSETS_VERSION = '20260915a';
+const ASSETS_VERSION = '20260915b';
 const asset = (path) => `${path}?v=${ASSETS_VERSION}`;
 
 // Icônes au trait (viewBox 24, stroke 1.8), même convention que les SVG du site public.
@@ -134,17 +134,21 @@ export function adminShell({ active, eyebrow = '', title, subtitle = '', stats =
   const moreLinks = ADMIN_NAV_LINKS.filter((l) => !l.mobile);
   const moreActive = moreLinks.some((l) => l.key === active);
 
+  // La barre du haut est hors du bandeau pour rester collée en haut au défilement (.adm-hero a un
+  // overflow: hidden, qui empêcherait position: sticky de fonctionner à l'intérieur).
   return `<a href="#adm-main" class="skip-link">Aller au contenu</a>
+<div class="adm-topnav">
+  <div class="adm-wrap adm-topbar">
+    <a href="/admin/dashboard" class="adm-brand">
+      <img src="/assets/images/logo-96.webp" alt="" width="40" height="40">
+      <span><strong>Saint-Gratien FC</strong><small>Espace admin</small></span>
+    </a>
+    <nav class="adm-tabs" aria-label="Navigation admin">${tabs}</nav>
+    <a href="/admin/logout" class="adm-logout" title="Déconnexion">${icon('logout')}<span class="visually-hidden">Déconnexion</span></a>
+  </div>
+</div>
 <header class="adm-hero">
   <div class="adm-wrap">
-    <div class="adm-topbar">
-      <a href="/admin/dashboard" class="adm-brand">
-        <img src="/assets/images/logo-96.webp" alt="" width="40" height="40">
-        <span><strong>Saint-Gratien FC</strong><small>Espace admin</small></span>
-      </a>
-      <nav class="adm-tabs" aria-label="Navigation admin">${tabs}</nav>
-      <a href="/admin/logout" class="adm-logout" title="Déconnexion">${icon('logout')}<span class="visually-hidden">Déconnexion</span></a>
-    </div>
     <div class="adm-hero-main">
       <div class="adm-hero-heading">
         ${lead}

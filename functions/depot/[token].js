@@ -55,13 +55,45 @@ const EXAMPLES = `<div class="suivi-examples" aria-hidden="true">
   </figure>
 </div>`;
 
+// Valeurs identiques au <select> modePaiement d'inscription.html (et à MODES_PAIEMENT de ./[token]/paiement.js).
+const PAYMENT_CHOICES = [
+  ['HelloAsso', 'HelloAsso', 'Carte bancaire, en ligne — paiement en 3 fois sans frais possible'],
+  ['Espèces', 'Espèces', "À remettre à un responsable du club, par exemple lors d'un entraînement"],
+  ['Chèque', 'Chèque', "À remettre à un responsable du club, par exemple lors d'un entraînement"],
+];
+
 function helloAssoUrlFor(categories, label) {
   const categorie = categories.find((c) => c.label === label);
   return categorie && /^https:\/\//.test(categorie.helloAssoUrl || '') ? categorie.helloAssoUrl : '';
 }
 
-function page({ inscription, saison, helloAssoUrl, messages }) {
+function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   const token = escapeHtml(inscription.upload_token);
+  // Même PDF qu'à l'inscription (assets/js/pdf-inscription.js, généré dans le navigateur par
+  // assets/js/suivi.js) : la famille peut le retélécharger si elle a perdu l'e-mail de confirmation.
+  // Même forme de données que la fiche admin (functions/admin/inscriptions/[id].js).
+  const pdfData = {
+    enfantPrenom: inscription.enfant_prenom,
+    enfantNom: inscription.enfant_nom,
+    naissance: inscription.naissance,
+    categorie: inscription.categorie,
+    saison,
+    prix,
+    tailleMaillot: inscription.taille_maillot,
+    modePaiement: inscription.mode_paiement,
+    parentPrenom: inscription.parent_prenom,
+    parentNom: inscription.parent_nom,
+    email: inscription.email,
+    telephone: inscription.telephone,
+    adresse: inscription.adresse,
+    codePostal: inscription.code_postal,
+    ville: inscription.ville,
+    droitImage: inscription.droit_image,
+    parent2Prenom: inscription.parent2_prenom,
+    parent2Nom: inscription.parent2_nom,
+    parent2Email: inscription.parent2_email,
+    parent2Telephone: inscription.parent2_telephone,
+  };
   const prenom = escapeHtml(inscription.enfant_prenom);
   const nomEnfant = `${prenom} ${escapeHtml(inscription.enfant_nom)}`;
   const docOk = Boolean(inscription.dossier_uploaded_at);
@@ -112,8 +144,12 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
     <p class="suivi-help">${
       docOk
         ? `Nous avons bien reçu votre dossier le ${formatDate(inscription.dossier_uploaded_at)}. Vous pouvez le remplacer ci-dessous si besoin.`
-        : 'Imprimez le dossier reçu par e-mail, faites-le signer, puis déposez-le ici : un scan ou une simple photo du document suffit.'
+        : 'Imprimez le dossier, faites-le signer, puis déposez-le ici : un scan ou une simple photo du document suffit.'
     }</p>
+    <div class="suivi-download">
+      <button type="button" class="btn btn-dark suivi-pdf-btn" data-pdf="${escapeHtml(JSON.stringify(pdfData))}" data-depot-url="${escapeHtml(`${siteUrl}/depot/${inscription.upload_token}`)}">Télécharger mon dossier à signer</button>
+      <small>Vous ne l'avez plus ? Il est régénéré à l'identique.</small>
+    </div>
     <form method="POST" action="/depot/${token}" enctype="multipart/form-data" class="suivi-upload">
       <label for="dossier">Fiche d'inscription signée (PDF ou photo)</label>
       <input type="file" id="dossier" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
@@ -129,7 +165,7 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
     <div class="suivi-photo-grid">
       <div class="suivi-photo-preview">${photoOk ? `<img src="${photoSrc}" alt="Photo de ${prenom}">` : `<span>${icon('camera')}Pas encore de photo</span>`}</div>
       <div>
-        <p class="suivi-help">Elle sert notamment à la licence de ${prenom} et reste réservée au club. Pour une photo réussie :</p>
+        <p class="suivi-help">Elle reste réservée au club. Pour une photo réussie :</p>
         <ul class="suivi-tips">
           <li>${icon('check')}<span><strong>Sur un fond blanc</strong> ou très clair : un mur blanc fait parfaitement l'affaire.</span></li>
           <li>${icon('check')}<span><strong>De face</strong>, le visage bien visible et centré, les épaules dans le cadre.</span></li>
@@ -151,6 +187,8 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
     ? ''
     : `<div class="suivi-card" id="paiement">
     <div class="suivi-card-head"><h2>${icon('card')}Paiement de l'adhésion</h2>${tag(false)}</div>
+    ${messages.modeOk ? flash('ok', 'Mode de paiement enregistré, merci !') : ''}
+    ${messages.modeError ? flash('error', messages.modeError) : ''}
     ${
       mode === 'HelloAsso'
         ? `<p class="suivi-help">Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire).</p>${
@@ -161,6 +199,21 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
           }à remettre à un responsable du club, par exemple lors d'un entraînement (le jeudi de 17h à 18h, au Stade Robert Lemoine).</p>`
     }
     <p class="suivi-note">Dès que le club a bien reçu votre règlement, il le valide et cette étape passe au vert — cela peut prendre quelques jours.</p>
+    <details class="suivi-change"${messages.modeError ? ' open' : ''}>
+      <summary>Changer de mode de paiement</summary>
+      <form method="POST" action="/depot/${token}/paiement" class="suivi-change-form">
+        <fieldset>
+          <legend>Comment souhaitez-vous régler l'adhésion ?</legend>
+          ${PAYMENT_CHOICES.map(
+            ([value, title, detail]) => `<label class="suivi-choice">
+            <input type="radio" name="modePaiement" value="${value}"${value === mode ? ' checked' : ''} required>
+            <span><strong>${title}</strong><small>${detail}</small></span>
+          </label>`
+          ).join('')}
+        </fieldset>
+        <button type="submit" class="btn btn-dark">Enregistrer ce choix</button>
+      </form>
+    </details>
   </div>`;
 
   return `<!DOCTYPE html>
@@ -180,7 +233,7 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/styles.css?v=20260915a">
-<link rel="stylesheet" href="/assets/css/suivi.css?v=20260915a">
+<link rel="stylesheet" href="/assets/css/suivi.css?v=20260915b">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -239,6 +292,8 @@ function page({ inscription, saison, helloAssoUrl, messages }) {
 </footer>
 
 <script src="/assets/js/main.js?v=20260909c"></script>
+<script src="/assets/js/pdf-inscription.js?v=20260915a"></script>
+<script src="/assets/js/suivi.js?v=20260915a"></script>
 </body>
 </html>
 `;
@@ -255,10 +310,17 @@ async function notFound(request, env) {
   return new Response(res.body, { status: 404, headers: res.headers });
 }
 
-async function render(env, inscription, messages, status = 200) {
-  const { saison, categories } = await getCategoriesConfig(env);
+async function render(env, inscription, messages, status = 200, siteUrl = 'https://saintgratienfc.fr') {
+  const { saison, prix, categories } = await getCategoriesConfig(env);
   return new Response(
-    page({ inscription, saison: inscription.saison || saison, helloAssoUrl: helloAssoUrlFor(categories, inscription.categorie), messages }),
+    page({
+      inscription,
+      saison: inscription.saison || saison,
+      prix,
+      helloAssoUrl: helloAssoUrlFor(categories, inscription.categorie),
+      messages,
+      siteUrl,
+    }),
     { status, headers: { 'Content-Type': 'text/html;charset=UTF-8' } }
   );
 }
@@ -272,14 +334,16 @@ export async function onRequestGet({ request, env, params }) {
     dossierOk: searchParams.get('ok') === '1',
     photoOk: searchParams.get('photoOk') === '1',
     photoError: searchParams.get('photoError'),
-  });
+    modeOk: searchParams.get('modeOk') === '1',
+    modeError: searchParams.get('modeError'),
+  }, 200, new URL(request.url).origin);
 }
 
 export async function onRequestPost({ request, env, params, waitUntil }) {
   const inscription = await loadInscription(env, params.token);
   if (!inscription) return notFound(request, env);
 
-  const renderError = (error) => render(env, inscription, { error }, 400);
+  const renderError = (error) => render(env, inscription, { error }, 400, new URL(request.url).origin);
 
   let form;
   try {

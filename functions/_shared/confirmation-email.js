@@ -279,8 +279,9 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
       key: 'dossier',
       ok: Boolean(row.dossier_uploaded_at),
       title: 'Dossier signé',
-      text: "Imprimez le dossier d'inscription reçu en pièce jointe de notre premier e-mail, faites-le signer, puis déposez-le : un scan ou une simple photo du document suffit. Vous ne l'avez plus ? Répondez à cet e-mail, nous vous le renvoyons.",
+      text: "Imprimez le dossier d'inscription reçu en pièce jointe de notre premier e-mail, faites-le signer, puis déposez-le : un scan ou une simple photo du document suffit.",
       cta: suiviUrl && { label: 'Déposer le dossier', url: `${suiviUrl}#dossier` },
+      alt: suiviUrl && { intro: "Vous n'avez plus le dossier ?", label: 'Le retélécharger', url: `${suiviUrl}?telecharger=1#dossier` },
     },
     {
       key: 'photo',
@@ -297,6 +298,11 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
         ? `Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire)${prixText ? ` : ${prixText}` : ''}.`
         : `${mode ? `Vous avez choisi de régler par ${mode.toLowerCase()}${prix ? ` (${prix} €)` : ''} : ` : ''}à remettre à un responsable du club, par exemple lors d'un entraînement, le jeudi de 17h à 18h au Stade Robert Lemoine.`,
       cta: payOnline && { label: 'Payer sur HelloAsso', url: helloAssoUrl },
+      alt: suiviUrl && {
+        intro: mode === 'HelloAsso' ? 'Vous préférez régler en espèces ou par chèque ?' : 'Vous préférez payer en ligne par carte (en 3 fois sans frais possible) ?',
+        label: 'Changer de mode de paiement',
+        url: `${suiviUrl}#paiement`,
+      },
     },
   ];
   const missing = steps.filter((s) => !s.ok);
@@ -309,7 +315,7 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
 Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : ${remaining} pour la finaliser${done ? ` (${done} sur 3 déjà validée${done > 1 ? 's' : ''})` : ''}.
 
 ${missing
-  .map((s) => `• ${s.title}\n  ${s.text}${s.cta ? `\n  ${s.cta.label} : ${s.cta.url}` : ''}`)
+  .map((s) => `• ${s.title}\n  ${s.text}${s.cta ? `\n  ${s.cta.label} : ${s.cta.url}` : ''}${s.alt ? `\n  ${s.alt.intro} ${s.alt.label} : ${s.alt.url}` : ''}`)
   .join('\n\n')}
 ${suiviUrl ? `\nSuivre l'inscription et déposer vos documents : ${suiviUrl}\n` : ''}
 Infos pratiques
@@ -355,7 +361,12 @@ Saint-Gratien FC`;
                   </td>
                   <td valign="top" style="padding:16px 18px 16px 10px;font-family:Arial,Helvetica,sans-serif;">
                     <div style="font-size:15px;line-height:22px;font-weight:bold;color:${MAROON_900};">${escapeHtml(s.title)} <span style="display:inline-block;margin-left:6px;padding:2px 9px;border-radius:999px;background-color:${GOLD_100};color:#8a4b12;font-size:11px;line-height:16px;vertical-align:middle;">À faire</span></div>
-                    <div style="margin-top:4px;font-size:13px;line-height:20px;color:${INK_700};">${escapeHtml(s.text)}</div>${s.cta ? button(s.cta, n === 1) : ''}
+                    <div style="margin-top:4px;font-size:13px;line-height:20px;color:${INK_700};">${escapeHtml(s.text)}</div>${s.cta ? button(s.cta, n === 1) : ''}${
+                      s.alt
+                        ? `
+                    <div style="margin-top:12px;font-size:13px;line-height:19px;color:${INK_700};">${escapeHtml(s.alt.intro)} <a href="${escapeHtml(s.alt.url)}" target="_blank" style="color:${MAROON_900};font-weight:bold;">${escapeHtml(s.alt.label)}</a></div>`
+                        : ''
+                    }
                   </td>
                 </tr>
               </table>`;
@@ -834,6 +845,19 @@ export async function sendClubUploadAlert(env, row, siteUrl, kind) {
     to,
     subject: `${kind === 'photo' ? 'Photo déposée' : 'Dossier signé déposé'} : ${nomEnfant}`,
     textContent: `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) vient de déposer ${kind === 'photo' ? 'la photo de l’enfant' : 'le dossier signé'} en ligne.\n\nVoir la fiche : ${siteUrl}/admin/inscriptions/${row.id}`,
+  });
+}
+
+// Alerte interne : une famille a changé son mode de paiement depuis sa page de suivi.
+export async function sendClubPaymentModeAlert(env, row, siteUrl, previousMode) {
+  const to = await clubRecipients(env);
+  if (!to.length) return false;
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
+    to,
+    subject: `Mode de paiement changé : ${nomEnfant}`,
+    textContent: `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) a changé son mode de paiement : ${previousMode || 'non renseigné'} → ${row.mode_paiement}.\n\nVoir la fiche : ${siteUrl}/admin/inscriptions/${row.id}`,
   });
 }
 

@@ -19,7 +19,7 @@ function kpi({ iconName, label, value, of, link }) {
 const shortcut = (href, iconName, title, description) =>
   `<a href="${href}" class="adm-shortcut">${icon(iconName)}<span><strong>${title}</strong><small>${description}</small></span></a>`;
 
-function page({ total, archivedCount, payeCount, dossierCount, photoCount, completCount, categorieCounts, saison }) {
+function page({ total, archivedCount, payeCount, dossierCount, completCount, categorieCounts, saison }) {
   const categories = Object.keys(categorieCounts).sort();
 
   return `${adminHead('Tableau de bord')}
@@ -31,10 +31,9 @@ ${adminShell({
   actions: `<a href="/admin/inscriptions" class="adm-btn adm-btn-white">${icon('users')}Voir les inscriptions</a>`,
 })}
 <main id="adm-main" class="adm-wrap adm-main">
-  <div class="adm-kpis adm-kpis-5">
+  <div class="adm-kpis">
     ${kpi({ iconName: 'users', label: 'Inscriptions actives', value: total, link: { href: '/admin/inscriptions', label: 'Voir la liste' } })}
     ${kpi({ iconName: 'file', label: 'Documents validés', value: dossierCount, of: total })}
-    ${kpi({ iconName: 'camera', label: 'Photos validées', value: photoCount, of: total })}
     ${kpi({ iconName: 'card', label: 'Paiements validés', value: payeCount, of: total })}
     ${kpi({ iconName: 'send', label: 'À compléter', value: total - completCount, link: { href: '/admin/inscriptions?etat=incomplet', label: 'Voir et relancer' } })}
   </div>
@@ -88,7 +87,6 @@ export async function onRequestGet({ request, env }) {
       archivedCount: results.length - active.length,
       payeCount: active.filter((r) => r.paye).length,
       dossierCount: active.filter((r) => r.dossier_uploaded_at).length,
-      photoCount: active.filter((r) => r.photo_uploaded_at).length,
       completCount: active.filter(isInscriptionComplete).length,
       categorieCounts,
       saison,

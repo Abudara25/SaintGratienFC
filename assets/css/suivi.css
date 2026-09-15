@@ -72,6 +72,22 @@
 .suivi-example.is-good figcaption { color: var(--suivi-ok); }
 .suivi-example.is-bad figcaption { color: #a3440e; }
 
+/* Retélécharger le dossier à signer */
+.suivi-download { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 4px; }
+.suivi-download small { font-size: .82rem; color: var(--color-text-muted); }
+
+/* Changer de mode de paiement */
+.suivi-change { margin-top: 16px; border-top: 1px solid var(--cream-200); padding-top: 12px; }
+.suivi-change summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; font-weight: 600; color: var(--maroon-700); }
+.suivi-change-form { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 8px; }
+.suivi-change-form fieldset { width: 100%; margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.suivi-change-form legend { margin-bottom: 8px; font-size: .92rem; font-weight: 600; }
+.suivi-choice { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 14px; border: 1.5px solid var(--cream-200); border-radius: 12px; background: #fff; cursor: pointer; }
+.suivi-choice:has(input:checked) { border-color: var(--gold-500); background: var(--cream-100); }
+.suivi-choice input { width: 20px; height: 20px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--maroon-700); }
+.suivi-choice span { display: flex; flex-direction: column; gap: 2px; }
+.suivi-choice small { font-size: .85rem; color: var(--color-text-muted); }
+
 @media (max-width: 620px) {
   .suivi-card { padding: 18px 16px; }
   .suivi-avatar { width: 62px; height: 62px; border-radius: 18px; font-size: 1.3rem; }
@@ -81,4 +97,5 @@
   .suivi-photo-grid { grid-template-columns: 1fr; }
   .suivi-photo-preview { width: 150px; }
   .suivi-upload .btn { width: 100%; }
+  .suivi-change-form .btn, .suivi-download .btn { width: 100%; }
 }
