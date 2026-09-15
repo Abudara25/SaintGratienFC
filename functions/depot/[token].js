@@ -113,6 +113,8 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   const docOk = dossier === 'valide';
   const payOk = Boolean(inscription.paye);
   const photoOk = Boolean(inscription.photo_uploaded_at);
+  // La photo n'est pas vérifiée par le club : « Reçue », pas « Validé ».
+  const photoTag = photoOk ? '<span class="suivi-tag is-ok">Reçue</span>' : tag(false);
   const complete = isInscriptionComplete(inscription);
   const done = [docOk, photoOk, payOk].filter(Boolean).length;
   const remaining = 3 - done;
@@ -154,7 +156,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
     }
     <ul class="suivi-steps">
       ${step('file', 'Dossier signé', dossierDetail, docOk, DOSSIER_TAGS[dossier])}
-      ${step('camera', `Photo de ${prenom}`, photoOk ? `Reçue le ${formatDate(inscription.photo_uploaded_at)}` : '<a href="#photo">À ajouter ci-dessous</a>', photoOk)}
+      ${step('camera', `Photo de ${prenom}`, photoOk ? `Reçue le ${formatDate(inscription.photo_uploaded_at)}` : '<a href="#photo">À ajouter ci-dessous</a>', photoOk, photoTag)}
       ${step('card', 'Paiement', payOk ? `Reçu${mode ? ` (${escapeHtml(mode)})` : ''}` : `${mode ? `${escapeHtml(mode)} · ` : ''}<a href="#paiement">en attente de réception</a>`, payOk, payOk ? '<span class="suivi-tag is-ok">Payé</span>' : tag(false))}
     </ul>
   </div>`;
@@ -204,7 +206,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   </div>`;
 
   const photoCard = `<div class="suivi-card" id="photo">
-    <div class="suivi-card-head"><h2>${icon('camera')}Photo de ${prenom}</h2>${tag(photoOk)}</div>
+    <div class="suivi-card-head"><h2>${icon('camera')}Photo de ${prenom}</h2>${photoTag}</div>
     ${messages.photoOk ? flash('ok', 'Photo bien reçue, merci !') : ''}
     ${messages.photoError ? flash('error', messages.photoError) : ''}
     <div class="suivi-photo-grid">

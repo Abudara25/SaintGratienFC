@@ -14,6 +14,8 @@ import {
   avatar,
   statusTag,
   dossierTag,
+  PHOTO_TAG,
+  PAIEMENT_TAG,
   flash,
   formatDateFr,
   formatBirth,
@@ -224,7 +226,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
       ${kv('Document', dossierTag(row))}
       ${docReceived ? kv('Reçu le', formatDateFr(row.dossier_uploaded_at, LONG_DATE)) : ''}
       ${dossier === 'valide' && row.dossier_verified_at ? kv('Vérifié le', formatDateFr(row.dossier_verified_at, LONG_DATE)) : ''}
-      ${kv('Paiement', statusTag(payOk, { yes: 'Payé', no: 'Non payé' }))}
+      ${kv('Paiement', statusTag(payOk, PAIEMENT_TAG))}
       ${kv('Mode de paiement', escapeHtml(row.mode_paiement || '—'))}
       ${row.helloasso_order_id ? kv('Validé par HelloAsso', `commande n° ${escapeHtml(row.helloasso_order_id)}`) : ''}
       ${row.last_reminder_at ? kv('Dernière relance', `${formatDateFr(row.last_reminder_at, LONG_DATE)}${row.auto_reminders_sent ? ` (${row.auto_reminders_sent} auto.)` : ''}`) : ''}
@@ -247,7 +249,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
         : `<span class="adm-photo-empty">${icon('camera')}Pas encore de photo</span>`
     }</div>
     <dl class="adm-kv">
-      ${kv('Photo', statusTag(photoOk, { yes: 'Validée', no: 'Non validée' }))}
+      ${kv('Photo', statusTag(photoOk, PHOTO_TAG))}
       ${photoOk ? kv('Reçue le', formatDateFr(row.photo_uploaded_at, LONG_DATE)) : ''}
     </dl>
     <form method="POST" action="${self}/photo" enctype="multipart/form-data" class="adm-upload">
@@ -287,7 +289,7 @@ ${adminShell({
   eyebrow: "Fiche d'inscription",
   title: name,
   subtitle: `${escapeHtml(row.categorie)} · inscription du ${formatDateFr(row.created_at, LONG_DATE)}${archived ? ` · archivée le ${formatDateFr(row.archived_at, LONG_DATE)}` : ''}`,
-  meta: `<div class="adm-hero-tags"><span>Document</span>${dossierTag(row)}<span>Photo</span>${statusTag(photoOk, { yes: 'Validée', no: 'Non validée' })}<span>Paiement</span>${statusTag(payOk, { yes: 'Payé', no: 'Non payé' })}</div>`,
+  meta: `<div class="adm-hero-tags"><span>Document</span>${dossierTag(row)}<span>Photo</span>${statusTag(photoOk, PHOTO_TAG)}<span>Paiement</span>${statusTag(payOk, PAIEMENT_TAG)}</div>`,
 })}
 <main id="adm-main" class="adm-wrap adm-main">
   ${flashes}

@@ -275,6 +275,7 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
     {
       key: 'photo',
       ok: Boolean(row.photo_uploaded_at),
+      okLabel: 'Reçue',
       title: `Photo de ${prenom}`,
       text: `De face, sur un fond blanc (un mur blanc fait parfaitement l'affaire), bien éclairée et sans casquette. Une photo prise avec un téléphone convient très bien. Elle reste réservée au club.`,
       cta: suiviUrl && { label: 'Ajouter la photo', url: `${suiviUrl}#photo` },
@@ -717,7 +718,7 @@ function buildFollowUpEmail(row, siteUrl, { complete, step }) {
   // [libellé, état] — état : 'ok' | 'pending' (dossier en vérification) | 'todo' ; STATE_LABELS pour l'affichage.
   const steps = [
     ['Dossier signé', dossier === 'valide' ? 'ok' : dossier === 'a_verifier' ? 'pending' : 'todo'],
-    [`Photo de ${row.enfant_prenom}`, row.photo_uploaded_at ? 'ok' : 'todo'],
+    [`Photo de ${row.enfant_prenom}`, row.photo_uploaded_at ? 'ok' : 'todo', 'Reçue'],
     ["Paiement de l'adhésion", row.paye ? 'ok' : 'todo', 'Payé'],
   ];
   const STATE_LABELS = { ok: 'Validé', pending: 'En vérification', todo: 'En attente' };

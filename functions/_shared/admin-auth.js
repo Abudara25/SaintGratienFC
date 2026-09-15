@@ -297,9 +297,15 @@ export function flash(type, message) {
   return `<p class="adm-flash adm-flash-${type}" role="${type === 'error' ? 'alert' : 'status'}">${icon(type === 'error' ? 'alert' : type === 'info' ? 'calendar' : 'check')}<span>${escapeHtml(message)}</span></p>`;
 }
 
-export function statusTag(ok, { yes = 'Validé', no = 'Non validé' } = {}) {
-  return ok ? `<span class="adm-tag is-yes">${icon('check')}${yes}</span>` : `<span class="adm-tag is-no">${no}</span>`;
+// noTone : 'no' (orange, un problème à régler) ou 'neutral' (gris, simplement rien reçu pour l'instant).
+export function statusTag(ok, { yes = 'Validé', no = 'Non validé', noTone = 'no' } = {}) {
+  return ok ? `<span class="adm-tag is-yes">${icon('check')}${yes}</span>` : `<span class="adm-tag is-${noTone}">${no}</span>`;
 }
+
+// Statuts des étapes d'une inscription. Rien reçu = gris ; l'orange/rouge est réservé à ce qui demande une
+// action du club (dossier à vérifier, refusé).
+export const PHOTO_TAG = { yes: 'Reçue', no: 'Non reçue', noTone: 'neutral' };
+export const PAIEMENT_TAG = { yes: 'Payé', no: 'Non payé', noTone: 'neutral' };
 
 // Dossier signé : quatre états (voir dossierStatus dans _shared/inscriptions-db.js).
 export function dossierTag(row) {
@@ -307,7 +313,7 @@ export function dossierTag(row) {
     valide: `<span class="adm-tag is-yes">${icon('check')}Validé</span>`,
     a_verifier: `<span class="adm-tag is-wait">${icon('eye')}À vérifier</span>`,
     refuse: `<span class="adm-tag is-no">${icon('alert')}Refusé</span>`,
-    manquant: '<span class="adm-tag is-no">Non reçu</span>',
+    manquant: '<span class="adm-tag is-neutral">Non reçu</span>',
   }[dossierStatus(row)];
 }
 

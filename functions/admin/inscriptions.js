@@ -15,6 +15,8 @@ import {
   avatar,
   statusTag,
   dossierTag,
+  PHOTO_TAG,
+  PAIEMENT_TAG,
   flash,
   formatDateFr,
 } from '../_shared/admin-auth.js';
@@ -170,8 +172,8 @@ function inscriptionCard(r, returnTo) {
     </div>
     <div class="adm-lines">
       <div class="adm-line"><span>Document</span>${dossierTag(r)}</div>
-      <div class="adm-line"><span>Photo</span>${statusTag(r.photo_uploaded_at, { yes: 'Validée', no: 'Non validée' })}</div>
-      <div class="adm-line"><span>Paiement${r.mode_paiement ? ` <small>· ${escapeHtml(r.mode_paiement)}</small>` : ''}</span>${statusTag(r.paye, { yes: 'Payé', no: 'Non payé' })}</div>
+      <div class="adm-line"><span>Photo</span>${statusTag(r.photo_uploaded_at, PHOTO_TAG)}</div>
+      <div class="adm-line"><span>Paiement${r.mode_paiement ? ` <small>· ${escapeHtml(r.mode_paiement)}</small>` : ''}</span>${statusTag(r.paye, PAIEMENT_TAG)}</div>
     </div>
     <div class="adm-card-actions">
       <a href="${ficheHref}" class="adm-btn adm-btn-ghost">Voir la fiche</a>
@@ -247,7 +249,7 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
           <select name="paye" class="adm-select">${option('paye', '', 'Tous')}${option('paye', 'oui', 'Payé')}${option('paye', 'non', 'Non payé')}</select>
         </label>
         <label class="adm-field">Photo
-          <select name="photo" class="adm-select">${option('photo', '', 'Toutes')}${option('photo', 'recue', 'Validée')}${option('photo', 'manquante', 'Non validée')}</select>
+          <select name="photo" class="adm-select">${option('photo', '', 'Toutes')}${option('photo', 'recue', 'Reçue')}${option('photo', 'manquante', 'Non reçue')}</select>
         </label>
         <label class="adm-field adm-field-wide">Trier par
           <select name="sort" class="adm-select">
@@ -324,7 +326,7 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
       : [
           { value: counts.total, label: plural(counts.total, 'inscrit') },
           { value: `${counts.dossier}/${counts.total}`, label: 'documents validés' },
-          { value: `${counts.photo}/${counts.total}`, label: 'photos validées' },
+          { value: `${counts.photo}/${counts.total}`, label: 'photos reçues' },
           { value: `${counts.paye}/${counts.total}`, label: 'payés' },
         ],
     actions: statusBlock,
