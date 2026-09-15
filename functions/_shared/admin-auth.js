@@ -188,10 +188,9 @@ export function adminHead(title, bodyClass = 'adm') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>${escapeHtml(title)} — Admin Saint-Gratien FC</title>
 <meta name="robots" content="noindex, nofollow">
-<link rel="icon" type="image/svg+xml" href="/assets/images/favicon-admin.svg">
-<link rel="icon" type="image/png" href="/assets/images/favicon-admin.png">
+<link rel="icon" href="/assets/images/favicon.ico">
 <link rel="manifest" href="/manifest-admin.json">
-<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon-admin.png">
+<link rel="apple-touch-icon" href="/assets/images/apple-touch-icon.png">
 <meta name="theme-color" content="#4f1414">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
