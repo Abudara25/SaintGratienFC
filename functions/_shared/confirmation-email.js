@@ -257,61 +257,117 @@ Voir le détail : ${siteUrl}/admin/inscriptions`;
   }
 }
 
-// Relance manuelle envoyée depuis /admin/inscriptions (sélection multiple → "Envoyer une relance") :
-// contrairement à sendConfirmationEmail (déclenchée automatiquement à l'inscription), celle-ci est
-// déclenchée à la main par un responsable du club pour un ou plusieurs profils encore incomplets
-// (dossier, photo et/ou paiement manquants). Reprend la même structure visuelle que buildEmail() ci-dessus
-// (dupliquée plutôt que factorisée : un changement de palette devrait de toute façon être répercuté
-// à la main dans chaque template e-mail, voir la note en tête de fichier).
-function buildReminderEmail(row, siteUrl) {
+// Relance d'une inscription incomplète (dossier, photo et/ou paiement manquants) : manuelle depuis
+// /admin/inscriptions ou la fiche, ou automatique (runReminders dans _shared/automations.js).
+// Chaque étape manquante a sa carte avec un bouton qui mène droit au bon endroit (page de suivi
+// /depot/<token>#dossier|#photo, lien HelloAsso de la catégorie), les étapes validées restent
+// visibles en vert pour montrer l'avancement. Même habillage que buildEmail() ci-dessus (dupliqué,
+// voir la note en tête de fichier).
+const STADE_MAPS_URL = 'https://www.google.com/maps/search/?api=1&query=Stade+Robert+Lemoine+75+rue+d%27Orgemont+95210+Saint-Gratien';
+
+function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {}) {
   const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const prenom = row.enfant_prenom;
   const categorie = formatCategorie(row.categorie);
-  const depotUrl = row.upload_token ? `${siteUrl}/depot/${row.upload_token}` : null;
-  const missingDossier = !row.dossier_uploaded_at;
-  const missingPaiement = !row.paye;
-  const missingPhoto = !row.photo_uploaded_at;
+  const suiviUrl = row.upload_token ? `${siteUrl}/depot/${row.upload_token}` : null;
+  const mode = row.mode_paiement || '';
+  const payOnline = mode === 'HelloAsso' && /^https:\/\//.test(helloAssoUrl);
+  const prixText = prix ? `${prix} € (ou 3 × ${Math.round((prix / 3) * 100) / 100} € sans frais sur HelloAsso)` : '';
 
-  const htmlItems = [];
-  if (missingDossier) {
-    htmlItems.push(
-      `déposer le <strong>dossier signé</strong>${depotUrl ? ` — <a href="${depotUrl}#dossier" style="color:${MAROON_900};">lien de dépôt</a>` : ' (contactez-nous si vous avez perdu le lien)'}`
-    );
-  }
-  if (missingPhoto) {
-    htmlItems.push(
-      `ajouter une <strong>photo de votre enfant</strong>, de face et sur fond blanc (un mur blanc suffit)${depotUrl ? ` — <a href="${depotUrl}#photo" style="color:${MAROON_900};">ajouter la photo</a>` : ''}`
-    );
-  }
-  if (missingPaiement) {
-    htmlItems.push(`régler l'adhésion (mode choisi : <strong>${escapeHtml(row.mode_paiement)}</strong>)`);
-  }
-
-  const textItems = [];
-  if (missingDossier) textItems.push(`- Déposer le dossier signé : ${depotUrl || '(contactez-nous si vous avez perdu le lien)'}`);
-  if (missingPhoto) textItems.push(`- Ajouter une photo de votre enfant, de face et sur fond blanc (un mur blanc suffit)${depotUrl ? ` : ${depotUrl}#photo` : ''}`);
-  if (missingPaiement) textItems.push(`- Régler l'adhésion (mode choisi : ${row.mode_paiement})`);
-  const remaining = htmlItems.length > 1 ? 'il reste quelques étapes' : 'il reste une étape';
+  const steps = [
+    {
+      key: 'dossier',
+      ok: Boolean(row.dossier_uploaded_at),
+      title: 'Dossier signé',
+      text: "Imprimez le dossier d'inscription reçu en pièce jointe de notre premier e-mail, faites-le signer, puis déposez-le : un scan ou une simple photo du document suffit. Vous ne l'avez plus ? Répondez à cet e-mail, nous vous le renvoyons.",
+      cta: suiviUrl && { label: 'Déposer le dossier', url: `${suiviUrl}#dossier` },
+    },
+    {
+      key: 'photo',
+      ok: Boolean(row.photo_uploaded_at),
+      title: `Photo de ${prenom}`,
+      text: `De face, sur un fond blanc (un mur blanc fait parfaitement l'affaire), bien éclairée et sans casquette. Une photo prise avec un téléphone convient très bien. Elle reste réservée au club.`,
+      cta: suiviUrl && { label: 'Ajouter la photo', url: `${suiviUrl}#photo` },
+    },
+    {
+      key: 'paiement',
+      ok: Boolean(row.paye),
+      title: "Paiement de l'adhésion",
+      text: payOnline
+        ? `Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire)${prixText ? ` : ${prixText}` : ''}.`
+        : `${mode ? `Vous avez choisi de régler par ${mode.toLowerCase()}${prix ? ` (${prix} €)` : ''} : ` : ''}à remettre à un responsable du club, par exemple lors d'un entraînement, le jeudi de 17h à 18h au Stade Robert Lemoine.`,
+      cta: payOnline && { label: 'Payer sur HelloAsso', url: helloAssoUrl },
+    },
+  ];
+  const missing = steps.filter((s) => !s.ok);
+  const done = steps.length - missing.length;
+  const percent = Math.round((done / steps.length) * 100);
+  const remaining = missing.length > 1 ? `il reste ${missing.length} étapes` : 'il reste une seule étape';
 
   const text = `Bonjour ${greetingName(row)},
 
-Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : ${remaining} pour la finaliser.
+Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gratien FC : ${remaining} pour la finaliser${done ? ` (${done} sur 3 déjà validée${done > 1 ? 's' : ''})` : ''}.
 
-${textItems.join('\n')}
+${missing
+  .map((s) => `• ${s.title}\n  ${s.text}${s.cta ? `\n  ${s.cta.label} : ${s.cta.url}` : ''}`)
+  .join('\n\n')}
+${suiviUrl ? `\nSuivre l'inscription et déposer vos documents : ${suiviUrl}\n` : ''}
+Infos pratiques
+- Entraînements : le jeudi de 17h à 18h
+- Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien : ${STADE_MAPS_URL}
+- Ce qu'il faut prévoir : ${siteUrl}/entrainements.html
 
 Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
 
 Sportivement,
-Saint-Gratien FC
-Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
+Saint-Gratien FC`;
 
-  const itemsHtml = htmlItems
-    .map(
-      (item) => `
-              <tr>
-                <td style="padding:0 0 10px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${INK_900};" valign="top">&bull;&nbsp; ${item}</td>
-              </tr>`
-    )
+  const button = (cta, primary) => `
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:14px 0 0 0;">
+                        <tr>
+                          <td align="center" style="background-color:${primary ? GOLD_500 : MAROON_900};border-radius:8px;">
+                            <a href="${escapeHtml(cta.url)}" target="_blank" style="display:inline-block;padding:11px 22px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${primary ? MAROON_950 : '#ffffff'};text-decoration:none;">${escapeHtml(cta.label)} &rarr;</a>
+                          </td>
+                        </tr>
+                      </table>`;
+
+  let n = 0;
+  const stepsHtml = steps
+    .map((s) => {
+      if (s.ok) {
+        return `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0;background-color:${GREEN_100};border-radius:10px;">
+                <tr>
+                  <td width="44" valign="middle" style="padding:12px 0 12px 16px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" height="26" align="center" valign="middle" style="background-color:${GREEN_700};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;border-radius:50%;">&#10003;</td></tr></table>
+                  </td>
+                  <td valign="middle" style="padding:12px 16px 12px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${GREEN_700};"><strong>${escapeHtml(s.title)}</strong></td>
+                  <td align="right" valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${GREEN_700};">Validé</td>
+                </tr>
+              </table>`;
+      }
+      n++;
+      return `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0;background-color:#ffffff;border:1px solid ${GOLD_300};border-left:4px solid ${GOLD_500};border-radius:10px;">
+                <tr>
+                  <td width="44" valign="top" style="padding:16px 0 16px 16px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" height="26" align="center" valign="middle" style="background-color:${MAROON_900};color:${CREAM_100};font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;border-radius:50%;">${n}</td></tr></table>
+                  </td>
+                  <td valign="top" style="padding:16px 18px 16px 10px;font-family:Arial,Helvetica,sans-serif;">
+                    <div style="font-size:15px;line-height:22px;font-weight:bold;color:${MAROON_900};">${escapeHtml(s.title)} <span style="display:inline-block;margin-left:6px;padding:2px 9px;border-radius:999px;background-color:${GOLD_100};color:#8a4b12;font-size:11px;line-height:16px;vertical-align:middle;">À faire</span></div>
+                    <div style="margin-top:4px;font-size:13px;line-height:20px;color:${INK_700};">${escapeHtml(s.text)}</div>${s.cta ? button(s.cta, n === 1) : ''}
+                  </td>
+                </tr>
+              </table>`;
+    })
     .join('');
+
+  const info = (label, value) => `
+                <tr>
+                  <td valign="top" width="96" style="padding:5px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:${INK_700};text-transform:uppercase;letter-spacing:.06em;">${label}</td>
+                  <td valign="top" style="padding:5px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:19px;color:${INK_900};">${value}</td>
+                </tr>`;
+  const link = (url, label) => `<a href="${escapeHtml(url)}" target="_blank" style="color:${MAROON_900};font-weight:bold;">${label}</a>`;
 
   const html = `<!doctype html>
 <html lang="fr">
@@ -322,34 +378,75 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 </head>
 <body style="margin:0;padding:0;background-color:${CREAM_100};">
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
-    Petit rappel pour finaliser l'inscription de ${escapeHtml(nomEnfant)}.
+    Inscription de ${escapeHtml(nomEnfant)} : ${remaining}, tout se fait en quelques minutes depuis votre page de suivi.
   </div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
     <tr>
-      <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
           <tr>
-            <td style="background-color:${MAROON_900};padding:28px 32px;text-align:center;">
-              <img src="${siteUrl}/assets/images/logo-96.webp" width="48" height="48" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#ffffff;letter-spacing:.02em;">Saint-Gratien FC</div>
-              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.12em;margin-top:2px;">Val-d'Oise · École de foot U6-U9</div>
+            <td style="background-color:${MAROON_900};padding:28px 28px 26px 28px;text-align:center;">
+              <img src="${siteUrl}/assets/images/logo-96.webp" width="56" height="56" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.14em;">Saint-Gratien FC · Saison ${escapeHtml(row.saison || '')}</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:28px;font-weight:bold;color:#ffffff;margin-top:8px;">Encore un petit effort&nbsp;!</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${GOLD_300};margin-top:4px;">L'inscription de ${escapeHtml(prenom)} est presque terminée</div>
             </td>
           </tr>
           <tr>
-            <td style="padding:32px 32px 8px 32px;font-family:Arial,Helvetica,sans-serif;">
-              <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
-              <p style="margin:0 0 20px 0;font-size:15px;line-height:22px;color:${INK_900};">Petit rappel concernant l'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) : ${remaining} pour la finaliser.</p>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${GOLD_100};border-left:4px solid ${GOLD_500};border-radius:8px;margin:0 0 24px 0;padding:14px 18px;">
-                ${itemsHtml}
+            <td style="padding:28px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 14px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
+              <p style="margin:0 0 22px 0;font-size:15px;line-height:22px;color:${INK_900};">Petit rappel concernant l'inscription de <strong>${escapeHtml(nomEnfant)}</strong> (${escapeHtml(categorie)}) : ${remaining} pour la finaliser. Tout se fait en quelques minutes, depuis votre téléphone.</p>
+              ${
+                done
+                  ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px 0;">
+                <tr>
+                  <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${INK_900};">${done} étape${done > 1 ? 's' : ''} validée${done > 1 ? 's' : ''} sur 3</td>
+                  <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${MAROON_900};">${percent}&nbsp;%</td>
+                </tr>
+              </table>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px 0;background-color:${CREAM_200};border-radius:999px;">
+                <tr>
+                  <td width="${percent}%" height="8" style="background-color:${GOLD_500};border-radius:999px;font-size:0;line-height:0;">&nbsp;</td>
+                  <td height="8" style="font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>`
+                  : ''
+              }
+              ${stepsHtml}
+              ${
+                suiviUrl
+                  ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px auto 26px auto;">
+                <tr>
+                  <td align="center" style="border:2px solid ${MAROON_900};border-radius:8px;">
+                    <a href="${suiviUrl}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_900};text-decoration:none;">Voir le suivi de mon inscription</a>
+                  </td>
+                </tr>
+              </table>`
+                  : '<div style="height:18px;line-height:18px;font-size:0;">&nbsp;</div>'
+              }
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 22px 0;background-color:${CREAM_100};border-radius:10px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${MAROON_900};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Infos pratiques</div>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      ${info('Quand', 'Le jeudi, de 17h à 18h')}
+                      ${info('Où', `Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien<br>${link(STADE_MAPS_URL, 'Voir sur la carte')}`)}
+                      ${info('À prévoir', `Tenue adaptée à la météo, stabilisés ou crampons moulés, gourde d'eau — ${link(`${siteUrl}/entrainements.html`, 'tous les détails')}`)}
+                    </table>
+                  </td>
+                </tr>
               </table>
               <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:${INK_700};">Des questions ? Répondez directement à cet e-mail ou écrivez-nous à <a href="mailto:contact@saintgratienfc.fr" style="color:${MAROON_900};">contact@saintgratienfc.fr</a>.</p>
-              <p style="margin:24px 0 0 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
+              <p style="margin:20px 0 24px 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
             </td>
           </tr>
           <tr>
-            <td style="background-color:${CREAM_200};padding:20px 32px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:${INK_700};text-align:center;">
+            <td style="background-color:${CREAM_200};padding:20px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:${INK_700};text-align:center;">
+              <a href="https://www.instagram.com/sgfc95" target="_blank" style="color:${MAROON_900};font-weight:bold;text-decoration:none;">Instagram</a> &nbsp;·&nbsp;
+              <a href="https://www.facebook.com/SGFootballClub" target="_blank" style="color:${MAROON_900};font-weight:bold;text-decoration:none;">Facebook</a> &nbsp;·&nbsp;
+              <a href="${siteUrl}" target="_blank" style="color:${MAROON_900};font-weight:bold;text-decoration:none;">saintgratienfc.fr</a><br>
               Saint-Gratien FC · Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise<br>
-              Cet e-mail vous est envoyé suite à votre demande d'inscription sur <a href="${siteUrl}" style="color:${INK_700};">saintgratienfc.fr</a>.
+              Cet e-mail vous est envoyé suite à votre demande d'inscription.
             </td>
           </tr>
         </table>
@@ -359,7 +456,21 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 </body>
 </html>`;
 
-  return { subject: `Rappel — inscription de ${nomEnfant} à finaliser`, html, text };
+  return { subject: `Rappel — inscription de ${nomEnfant} : ${remaining}`, html, text };
+}
+
+// Fiches sans jeton de suivi (anciennes inscriptions) : on en crée un au moment d'écrire à la famille,
+// sinon l'e-mail ne peut contenir aucun lien vers la page de suivi.
+async function ensureUploadToken(env, row) {
+  if (row.upload_token || !env.DB || !row.id) return row;
+  const token = crypto.randomUUID();
+  try {
+    await env.DB.prepare('UPDATE inscriptions SET upload_token = ? WHERE id = ? AND upload_token IS NULL').bind(token, row.id).run();
+    const fresh = await env.DB.prepare('SELECT upload_token FROM inscriptions WHERE id = ?').bind(row.id).first();
+    return { ...row, upload_token: fresh?.upload_token || null };
+  } catch {
+    return row;
+  }
 }
 
 // Contrairement à sendConfirmationEmail/sendAdminNotification (best-effort, fire-and-forget via
@@ -370,7 +481,14 @@ export async function sendReminderEmail(env, row, siteUrl) {
   if (!env.BREVO_API_KEY) return false;
   if (isInscriptionComplete(row)) return false; // rien à relancer
 
-  const { subject, html, text } = buildReminderEmail(row, siteUrl);
+  const withToken = await ensureUploadToken(env, row);
+  const config = await getCategoriesConfig(env);
+  const categorie = (config.categories || []).find((c) => c.label === row.categorie);
+  const { subject, html, text } = buildReminderEmail(
+    { ...withToken, saison: withToken.saison || config.saison },
+    siteUrl,
+    { helloAssoUrl: categorie?.helloAssoUrl || '', prix: config.prix }
+  );
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
     to: familyRecipients(row),
