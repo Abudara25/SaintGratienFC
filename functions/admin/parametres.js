@@ -128,10 +128,10 @@ function automationsSection(auto) {
   </section>`;
 }
 
-function page({ notificationEmail, passwordError, passwordOk, emailError, emailOk, awaitingCode, auto }) {
+function page({ notificationEmail, securityError, passwordOk, emailError, emailOk, awaitingCode, auto }) {
   const passwordSection = awaitingCode
     ? `${flash('info', 'Un code à 6 chiffres a été envoyé par e-mail. Saisissez-le pour confirmer le changement (valable 15 min).')}
-       ${passwordError ? flash('error', passwordError) : ''}
+       ${securityError ? flash('error', securityError) : ''}
        <form method="POST">
          <input type="hidden" name="action" value="password-confirm">
          <div class="form-field">
@@ -145,7 +145,7 @@ function page({ notificationEmail, passwordError, passwordOk, emailError, emailO
          <button type="submit" class="adm-btn adm-btn-sm adm-btn-ghost">Annuler</button>
        </form>`
     : `${passwordOk ? flash('ok', 'Mot de passe mis à jour.') : ''}
-       ${passwordError ? flash('error', passwordError) : ''}
+       ${securityError ? flash('error', securityError) : ''}
        <form method="POST">
          <input type="hidden" name="action" value="password">
          <div class="form-field">
@@ -269,13 +269,13 @@ export async function onRequestPost({ request, env }) {
     const newPassword = form.get('newPassword');
     const confirmPassword = form.get('confirmPassword');
     if (!(await verifyAdminPassword(env, String(currentPassword || '')))) {
-      return render(request, env, { notificationEmail, passwordError: 'Mot de passe actuel incorrect.' }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Mot de passe actuel incorrect.' }, { status: 400 });
     }
     if (!newPassword || newPassword.length < 8) {
-      return render(request, env, { notificationEmail, passwordError: 'Le nouveau mot de passe doit faire au moins 8 caractères.' }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Le nouveau mot de passe doit faire au moins 8 caractères.' }, { status: 400 });
     }
     if (newPassword !== confirmPassword) {
-      return render(request, env, { notificationEmail, passwordError: 'Les deux mots de passe ne correspondent pas.' }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Les deux mots de passe ne correspondent pas.' }, { status: 400 });
     }
 
     // Tirage cryptographique (pas Math.random, prévisible) : ce code protège un changement de mot de passe.
@@ -287,7 +287,7 @@ export async function onRequestPost({ request, env }) {
         env,
         {
           notificationEmail,
-          passwordError: "Échec de l'envoi du code de confirmation (vérifiez que l'adresse de notification est valide et BREVO_API_KEY configurée). Le mot de passe n'a pas été changé.",
+          securityError: "Échec de l'envoi du code de confirmation (vérifiez que l'adresse de notification est valide et BREVO_API_KEY configurée). Le mot de passe n'a pas été changé.",
         },
         { status: 500 }
       );
@@ -301,7 +301,7 @@ export async function onRequestPost({ request, env }) {
     const submittedCode = String(form.get('code') || '').trim();
 
     if (!pending) {
-      return render(request, env, { notificationEmail, passwordError: 'Code expiré, recommencez.' }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Code expiré, recommencez.' }, { status: 400 });
     }
     if (!timingSafeEqual(submittedCode, pending.code)) {
       // 5 essais par demande : au 5e code faux, la demande est annulée.
@@ -309,15 +309,15 @@ export async function onRequestPost({ request, env }) {
       if (!allowed) {
         await clearPendingPasswordChange(env);
         await clearRateLimit(env.DB, 'password-code').catch(() => {});
-        return render(request, env, { notificationEmail, passwordError: 'Trop d’essais : la demande est annulée, recommencez.' }, { status: 400 });
+        return render(request, env, { notificationEmail, securityError: 'Trop d’essais : la demande est annulée, recommencez.' }, { status: 400 });
       }
-      return render(request, env, { notificationEmail, passwordError: 'Code incorrect.', awaitingCode: true }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Code incorrect.', awaitingCode: true }, { status: 400 });
     }
 
     // newPassword : demande en attente créée avant le hachage (au plus 15 minutes d'ancienneté).
     const passwordHash = pending.newPasswordHash || (pending.newPassword ? await hashPassword(pending.newPassword) : null);
     if (!passwordHash) {
-      return render(request, env, { notificationEmail, passwordError: 'Code expiré, recommencez.' }, { status: 400 });
+      return render(request, env, { notificationEmail, securityError: 'Code expiré, recommencez.' }, { status: 400 });
     }
     await setAdminPasswordHash(env, passwordHash);
     await clearPendingPasswordChange(env);
