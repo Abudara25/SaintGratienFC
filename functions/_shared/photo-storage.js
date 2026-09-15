@@ -2,6 +2,8 @@
 // (functions/depot/[token]/photo.js) et la fiche admin (functions/admin/inscriptions/[id]/photo.js)
 // pour appliquer les mêmes règles des deux côtés. Stockée dans le bucket R2 "DOSSIERS" (comme le
 // dossier signé) sous photos/<upload_token> ; D1 ne garde que la référence (photo_key…).
+import { readUpload } from './security.js';
+
 export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
@@ -14,17 +16,20 @@ export function photoError(file) {
   return null;
 }
 
+// Renvoie { error } si le contenu n'est pas une vraie image JPG, PNG ou WebP (le type annoncé par le
+// navigateur n'est pas pris en compte).
 export async function storePhoto(env, row, file, waitUntil) {
+  const upload = await readUpload(file, { allowedTypes: ALLOWED_TYPES, maxSize: MAX_SIZE });
+  if (upload.error) return { error: photoError(file) || 'Format non accepté — envoyez une photo JPG, PNG ou WebP.' };
   const key = `photos/${row.upload_token || `admin-${row.id}`}`;
-  // arrayBuffer() plutôt qu'un stream : le même buffer sert aussi à la copie de sauvegarde.
-  const buffer = await file.arrayBuffer();
-  await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
+  await env.DOSSIERS.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } });
   await env.DB.prepare("UPDATE inscriptions SET photo_key = ?, photo_content_type = ?, photo_uploaded_at = datetime('now') WHERE id = ?")
-    .bind(key, file.type, row.id)
+    .bind(key, upload.type, row.id)
     .run();
   if (env.DOSSIERS_BACKUP && waitUntil) {
-    waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
+    waitUntil(env.DOSSIERS_BACKUP.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } }).catch(() => {}));
   }
+  return {};
 }
 
 // L'URL d'affichage porte ?v=<date d'envoi> : une nouvelle photo change d'URL, ce qui permet un

@@ -9,12 +9,14 @@
 // mot de passe n'est appliqué qu'après saisie de ce code — protège contre un changement fait
 // depuis une session compromise (cookie volé) sans que le vrai responsable en soit informé.
 import {
-  COOKIE_NAME,
   isAuthed,
   loginPage,
   escapeHtml,
-  getAdminPassword,
-  setAdminPassword,
+  verifyAdminPassword,
+  setAdminPasswordHash,
+  createSession,
+  revokeAllSessions,
+  withCookies,
   adminHead,
   adminShell,
   adminScripts,
@@ -23,6 +25,7 @@ import {
   statusTag,
   formatDateFr,
 } from '../_shared/admin-auth.js';
+import { hashPassword, timingSafeEqual, hitRateLimit, clearRateLimit } from '../_shared/security.js';
 import {
   getNotificationEmail,
   setNotificationEmail,
@@ -265,9 +268,7 @@ export async function onRequestPost({ request, env }) {
     const currentPassword = form.get('currentPassword');
     const newPassword = form.get('newPassword');
     const confirmPassword = form.get('confirmPassword');
-    const actualPassword = await getAdminPassword(env);
-
-    if (currentPassword !== actualPassword) {
+    if (!(await verifyAdminPassword(env, String(currentPassword || '')))) {
       return render(request, env, { notificationEmail, passwordError: 'Mot de passe actuel incorrect.' }, { status: 400 });
     }
     if (!newPassword || newPassword.length < 8) {
@@ -291,7 +292,7 @@ export async function onRequestPost({ request, env }) {
         { status: 500 }
       );
     }
-    await setPendingPasswordChange(env, { code, newPassword });
+    await setPendingPasswordChange(env, { code, newPasswordHash: await hashPassword(newPassword) });
     return render(request, env, { notificationEmail, awaitingCode: true });
   }
 
@@ -302,20 +303,29 @@ export async function onRequestPost({ request, env }) {
     if (!pending) {
       return render(request, env, { notificationEmail, passwordError: 'Code expiré, recommencez.' }, { status: 400 });
     }
-    if (submittedCode !== pending.code) {
+    if (!timingSafeEqual(submittedCode, pending.code)) {
+      // 5 essais par demande : au 5e code faux, la demande est annulée.
+      const { allowed } = await hitRateLimit(env.DB, 'password-code', { limit: 4, windowSeconds: 15 * 60 }).catch(() => ({ allowed: true }));
+      if (!allowed) {
+        await clearPendingPasswordChange(env);
+        await clearRateLimit(env.DB, 'password-code').catch(() => {});
+        return render(request, env, { notificationEmail, passwordError: 'Trop d’essais : la demande est annulée, recommencez.' }, { status: 400 });
+      }
       return render(request, env, { notificationEmail, passwordError: 'Code incorrect.', awaitingCode: true }, { status: 400 });
     }
 
-    await setAdminPassword(env, pending.newPassword);
+    // newPassword : demande en attente créée avant le hachage (au plus 15 minutes d'ancienneté).
+    const passwordHash = pending.newPasswordHash || (pending.newPassword ? await hashPassword(pending.newPassword) : null);
+    if (!passwordHash) {
+      return render(request, env, { notificationEmail, passwordError: 'Code expiré, recommencez.' }, { status: 400 });
+    }
+    await setAdminPasswordHash(env, passwordHash);
     await clearPendingPasswordChange(env);
-    // Réémet le cookie avec le nouveau mot de passe : sans ça, l'admin serait déconnecté par son
-    // propre changement de mot de passe au prochain rechargement.
-    return render(
-      request,
-      env,
-      { notificationEmail, passwordOk: true },
-      { headers: { 'Set-Cookie': `${COOKIE_NAME}=${encodeURIComponent(pending.newPassword)}; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=2592000` } }
-    );
+    await clearRateLimit(env.DB, 'password-code').catch(() => {});
+    // Toutes les sessions sont fermées (un éventuel cookie volé ne sert plus), puis une nouvelle est
+    // ouverte pour la personne qui vient de changer le mot de passe.
+    await revokeAllSessions(env);
+    return withCookies(await render(request, env, { notificationEmail, passwordOk: true }), await createSession(env));
   }
 
   if (action === 'password-cancel') {

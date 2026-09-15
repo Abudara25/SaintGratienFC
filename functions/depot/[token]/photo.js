@@ -35,11 +35,13 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     return withError("L'envoi en ligne n'est pas encore activé — envoyez-nous la photo par e-mail à contact@saintgratienfc.fr en attendant.");
   }
 
+  let stored;
   try {
-    await storePhoto(env, inscription, file, waitUntil);
+    stored = await storePhoto(env, inscription, file, waitUntil);
   } catch {
     return withError("Échec de l'envoi, réessayez ou écrivez-nous à contact@saintgratienfc.fr.");
   }
+  if (stored.error) return withError(stored.error);
   waitUntil(afterInscriptionChange(env, { id: inscription.id, before: inscription, step: 'photo', source: 'famille', siteUrl: new URL(request.url).origin }));
   return back('photoOk=1');
 }

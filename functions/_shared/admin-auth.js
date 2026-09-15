@@ -1,51 +1,148 @@
-// Authentification et habillage partagés par les pages /admin/* : mot de passe unique comparé à un
-// cookie HttpOnly, plus l'en-tête HTML, le bandeau de navigation et les petits composants communs
-// (icônes, statuts, avatars, messages) — centralisés ici pour qu'une page admin reste cohérente avec
-// les autres sans dupliquer ce code. CSS correspondant : assets/css/admin.css.
-export const COOKIE_NAME = 'admin_auth';
+// Authentification et habillage partagés par les pages /admin/* : un mot de passe (haché) ouvre une
+// session enregistrée dans D1 — le cookie ne contient qu'un jeton aléatoire, jamais le mot de passe —,
+// plus l'en-tête HTML, le bandeau de navigation et les petits composants communs (icônes, statuts,
+// avatars, messages). CSS correspondant : assets/css/admin.css.
+import {
+  sha256Hex,
+  randomToken,
+  timingSafeEqual,
+  hashPassword,
+  verifyPassword,
+  isPasswordHash,
+  clientKey,
+  hitRateLimit,
+  isRateLimited,
+  clearRateLimit,
+} from './security.js';
 
-// Mot de passe actuel : le secret Cloudflare ADMIN_PASSWORD reste la valeur par défaut, mais
-// functions/admin/parametres.js permet de le changer depuis l'interface — dans ce cas la valeur
-// choisie est stockée dans le KV "saintgratienfc_config" (même binding INSCRIPTION_STATUS que le
-// statut d'ouverture des inscriptions, clé "admin_password") et prend le pas sur le secret. Sans
-// changement via l'interface, le comportement est inchangé (secret Cloudflare seul).
-export async function getAdminPassword(env) {
+export const COOKIE_NAME = 'admin_session';
+// Ancien cookie, qui contenait le mot de passe lui-même : effacé à chaque connexion et déconnexion.
+const LEGACY_COOKIE_NAME = 'admin_auth';
+const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
+// 5 mots de passe erronés depuis une même connexion bloquent les essais pendant 15 minutes.
+const LOGIN_LIMIT = { limit: 5, windowSeconds: 15 * 60 };
+
+// Le secret Cloudflare ADMIN_PASSWORD reste la valeur par défaut ; un mot de passe changé depuis
+// /admin/parametres est stocké haché (PBKDF2) dans le KV "saintgratienfc_config" (clé "admin_password")
+// et prend le pas sur le secret.
+export async function verifyAdminPassword(env, candidate) {
+  if (typeof candidate !== 'string' || !candidate) return false;
+  let stored = null;
   try {
-    const stored = await env.INSCRIPTION_STATUS.get('admin_password');
-    if (stored) return stored;
+    stored = await env.INSCRIPTION_STATUS.get('admin_password');
   } catch {
-    // KV indisponible (binding non configuré) : repli sur le secret.
+    // KV indisponible : repli sur le secret.
   }
-  return env.ADMIN_PASSWORD || null;
+  if (stored) {
+    const ok = await verifyPassword(candidate, stored);
+    // Valeur enregistrée en clair avant le hachage : remplacée par son empreinte à la première connexion.
+    if (ok && !isPasswordHash(stored)) await setAdminPasswordHash(env, await hashPassword(candidate)).catch(() => {});
+    return ok;
+  }
+  return Boolean(env.ADMIN_PASSWORD) && timingSafeEqual(candidate, env.ADMIN_PASSWORD);
 }
 
-export async function setAdminPassword(env, newPassword) {
-  await env.INSCRIPTION_STATUS.put('admin_password', newPassword);
+export async function setAdminPasswordHash(env, passwordHash) {
+  await env.INSCRIPTION_STATUS.put('admin_password', passwordHash);
 }
+
+let sessionsTableReady;
+function ensureSessionsTable(db) {
+  sessionsTableReady ??= db
+    .prepare('CREATE TABLE IF NOT EXISTS admin_sessions (token_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)')
+    .run()
+    .catch((error) => {
+      sessionsTableReady = undefined;
+      throw error;
+    });
+  return sessionsTableReady;
+}
+
+function readCookie(request, name) {
+  const match = (request.headers.get('Cookie') || '').match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match ? match[1] : null;
+}
+
+const cookie = (name, value, maxAge) => `${name}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=${maxAge}`;
+
+export const withCookies = (response, cookies) => {
+  for (const value of cookies) response.headers.append('Set-Cookie', value);
+  return response;
+};
 
 export async function isAuthed(request, env) {
-  const cookie = request.headers.get('Cookie') || '';
-  const match = cookie.match(/\badmin_auth=([^;]+)/);
-  const currentPassword = await getAdminPassword(env);
-  if (!match || !currentPassword) return false;
-  // decodeURIComponent : la valeur est encodée à l'écriture (voir functions/admin/inscriptions.js)
-  // pour qu'un mot de passe contenant ';', ',' ou un espace ne tronque pas le cookie.
-  let value;
+  const token = readCookie(request, COOKIE_NAME);
+  if (!token || !env.DB) return false;
   try {
-    value = decodeURIComponent(match[1]);
+    await ensureSessionsTable(env.DB);
+    const row = await env.DB.prepare('SELECT expires_at FROM admin_sessions WHERE token_hash = ?').bind(await sha256Hex(token)).first();
+    return Boolean(row && row.expires_at > Math.floor(Date.now() / 1000));
   } catch {
     return false;
   }
-  return value === currentPassword;
+}
+
+// Ouvre une session ; renvoie les en-têtes Set-Cookie à ajouter à la réponse (voir withCookies).
+export async function createSession(env) {
+  await ensureSessionsTable(env.DB);
+  const token = randomToken();
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
+  await env.DB.prepare('INSERT INTO admin_sessions (token_hash, created_at, expires_at) VALUES (?, ?, ?)')
+    .bind(await sha256Hex(token), now, now + SESSION_TTL_SECONDS)
+    .run();
+  return [cookie(COOKIE_NAME, token, SESSION_TTL_SECONDS), cookie(LEGACY_COOKIE_NAME, '', 0)];
+}
+
+export async function destroySession(request, env) {
+  const token = readCookie(request, COOKIE_NAME);
+  if (token && env.DB) {
+    try {
+      await ensureSessionsTable(env.DB);
+      await env.DB.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(await sha256Hex(token)).run();
+    } catch {
+      // le cookie est effacé quoi qu'il arrive
+    }
+  }
+  return [cookie(COOKIE_NAME, '', 0), cookie(LEGACY_COOKIE_NAME, '', 0)];
+}
+
+// Après un changement de mot de passe : toutes les sessions ouvertes, sur tous les appareils, sont fermées.
+export async function revokeAllSessions(env) {
+  await ensureSessionsTable(env.DB);
+  await env.DB.prepare('DELETE FROM admin_sessions').run();
+}
+
+// Formulaire de connexion (POST /admin/inscriptions sans action).
+export async function handleLogin(request, env, form) {
+  const html = (error, status) => new Response(loginPage({ error }), { status, headers: { 'Content-Type': 'text/html;charset=UTF-8' } });
+  const bucket = `login:${await clientKey(request)}`;
+
+  if (await isRateLimited(env.DB, bucket, LOGIN_LIMIT).catch(() => false)) {
+    return html('Trop de tentatives. Réessayez dans 15 minutes.', 429);
+  }
+  if (!(await verifyAdminPassword(env, String(form.get('password') || '')))) {
+    await hitRateLimit(env.DB, bucket, LOGIN_LIMIT).catch(() => {});
+    return html('Mot de passe incorrect.', 401);
+  }
+  await clearRateLimit(env.DB, bucket).catch(() => {});
+
+  let cookies;
+  try {
+    cookies = await createSession(env);
+  } catch {
+    return html('Connexion impossible pour le moment (base de données indisponible). Réessayez dans un instant.', 503);
+  }
+  return withCookies(new Response('', { status: 302, headers: { Location: '/admin/inscriptions' } }), cookies);
 }
 
 export const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Version (?v=) de tous les assets chargés par l'admin — Cloudflare Pages les met en cache 4h sans
-// possibilité de le changer (voir CLAUDE.md) : à modifier ici à chaque édition de styles.css,
-// admin.css ou d'un script chargé par l'admin, une seule fois pour toutes les pages.
-const ASSETS_VERSION = '20260915d';
+// possibilité de le changer (voir CLAUDE.md). Valeur écrite par `npm run sync` (empreinte des assets) :
+// ne pas la modifier à la main.
+const ASSETS_VERSION = '47c4448abb';
 const asset = (path) => `${path}?v=${ASSETS_VERSION}`;
 
 // Icônes au trait (viewBox 24, stroke 1.8), même convention que les SVG du site public.
@@ -184,7 +281,7 @@ export function loginPage({ error } = {}) {
     <img src="/assets/images/logo-96.webp" alt="Blason du Saint-Gratien FC" width="72" height="72">
     <p class="adm-eyebrow">Espace admin</p>
     <h1>Connexion</h1>
-    ${error ? flash('error', 'Mot de passe incorrect.') : ''}
+    ${error ? flash('error', typeof error === 'string' ? error : 'Mot de passe incorrect.') : ''}
     <div class="form-field">
       <label for="password">Mot de passe</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required autofocus>

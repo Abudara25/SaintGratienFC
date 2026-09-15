@@ -1,21 +1,54 @@
-// Reçoit une soumission du formulaire d'inscription (inscription.html) et l'enregistre dans la
-// base D1 "DB" (voir CLAUDE.md pour la création du binding). Le PDF est toujours généré côté
-// client avant cet appel (assets/js/inscription.js) : cette requête ne bloque jamais le
-// téléchargement du PDF, mais son résultat (uploadToken) conditionne désormais l'affichage du
-// lien de dépôt du dossier signé (functions/depot/[token].js) — ce n'est plus un pur filet de
-// sécurité silencieux comme avant l'ajout du dépôt (2026-09-04). Envoie aussi un e-mail de
-// réception (pas de confirmation définitive, voir confirmation-email.js) via Brevo.
-import { ensureInscriptionsTable, findExistingInscription, buildDedupKey } from '../_shared/inscriptions-db.js';
-import { sendConfirmationEmail, sendAdminNotification } from '../_shared/confirmation-email.js';
+// Formulaire d'inscription (inscription.html et /reinscription/<token>) : enregistre la demande dans D1
+// et envoie l'e-mail de réception à la famille et l'alerte au club (Brevo). Le résultat (uploadToken)
+// sert au lien de l'espace famille (functions/depot/[token].js).
+// Protections : limite de débit par connexion, Cloudflare Turnstile (dès que ses clés sont définies),
+// formats et tranche d'âge revérifiés ici, anti-doublon par saison — et jamais de lien de suivi dans la
+// réponse à un doublon (il est renvoyé par e-mail aux adresses déjà enregistrées).
+import { ensureInscriptionsTable, findExistingInscription, buildDedupKey, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { sendConfirmationEmail, sendAdminNotification, sendReminderEmail, sendFollowUpEmail } from '../_shared/confirmation-email.js';
 import { getCategoriesConfig } from '../_shared/settings-kv.js';
+import { clientKey, hitRateLimit, verifyTurnstile } from '../_shared/security.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
+const TEXT_FIELDS = [...REQUIRED_FIELDS, 'adresse', 'codePostal', 'ville', 'parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'];
+const MAX_FIELD_LENGTH = 200;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Contrôle temps réel pendant la saisie (voir assets/js/inscription.js, déclenché au blur de
-// prénom/nom/e-mail) : ne renvoie qu'un booléen, jamais createdAt/uploadToken — contrairement au
-// POST complet (16 champs requis + validations), ce GET public en query string est trivial à
-// sonder en boucle, donc on limite volontairement ce qu'il expose.
+// Largement au-dessus d'un usage normal (une famille qui inscrit plusieurs enfants).
+const SUBMIT_LIMIT = { limit: 6, windowSeconds: 60 * 60 };
+const CHECK_LIMIT = { limit: 40, windowSeconds: 60 * 60 };
+const RESEND_LIMIT = { limit: 1, windowSeconds: 60 * 60 };
+
+const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+// Une panne D1 ne doit jamais empêcher une inscription : erreur = pas de limite.
+async function overLimit(env, request, name, limits) {
+  try {
+    const { allowed } = await hitRateLimit(env.DB, `${name}:${await clientKey(request)}`, limits);
+    return !allowed;
+  } catch {
+    return false;
+  }
+}
+
+// Doublon : renvoie le lien de suivi aux adresses de la fiche existante (au plus une fois par heure),
+// avec l'e-mail de relance habituel, ou celui de dossier complet si tout est déjà reçu.
+async function resendTrackingLink(env, uploadToken, siteUrl) {
+  try {
+    const row = await env.DB.prepare('SELECT * FROM inscriptions WHERE upload_token = ?').bind(uploadToken).first();
+    if (!row) return;
+    const { allowed } = await hitRateLimit(env.DB, `resend:${row.id}`, RESEND_LIMIT);
+    if (!allowed) return;
+    if (isInscriptionComplete(row)) await sendFollowUpEmail(env, row, siteUrl, { complete: true });
+    else await sendReminderEmail(env, row, siteUrl);
+  } catch {
+    // best-effort
+  }
+}
+
+// Contrôle en direct pendant la saisie (assets/js/inscription.js) : ne renvoie qu'un booléen.
 export async function onRequestGet({ request, env }) {
+  if (await overLimit(env, request, 'dupcheck', CHECK_LIMIT)) return json({ error: 'Trop de vérifications' }, 429);
   const { searchParams } = new URL(request.url);
   const enfantPrenom = searchParams.get('enfantPrenom') || '';
   const enfantNom = searchParams.get('enfantNom') || '';
@@ -23,106 +56,80 @@ export async function onRequestGet({ request, env }) {
   const naissance = searchParams.get('naissance') || '';
 
   if (!enfantPrenom.trim() || !enfantNom.trim() || !email.trim()) {
-    return new Response(JSON.stringify({ error: 'Paramètres manquants' }), { status: 400 });
+    return json({ error: 'Paramètres manquants' }, 400);
   }
 
   try {
     await ensureInscriptionsTable(env.DB);
     const { saison } = await getCategoriesConfig(env);
     const existing = await findExistingInscription(env.DB, { enfantPrenom, enfantNom, naissance, email }, saison);
-    return new Response(JSON.stringify({ duplicate: !!existing }), { headers: { 'Content-Type': 'application/json' } });
+    return json({ duplicate: Boolean(existing) });
   } catch {
-    return new Response(JSON.stringify({ error: 'Échec de la vérification' }), { status: 500 });
+    return json({ error: 'Échec de la vérification' }, 500);
   }
 }
 
 export async function onRequestPost({ request, env, waitUntil }) {
-  let data;
+  let body;
   try {
-    data = await request.json();
+    body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'JSON invalide' }), { status: 400 });
+    return json({ error: 'JSON invalide' }, 400);
   }
+  if (!body || typeof body !== 'object') return json({ error: 'JSON invalide' }, 400);
+
+  if (await overLimit(env, request, 'inscription', SUBMIT_LIMIT)) {
+    return json({ error: 'Trop de demandes envoyées depuis cette connexion. Réessayez dans une heure, ou écrivez-nous à contact@saintgratienfc.fr.' }, 429);
+  }
+  if (!(await verifyTurnstile(env, body.turnstileToken, request))) {
+    return json({ error: 'La vérification anti-robot a échoué. Rechargez la page et réessayez.', turnstile: true }, 403);
+  }
+
+  // Copie nettoyée : seuls les champs attendus, en texte, bornés en longueur.
+  const data = {};
+  for (const field of TEXT_FIELDS) {
+    const value = typeof body[field] === 'string' ? body[field].trim() : '';
+    if (value.length > MAX_FIELD_LENGTH) return json({ error: `Champ trop long : ${field}` }, 400);
+    data[field] = value;
+  }
+  for (const field of ['autorisation', 'droitImage', 'rgpd']) data[field] = body[field] === true;
 
   for (const field of REQUIRED_FIELDS) {
-    if (!String(data[field] ?? '').trim()) {
-      return new Response(JSON.stringify({ error: `Champ manquant : ${field}` }), { status: 400 });
-    }
+    if (!data[field]) return json({ error: `Champ manquant : ${field}` }, 400);
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    return new Response(JSON.stringify({ error: 'E-mail invalide' }), { status: 400 });
-  }
-  // Second responsable légal facultatif : s'il est renseigné, prénom et nom sont requis, et son
-  // e-mail (lui aussi facultatif) doit être valide puisqu'il reçoit les e-mails de suivi.
-  const parent2 = ['parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'].map((key) => String(data[key] ?? '').trim());
+  if (!data.autorisation || !data.rgpd) return json({ error: 'Autorisations requises' }, 400);
+  if (!EMAIL_RE.test(data.email)) return json({ error: 'E-mail invalide' }, 400);
+  // Second responsable légal facultatif : s'il est renseigné, prénom et nom sont requis, et son e-mail
+  // (facultatif) doit être valide puisqu'il reçoit les e-mails de suivi.
+  const parent2 = [data.parent2Prenom, data.parent2Nom, data.parent2Email, data.parent2Telephone];
   if (parent2.some(Boolean)) {
-    if (!parent2[0] || !parent2[1]) {
-      return new Response(JSON.stringify({ error: 'Prénom et nom du second responsable légal requis' }), { status: 400 });
-    }
-    if (parent2[2] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent2[2])) {
-      return new Response(JSON.stringify({ error: 'E-mail du second responsable légal invalide' }), { status: 400 });
-    }
+    if (!parent2[0] || !parent2[1]) return json({ error: 'Prénom et nom du second responsable légal requis' }, 400);
+    if (parent2[2] && !EMAIL_RE.test(parent2[2])) return json({ error: 'E-mail du second responsable légal invalide' }, 400);
   }
-  // Format contrôlé (pas juste "non vide") : ce champ est ensuite utilisé tel quel pour dériver
-  // la liste des années de naissance affichée dans les filtres de /admin/inscriptions.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance)) {
-    return new Response(JSON.stringify({ error: 'Date de naissance invalide' }), { status: 400 });
-  }
+  // Format contrôlé : les années alimentent les filtres de /admin/inscriptions.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance)) return json({ error: 'Date de naissance invalide' }, 400);
 
-  // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
-  // navigateur avait chargé /api/categories avant un changement de saison entre-temps. Sert à la
-  // fois à scoper le contrôle anti-doublon ci-dessous à la saison en cours (voir
-  // findExistingInscription) et à tamponner la fiche pour l'action "Archiver les saisons
-  // précédentes"/"Envoyer le lien de réinscription" de /admin/inscriptions et /admin/categories.
+  // Saison et catégories lues côté serveur, jamais celles envoyées par le navigateur.
   const { saison, categories } = await getCategoriesConfig(env);
 
-  // Garde définitive contre un enfant hors tranche d'âge (ex. né en 2017 alors que la catégorie
-  // la plus âgée s'arrête à 2018) : assets/js/inscription.js bloque déjà ce cas côté formulaire,
-  // mais ce contrôle serveur reste la seule protection fiable contre un appel direct à cette API
-  // (JS désactivé, requête rejouée, formulaire modifié) — un incident réel a montré qu'une
-  // inscription avec une catégorie ne correspondant pas à l'année de naissance pouvait autrement
-  // être enregistrée.
+  // Seule protection fiable contre une catégorie qui ne correspond pas à l'âge (JS désactivé, requête rejouée).
   const anneeNaissance = Number(data.naissance.slice(0, 4));
   const categorieValide = categories.some(
     (c) => c.active && c.label === data.categorie && anneeNaissance >= c.anneeMin && anneeNaissance <= c.anneeMax
   );
-  if (!categorieValide) {
-    return new Response(
-      JSON.stringify({ error: "La date de naissance ne correspond pas à la catégorie sélectionnée" }),
-      { status: 400 }
-    );
-  }
+  if (!categorieValide) return json({ error: 'La date de naissance ne correspond pas à la catégorie sélectionnée' }, 400);
 
+  const siteUrl = new URL(request.url).origin;
   try {
     await ensureInscriptionsTable(env.DB);
-
-    // Anti-doublon : un même enfant (nom+prénom+naissance) déjà inscrit par le même parent
-    // (e-mail) POUR LA SAISON EN COURS ne recrée pas une nouvelle fiche. Ajouté après qu'un parent
-    // a soumis 4 fois de suite le même dossier (clics répétés) — chaque soumission créait une ligne
-    // D1 distincte et renvoyait un nouvel e-mail de confirmation. Scopé à `saison` depuis l'ajout de
-    // la réinscription : sans ça, une famille qui se réinscrit légitimement l'année suivante était
-    // bloquée par sa fiche de l'an dernier. Requête factorisée dans _shared/inscriptions-db.js (aussi
-    // utilisée par le contrôle temps réel, onRequestGet ci-dessus, et par functions/reinscription/
-    // [token].js).
-    const existing = await findExistingInscription(
-      env.DB,
-      {
-        enfantPrenom: data.enfantPrenom,
-        enfantNom: data.enfantNom,
-        naissance: data.naissance,
-        email: data.email,
-      },
-      saison
-    );
-
+    // Anti-doublon par saison : même enfant (prénom, nom, naissance) et même e-mail de parent.
+    const existing = await findExistingInscription(env.DB, data, saison);
     if (existing) {
-      return new Response(
-        JSON.stringify({ duplicate: true, uploadToken: existing.upload_token, createdAt: existing.created_at }),
-        { status: 409, headers: { 'Content-Type': 'application/json' } }
-      );
+      waitUntil(resendTrackingLink(env, existing.upload_token, siteUrl));
+      return json({ duplicate: true, linkResent: true }, 409);
     }
   } catch {
-    return new Response(JSON.stringify({ error: "Échec de la vérification" }), { status: 500 });
+    return json({ error: 'Échec de la vérification' }, 500);
   }
 
   const uploadToken = crypto.randomUUID();
@@ -135,47 +142,37 @@ export async function onRequestPost({ request, env, waitUntil }) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
-        data.enfantPrenom.trim(),
-        data.enfantNom.trim(),
+        data.enfantPrenom,
+        data.enfantNom,
         data.naissance,
         data.categorie,
         data.tailleMaillot,
         data.modePaiement,
-        data.parentPrenom.trim(),
-        data.parentNom.trim(),
-        data.email.trim(),
-        data.telephone?.trim() || null,
-        data.adresse?.trim() || null,
-        data.codePostal?.trim() || null,
-        data.ville?.trim() || null,
+        data.parentPrenom,
+        data.parentNom,
+        data.email,
+        data.telephone || null,
+        data.adresse || null,
+        data.codePostal || null,
+        data.ville || null,
         data.autorisation ? 1 : 0,
         data.droitImage ? 1 : 0,
         data.rgpd ? 1 : 0,
         uploadToken,
         dedupKey,
         saison,
-        parent2[0] || null,
-        parent2[1] || null,
-        parent2[2] || null,
-        parent2[3] || null
+        data.parent2Prenom || null,
+        data.parent2Nom || null,
+        data.parent2Email || null,
+        data.parent2Telephone || null
       )
       .run();
-  } catch (e) {
-    return new Response(JSON.stringify({ error: "Échec de l'enregistrement" }), { status: 500 });
+  } catch {
+    return json({ error: "Échec de l'enregistrement" }, 500);
   }
 
-  // waitUntil (pas await) : l'envoi de l'e-mail continue après la réponse HTTP, sans ajouter de
-  // latence pour le parent — sendConfirmationEmail() est déjà best-effort en interne.
-  // data.pdfBase64 (optionnel, généré côté client par getInscriptionPdfBase64() dans
-  // pdf-inscription.js) est joint en pièce jointe à l'e-mail — voir confirmation-email.js.
-  const siteUrl = new URL(request.url).origin;
+  // waitUntil : les e-mails partent après la réponse, sans la retarder.
   waitUntil(sendConfirmationEmail(env, data, uploadToken, siteUrl));
-  // Notifie aussi le club (contact@saintgratienfc.fr) : jusqu'ici, seule la famille recevait un
-  // e-mail — le club devait consulter /admin/inscriptions manuellement pour savoir qu'une nouvelle
-  // demande était arrivée.
   waitUntil(sendAdminNotification(env, data, siteUrl));
-
-  return new Response(JSON.stringify({ ok: true, uploadToken }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return json({ ok: true, uploadToken });
 }

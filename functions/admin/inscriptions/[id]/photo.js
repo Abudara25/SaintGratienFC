@@ -38,11 +38,13 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
   if (error) return withError(error);
   if (!env.DOSSIERS) return withError('Stockage des fichiers (bucket R2) non configuré.');
 
+  let stored;
   try {
-    await storePhoto(env, inscription, file, waitUntil);
+    stored = await storePhoto(env, inscription, file, waitUntil);
   } catch {
     return withError("Échec de l'envoi, réessayez.");
   }
+  if (stored.error) return withError(stored.error);
   waitUntil(afterInscriptionChange(env, { id: inscription.id, before: inscription, step: 'photo', source: 'admin', siteUrl: new URL(request.url).origin }));
   return back('photoOk=1');
 }

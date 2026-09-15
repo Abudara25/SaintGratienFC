@@ -1,0 +1,11 @@
+{
+  "name": "saintgratienfc",
+  "private": true,
+  "type": "module",
+  "description": "Outils de développement uniquement : le site est publié tel quel, sans étape de build.",
+  "scripts": {
+    "test": "node --test --disable-warning=ExperimentalWarning \"tests/*.test.mjs\"",
+    "sync": "node scripts/sync-assets.mjs",
+    "check": "node scripts/sync-assets.mjs --check && npm test"
+  }
+}

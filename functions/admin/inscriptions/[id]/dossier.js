@@ -8,6 +8,7 @@
 import { ensureInscriptionsTable } from '../../../_shared/inscriptions-db.js';
 import { isAuthed, loginPage } from '../../../_shared/admin-auth.js';
 import { afterInscriptionChange } from '../../../_shared/automations.js';
+import { readUpload } from '../../../_shared/security.js';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
@@ -41,6 +42,7 @@ export async function onRequestGet({ request, env, params }) {
     headers: {
       'Content-Type': row.dossier_content_type || 'application/octet-stream',
       'Content-Disposition': `inline; filename="dossier-${params.id}.${ext}"`,
+      'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, no-store',
     },
   });
@@ -72,38 +74,29 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     return withError('Envoi invalide, réessayez.');
   }
 
-  const file = form.get('dossier');
-  if (!file || typeof file === 'string' || !file.size) {
-    return withError('Choisissez un fichier avant d’envoyer.');
-  }
-  if (file.size > MAX_SIZE) {
-    return withError('Le fichier dépasse 10 Mo.');
-  }
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return withError('Format non accepté — PDF, JPG ou PNG uniquement.');
-  }
   if (!env.DOSSIERS) {
     return withError("Stockage des dossiers (bucket R2) non configuré.");
   }
+  // Type déduit du contenu du fichier, pas de ce qu'annonce le navigateur.
+  const upload = await readUpload(form.get('dossier'), { allowedTypes: ALLOWED_TYPES, maxSize: MAX_SIZE });
+  if (upload.error) {
+    return withError({ empty: 'Choisissez un fichier avant d’envoyer.', too_large: 'Le fichier dépasse 10 Mo.', bad_type: 'Format non accepté — PDF, JPG ou PNG uniquement.' }[upload.error]);
+  }
 
   const key = `dossiers/${row.upload_token || `admin-${id}`}`;
-  let buffer;
   try {
-    // arrayBuffer() (pas file.stream(), lisible une seule fois) : le même buffer sert aussi à la
-    // copie de sauvegarde ci-dessous — voir functions/depot/[token].js pour le contexte complet.
-    buffer = await file.arrayBuffer();
-    await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
+    await env.DOSSIERS.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } });
     await env.DB.prepare(
       "UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime('now') WHERE id = ?"
     )
-      .bind(key, file.type, id)
+      .bind(key, upload.type, id)
       .run();
   } catch {
     return withError("Échec de l'envoi, réessayez.");
   }
 
   if (env.DOSSIERS_BACKUP) {
-    waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
+    waitUntil(env.DOSSIERS_BACKUP.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } }).catch(() => {}));
   }
 
   waitUntil(afterInscriptionChange(env, { id, before: row, step: 'dossier', source: 'admin', siteUrl: new URL(request.url).origin }));

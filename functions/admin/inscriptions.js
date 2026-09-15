@@ -4,11 +4,10 @@
 // fiche et groupées sont traitées ici (onRequestPost), tout comme la connexion.
 import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
 import {
-  COOKIE_NAME,
   isAuthed,
   loginPage,
   escapeHtml,
-  getAdminPassword,
+  handleLogin,
   adminHead,
   adminShell,
   adminScripts,
@@ -611,21 +610,5 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return new Response('', { status: 302, headers: { Location: withParam(redirectTo, `bulkOk=${msg}`) } });
   }
 
-  const password = form.get('password');
-  const currentPassword = await getAdminPassword(env);
-
-  if (!currentPassword || password !== currentPassword) {
-    return new Response(loginPage({ error: true }), {
-      status: 401,
-      headers: { 'Content-Type': 'text/html;charset=UTF-8' },
-    });
-  }
-
-  return new Response('', {
-    status: 302,
-    headers: {
-      Location: '/admin/inscriptions',
-      'Set-Cookie': `${COOKIE_NAME}=${encodeURIComponent(password)}; HttpOnly; Secure; SameSite=Lax; Path=/admin; Max-Age=2592000`,
-    },
-  });
+  return handleLogin(request, env, form);
 }

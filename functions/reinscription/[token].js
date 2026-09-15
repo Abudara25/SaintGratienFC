@@ -55,7 +55,7 @@ function shell({ title, intro, body }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260915d">
+<link rel="stylesheet" href="/assets/css/styles.css?v=7109b179b1">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -109,9 +109,9 @@ function shell({ title, intro, body }) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260909c"></script>
-<script src="/assets/js/pdf-inscription.js?v=20260915a"></script>
-<script src="/assets/js/inscription.js?v=20260915a"></script>
+<script src="/assets/js/main.js?v=e9e2287f4e"></script>
+<script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
+<script src="/assets/js/inscription.js?v=8176dbbb72"></script>
 </body>
 </html>
 `;
@@ -271,7 +271,7 @@ function formPage(row) {
         <div class="card" style="background:var(--gold-100);box-shadow:none;">
           <div class="card-body">
             <h3 style="margin-bottom:8px;">Dossier déjà envoyé</h3>
-            <p style="margin-bottom:0;color:var(--color-text-muted);">Une réinscription pour cet enfant a déjà été envoyée le <strong id="inscription-duplicate-date"></strong>. Consultez vos e-mails (pensez aux spams), ou contactez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a> si besoin.</p>
+            <p style="margin-bottom:0;color:var(--color-text-muted);">Une réinscription existe déjà pour cet enfant. Le lien de votre espace famille est renvoyé à l'adresse e-mail enregistrée (au plus une fois par heure) : pensez à vérifier les spams, ou contactez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a> si besoin.</p>
           </div>
         </div>
       </div>

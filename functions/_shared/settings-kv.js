@@ -26,8 +26,9 @@ export async function setNotificationEmail(env, value) {
 const KV_KEY_PENDING_PASSWORD = 'pending_password_change';
 const PENDING_PASSWORD_TTL_SECONDS = 15 * 60;
 
-export async function setPendingPasswordChange(env, { code, newPassword }) {
-  await env.INSCRIPTION_STATUS.put(KV_KEY_PENDING_PASSWORD, JSON.stringify({ code, newPassword }), {
+// newPasswordHash : empreinte PBKDF2 (voir _shared/security.js) — le mot de passe n'est jamais stocké en clair.
+export async function setPendingPasswordChange(env, { code, newPasswordHash }) {
+  await env.INSCRIPTION_STATUS.put(KV_KEY_PENDING_PASSWORD, JSON.stringify({ code, newPasswordHash }), {
     expirationTtl: PENDING_PASSWORD_TTL_SECONDS,
   });
 }

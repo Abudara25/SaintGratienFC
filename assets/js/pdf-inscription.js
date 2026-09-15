@@ -141,11 +141,3 @@ function downloadInscriptionPdf(data, depotUrl) {
   doc.save(inscriptionPdfFilename(data));
 }
 
-// Base64 brut (sans le préfixe "data:application/pdf;base64,") — utilisé pour joindre le PDF à
-// l'e-mail de confirmation envoyé côté serveur (voir functions/api/inscriptions.js). Généré sans
-// depotUrl : le lien de dépôt est de toute façon déjà présent dans le corps de cet e-mail, et le
-// jeton n'est connu qu'après la réponse du serveur — pas encore disponible à ce stade.
-function getInscriptionPdfBase64(data) {
-  const doc = buildInscriptionPdfDoc(data, null);
-  return doc.output('datauristring').split(',')[1];
-}

@@ -1,9 +1,9 @@
-// Saint-Gratien FC — formulaire d'inscription : génère un PDF rempli, puis propose le dépôt du dossier signé (lien unique par famille, /depot/<token>) et le paiement HelloAsso (widget adapté à la catégorie choisie).
+// Saint-Gratien FC — formulaire d'inscription (inscription.html, /reinscription/<token>) : saisie en
+// 3 étapes quand le HTML les prévoit (.form-step), génération du PDF rempli, puis lien vers l'espace
+// famille (/depot/<token>) et paiement HelloAsso (widget adapté à la catégorie choisie).
 
-// Repli utilisé tant que /api/categories n'a pas répondu (ou si l'appel échoue) : catégories,
-// tranches de naissance, saison et liens HelloAsso sont normalement gérés depuis /admin/categories
-// (voir functions/admin/categories.js et functions/_shared/settings-kv.js) sans devoir toucher au
-// code à chaque saison — ces constantes ne servent plus que de filet de sécurité hors-ligne.
+// Repli utilisé tant que /api/categories n'a pas répondu (ou s'il échoue) : catégories, tranches de
+// naissance, saison et liens HelloAsso sont gérés depuis /admin/categories.
 const FALLBACK_SAISON = '2026-2027';
 const FALLBACK_PRIX = 180;
 const FALLBACK_HELLOASSO_URLS = {
@@ -16,25 +16,8 @@ const FALLBACK_HELLOASSO_WIDGET_URLS = {
 };
 const FALLBACK_CATEGORIE_PAR_ANNEE = { 2020: 'U6 - U7', 2021: 'U6 - U7', 2018: 'U8 - U9', 2019: 'U8 - U9' };
 
-// `datetime('now')` (SQLite) renvoie "YYYY-MM-DD HH:MM:SS" en UTC, sans "T" ni "Z" — il faut les
-// ajouter pour que `new Date(...)` le reconnaisse de façon fiable (voir aussi la même fonction
-// côté serveur dans functions/depot/[token].js).
-function formatDuplicateDate(sqliteDatetime) {
-  if (!sqliteDatetime) return 'récemment';
-  try {
-    return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Europe/Paris' }).format(
-      new Date(`${sqliteDatetime.replace(' ', 'T')}Z`)
-    );
-  } catch {
-    return sqliteDatetime;
-  }
-}
-
-// Construit l'iframe widget HelloAsso (auto-agrandie via postMessage — HelloAsso poste sa hauteur
-// réelle une fois le formulaire chargé, sinon l'iframe reste tronquée à la hauteur de départ).
-// helloassoMessageAbort : un nouveau submit (retry, changement de mode de paiement) recrée un
-// widget sans jamais retirer l'ancien listener "message" sur window — l'AbortController permet de
-// désabonner l'ancien avant d'en attacher un nouveau plutôt que de les empiler indéfiniment.
+// Iframe du widget HelloAsso, agrandie à la hauteur que HelloAsso annonce par postMessage.
+// L'AbortController retire l'écouteur du widget précédent quand un nouvel envoi en recrée un.
 let helloassoMessageAbort = null;
 
 function createHelloAssoWidget(url) {
@@ -70,6 +53,32 @@ function createHelloAssoWidget(url) {
   return iframe;
 }
 
+// Cloudflare Turnstile : chargé seulement si /api/categories fournit une clé publique (secret
+// TURNSTILE_SITE_KEY du projet Pages). Mode "interaction-only" : invisible sauf en cas de doute.
+const turnstile = { siteKey: '', widgetId: null };
+
+function setupTurnstile(siteKey, anchor) {
+  if (!siteKey || turnstile.siteKey || !anchor) return;
+  turnstile.siteKey = siteKey;
+  const container = document.createElement('div');
+  container.className = 'form-turnstile';
+  anchor.before(container);
+  window.sgfcTurnstileReady = () => {
+    turnstile.widgetId = window.turnstile.render(container, { sitekey: siteKey, language: 'fr', appearance: 'interaction-only' });
+  };
+  const script = document.createElement('script');
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=sgfcTurnstileReady';
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+const turnstileToken = () =>
+  turnstile.siteKey && window.turnstile && turnstile.widgetId !== null ? window.turnstile.getResponse(turnstile.widgetId) || '' : '';
+
+const resetTurnstile = () => {
+  if (window.turnstile && turnstile.widgetId !== null) window.turnstile.reset(turnstile.widgetId);
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   const statusEl = document.getElementById('inscription-status');
   if (statusEl) {
@@ -77,10 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data || (data.status !== 'open' && data.status !== 'closed')) return;
-        // "priority" (pas renvoyé tel quel par l'API — voir functions/api/inscription-status.js) :
-        // le statut brut est "closed" mais une date limite de réinscription prioritaire est encore
-        // en cours, on affiche donc un message différent de "fermé" (voir .inscription-priority
-        // ci-dessous et sa date limite, plutôt que le bloc .inscription-closed générique).
+        // "priority" : fermé au public, mais la réinscription prioritaire est encore en cours.
         if (data.status === 'closed' && data.dateLimiteReinscription) {
           statusEl.dataset.status = 'priority';
           const dateEl = document.getElementById('inscription-priority-date');
@@ -110,11 +116,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const helloassoBox = document.getElementById('paiement-helloasso');
   const helloassoWidgetContainer = document.getElementById('helloasso-widget-container');
   const helloassoFallbackLink = document.getElementById('helloasso-fallback-link');
+  const submitBtn = form.querySelector('button[type=submit]');
+  const submitBtnDefaultLabel = submitBtn.textContent;
+  // Turnstile et messages d'erreur se placent juste au-dessus des boutons d'envoi.
+  const submitAnchor = submitBtn.closest('.form-step-nav') || submitBtn;
 
-  // État rempli par /api/categories ci-dessous — initialisé au repli hors-ligne (FALLBACK_*) puis
-  // remplacé dès que l'appel réussit. Des `let` (pas `const`) : les gestionnaires d'événements
-  // enregistrés plus bas (fermeture) lisent la valeur en vigueur au moment où ils s'exécutent, pas
-  // celle au moment de leur enregistrement.
+  // État rempli par /api/categories (let : les gestionnaires lisent la valeur à jour).
   let saison = FALLBACK_SAISON;
   let prix = FALLBACK_PRIX;
   let categorieParAnnee = FALLBACK_CATEGORIE_PAR_ANNEE;
@@ -128,6 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetch('/api/categories')
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
+      if (data?.turnstileSiteKey) setupTurnstile(data.turnstileSiteKey, submitAnchor);
       if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
 
       if (data.saison) {
@@ -141,9 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-prix-text]').forEach((el) => {
           el.textContent = prix;
         });
-        // Approximation du montant par échéance affiché sur la carte d'offre — le détail exact des
-        // 3 prélèvements dépend du plan de paiement configuré côté HelloAsso (onglet campagne), pas
-        // de ce site ; ce n'est qu'un aperçu, jamais utilisé pour calculer un vrai paiement.
+        // Aperçu du montant par échéance : le vrai plan de paiement est réglé chez HelloAsso.
         document.querySelectorAll('[data-prix-tiers-text]').forEach((el) => {
           el.textContent = Math.round(prix / 3);
         });
@@ -164,20 +170,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (categorieSelect) {
         const previousValue = categorieSelect.value;
-        // Options créées via le DOM (value/textContent) plutôt qu'en HTML : aucune donnée de
-        // /api/categories n'est jamais interprétée comme du code, quel que soit son contenu.
+        // Options créées via le DOM : aucune donnée de l'API n'est interprétée comme du HTML.
         categorieSelect.replaceChildren(
           ...data.categories.map((c) => {
             const annees = c.anneeMin === c.anneeMax ? c.anneeMin : `${c.anneeMin}-${c.anneeMax}`;
             return new Option(`${c.label} (${annees})`, c.label);
           })
         );
-        // Si une date de naissance est déjà renseignée (pré-remplie par functions/reinscription/
-        // [token].js, ou déjà saisie par l'utilisateur avant que cette réponse n'arrive), on
-        // recalcule la catégorie à partir des tranches d'âge à jour plutôt que de garder l'ancienne
-        // valeur telle quelle — indispensable pour la réinscription, où l'enfant change souvent de
-        // catégorie d'une saison à l'autre. Sinon, reprend la sélection précédente si elle existe
-        // toujours, ou garde le 1er élément par défaut.
+        // Date déjà renseignée (réinscription pré-remplie, ou saisie avant la réponse) : catégorie
+        // recalculée avec les tranches à jour ; sinon, sélection précédente conservée si elle existe.
         const anneeNaissance = naissanceInput?.value ? new Date(naissanceInput.value).getUTCFullYear() : null;
         const categorieRecalculee = anneeNaissance && categorieParAnnee[anneeNaissance];
         if (categorieRecalculee) {
@@ -187,15 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     })
-    .catch(() => {}); // en cas d'échec, on garde les repères par défaut (FALLBACK_*) et le <select> statique du HTML
+    .catch(() => {}); // en cas d'échec, on garde les repères par défaut (FALLBACK_*)
 
   const ageWarning = document.getElementById('inscription-age-warning');
 
-  // Vrai uniquement si la date de naissance saisie tombe dans la tranche d'âge d'une catégorie
-  // ouverte cette saison — évite qu'une naissance hors tranche (ex. 2017, alors que la plus âgée
-  // des catégories s'arrête à 2018) ne passe avec la catégorie précédemment sélectionnée restée
-  // inchangée (voir le gestionnaire de "change" ci-dessous, qui ne touche à la catégorie que si la
-  // date est valide).
+  // Vrai seulement si l'année de naissance tombe dans la tranche de la catégorie sélectionnée.
   function naissanceCorrespondACategorie() {
     if (!naissanceInput.value) return false;
     const annee = new Date(naissanceInput.value).getUTCFullYear();
@@ -204,30 +201,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (naissanceInput && categorieSelect) {
     naissanceInput.addEventListener('change', () => {
-      // getUTCFullYear (pas getFullYear) : "YYYY-MM-DD" est parsé comme minuit UTC, et lire
-      // l'année en heure locale décalerait d'un an pour un fuseau très négatif (ex. UTC-8)
-      // sur une naissance au 1er janvier.
+      // getUTCFullYear : "YYYY-MM-DD" est lu comme minuit UTC (un fuseau négatif décalerait l'année).
       const annee = new Date(naissanceInput.value).getUTCFullYear();
       const categorie = categorieParAnnee[annee];
       if (categorie) {
         categorieSelect.value = categorie;
         if (ageWarning) ageWarning.hidden = true;
       } else if (ageWarning) {
-        // Année hors de toute tranche connue (ex. 2017) : on ne force plus une catégorie qui ne
-        // correspond pas à l'âge réel de l'enfant — le contrôle au submit ci-dessous bloque
-        // l'envoi tant que ce message reste affiché.
         ageWarning.hidden = false;
       }
     });
   }
 
-  const submitBtn = form.querySelector('button[type=submit]');
-  const submitBtnDefaultLabel = submitBtn.textContent;
+  // ---------- Étapes ----------
+  const steps = [...form.querySelectorAll('.form-step')];
+  const stepsIndicator = document.getElementById('form-steps');
+  let currentStep = 0;
 
-  // Avertissement précoce (pas le contrôle définitif, qui reste au submit ci-dessous avec la
-  // date exacte) : dès que prénom+nom de l'enfant et e-mail du parent sont remplis, un parent
-  // n'a plus à finir tout le formulaire pour apprendre que son enfant est déjà inscrit — cas
-  // réel d'un parent ayant soumis 4 fois de suite le même dossier.
+  function showStep(index, { scroll = true } = {}) {
+    currentStep = index;
+    steps.forEach((step, i) => {
+      step.hidden = i !== index;
+    });
+    stepsIndicator?.querySelectorAll('li').forEach((li, i) => {
+      li.classList.toggle('is-current', i === index);
+      li.classList.toggle('is-done', i < index);
+      if (i === index) li.setAttribute('aria-current', 'step');
+      else li.removeAttribute('aria-current');
+    });
+    if (scroll) {
+      (stepsIndicator || form).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      steps[index].querySelector('input, select')?.focus({ preventScroll: true });
+    }
+  }
+
+  // Signale un champ invalide en affichant d'abord l'étape et le bloc repliable qui le contiennent.
+  function reportField(field) {
+    const stepIndex = steps.findIndex((step) => step.contains(field));
+    if (stepIndex !== -1 && stepIndex !== currentStep) showStep(stepIndex, { scroll: false });
+    field.closest('details')?.setAttribute('open', '');
+    field.reportValidity();
+  }
+
+  function validate(container) {
+    const invalid = [...container.querySelectorAll('input, select, textarea')].find((field) => !field.checkValidity());
+    if (invalid) {
+      reportField(invalid);
+      return false;
+    }
+    if (naissanceInput && container.contains(naissanceInput) && !naissanceCorrespondACategorie()) {
+      const stepIndex = steps.findIndex((step) => step.contains(naissanceInput));
+      if (stepIndex !== -1 && stepIndex !== currentStep) showStep(stepIndex, { scroll: false });
+      if (ageWarning) {
+        ageWarning.hidden = false;
+        ageWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return false;
+    }
+    return true;
+  }
+
+  if (steps.length) {
+    form.classList.add('is-stepped');
+    if (stepsIndicator) stepsIndicator.hidden = false;
+    showStep(0, { scroll: false });
+    form.addEventListener('click', (e) => {
+      if (e.target.closest('[data-step-next]')) {
+        if (validate(steps[currentStep])) showStep(Math.min(currentStep + 1, steps.length - 1));
+      } else if (e.target.closest('[data-step-prev]')) {
+        showStep(Math.max(currentStep - 1, 0));
+      }
+    });
+  }
+
+  // ---------- Avertissements ----------
+  // Avertissement précoce de doublon, dès que prénom, nom et e-mail sont remplis (le contrôle
+  // définitif reste celui du serveur à l'envoi).
   const duplicateWarning = document.getElementById('inscription-duplicate-warning');
   let duplicateCheckController = null;
 
@@ -249,16 +298,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const json = res.ok ? await res.json() : null;
       duplicateWarning.hidden = !json?.duplicate;
     } catch {
-      // Requête abandonnée (nouvelle frappe pendant la vérification) ou réseau indisponible :
-      // on n'affiche rien plutôt qu'une fausse alerte — le contrôle au submit reste la garde
-      // définitive contre un vrai doublon en base.
+      // requête abandonnée ou réseau indisponible : pas de fausse alerte
     }
   }
 
   [form.enfantPrenom, form.enfantNom, form.email].forEach((el) => el.addEventListener('blur', checkDuplicateInline));
 
-  // Second responsable légal facultatif : dès qu'un de ses champs est rempli, son prénom et son nom
-  // deviennent obligatoires (validation native, comme les autres champs du formulaire).
+  // Second responsable légal facultatif : dès qu'un de ses champs est rempli, prénom et nom deviennent requis.
   const parent2Fields = ['parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'].map((name) => form[name]).filter(Boolean);
   const syncParent2Required = () => {
     const filled = parent2Fields.some((input) => input.value.trim());
@@ -268,22 +314,32 @@ document.addEventListener('DOMContentLoaded', () => {
   parent2Fields.forEach((input) => input.addEventListener('input', syncParent2Required));
   syncParent2Required();
 
+  let submitError = null;
+  function showSubmitError(message) {
+    if (!submitError) {
+      submitError = document.createElement('p');
+      submitError.className = 'form-alert';
+      submitError.setAttribute('role', 'alert');
+      submitAnchor.before(submitError);
+    }
+    submitError.textContent = message;
+    submitError.hidden = !message;
+  }
+
+  // ---------- Envoi ----------
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!form.checkValidity()) {
-      form.reportValidity();
+    // Entrée pressée dans un champ d'une étape intermédiaire : on passe à l'étape suivante.
+    if (steps.length && currentStep < steps.length - 1) {
+      if (validate(steps[currentStep])) showStep(currentStep + 1);
       return;
     }
-    // Garde définitive (pas seulement l'avertissement au changement de date ci-dessus) : bloque
-    // tout envoi si la date de naissance ne correspond pas à la catégorie sélectionnée, quelle
-    // que soit la façon dont ce décalage s'est produit.
-    if (!naissanceCorrespondACategorie()) {
-      if (ageWarning) {
-        ageWarning.hidden = false;
-        ageWarning.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    if (!validate(form)) return;
+    if (turnstile.siteKey && !turnstileToken()) {
+      showSubmitError('Vérification anti-robot en cours… patientez une seconde, puis renvoyez le formulaire.');
       return;
     }
+    showSubmitError('');
 
     const data = {
       enfantPrenom: form.enfantPrenom.value.trim(),
@@ -310,8 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
       rgpd: form.rgpd.checked,
     };
 
-    // Bouton mis à jour avant tout travail, pour que le navigateur affiche aussitôt « Génération… » ;
-    // jsPDF n'est chargé qu'ici (voir loadJsPdf dans pdf-inscription.js).
+    // Bouton mis à jour avant tout travail ; jsPDF n'est chargé qu'ici (loadJsPdf, pdf-inscription.js).
     submitBtn.disabled = true;
     submitBtn.textContent = 'Génération…';
     try {
@@ -319,54 +374,45 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch {
       submitBtn.disabled = false;
       submitBtn.textContent = submitBtnDefaultLabel;
-      alert("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou contactez-nous directement à contact@saintgratienfc.fr.");
+      showSubmitError("Le générateur de PDF n'a pas pu se charger (connexion instable ou bloqueur de contenu). Réessayez, ou écrivez-nous à contact@saintgratienfc.fr.");
       return;
     }
 
-    // Le PDF (sans lien de dépôt, pas encore connu à ce stade) est joint en base64 à la requête
-    // pour que le serveur puisse l'attacher à l'e-mail de confirmation (voir
-    // functions/_shared/confirmation-email.js) — la famille reçoit ainsi sa fiche remplie par
-    // e-mail en plus du téléchargement local ci-dessous. On attend ensuite la réponse du serveur
-    // avant de télécharger le PDF local : le lien de dépôt (uploadToken) est imprimé dedans.
-    const pdfBase64 = getInscriptionPdfBase64(data);
+    // Réponse attendue avant de télécharger le PDF : le lien de l'espace famille y est imprimé.
     let uploadToken = null;
-    let duplicateCreatedAt = null;
+    let duplicate = false;
+    let refusal = null;
     try {
       const res = await fetch('/api/inscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, pdfBase64 }),
+        body: JSON.stringify({ ...data, turnstileToken: turnstileToken() }),
       });
-      if (res.status === 409) {
-        const json = await res.json().catch(() => null);
-        if (json?.duplicate) duplicateCreatedAt = json.createdAt || '';
-      } else if (res.ok) {
-        const json = await res.json();
-        uploadToken = json.uploadToken || null;
-      }
+      const json = await res.json().catch(() => null);
+      if (res.status === 409 && json?.duplicate) duplicate = true;
+      else if (res.ok) uploadToken = json?.uploadToken || null;
+      else if (res.status === 429 || res.status === 403) refusal = json?.error || 'Envoi refusé pour le moment, réessayez plus tard.';
     } catch {
-      // uploadToken reste null : le bouton de dépôt sera remplacé par le repli mailto ci-dessous.
+      // uploadToken reste null : repli sur l'envoi du dossier par e-mail ci-dessous.
     }
+    resetTurnstile();
     submitBtn.disabled = false;
     submitBtn.textContent = submitBtnDefaultLabel;
 
-    // Anti-doublon : un enfant déjà inscrit (même nom/prénom/naissance/e-mail parent) ne
-    // régénère pas de nouvelle fiche — un parent avait soumis le même dossier 4 fois de suite par
-    // clics répétés, créant autant de lignes D1 et d'e-mails de confirmation. On s'arrête ici,
-    // sans télécharger de PDF ni afficher les étapes suivantes.
-    if (duplicateCreatedAt !== null) {
-      const duplicateEl = document.getElementById('inscription-duplicate');
-      const dateEl = document.getElementById('inscription-duplicate-date');
-      if (dateEl) dateEl.textContent = formatDuplicateDate(duplicateCreatedAt);
+    if (refusal) {
+      showSubmitError(refusal);
+      return;
+    }
+
+    const duplicateEl = document.getElementById('inscription-duplicate');
+    // Doublon : pas de nouveau PDF ni de nouvelles étapes, le lien est renvoyé par e-mail par le serveur.
+    if (duplicate) {
       if (duplicateEl) {
         duplicateEl.hidden = false;
         duplicateEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       return;
     }
-
-    // Masqué au cas où un précédent essai (autre enfant) avait affiché le message de doublon.
-    const duplicateEl = document.getElementById('inscription-duplicate');
     if (duplicateEl) duplicateEl.hidden = true;
 
     downloadInscriptionPdf(data, uploadToken ? `${location.origin}/depot/${uploadToken}` : null);
@@ -393,14 +439,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (data.modePaiement === 'HelloAsso') {
       const widgetUrl = helloAssoWidgetUrls[data.categorie] || helloAssoWidgetUrls[firstCategorieAvecHelloAsso];
-      helloassoWidgetContainer.innerHTML = '';
-      helloassoWidgetContainer.appendChild(createHelloAssoWidget(widgetUrl));
+      helloassoWidgetContainer.replaceChildren(createHelloAssoWidget(widgetUrl));
       helloassoFallbackLink.href = helloAssoUrls[data.categorie] || helloAssoUrls[firstCategorieAvecHelloAsso];
       helloassoBox.hidden = false;
       especesChequeBox.hidden = true;
     } else {
       helloassoBox.hidden = true;
-      helloassoWidgetContainer.innerHTML = '';
+      helloassoWidgetContainer.replaceChildren();
       especesChequeMode.textContent = data.modePaiement || 'espèces ou chèque';
       especesChequeBox.hidden = false;
     }

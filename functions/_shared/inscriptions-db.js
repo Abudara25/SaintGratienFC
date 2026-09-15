@@ -1,7 +1,24 @@
 // Schéma partagé par functions/api/inscriptions.js (écriture) et functions/admin/inscriptions.js
 // (lecture). CREATE TABLE IF NOT EXISTS : pas d'outil de migration pour un site sans build step,
 // la table s'auto-crée au premier appel plutôt que d'exiger une étape manuelle côté utilisateur.
-export async function ensureInscriptionsTable(db) {
+// Les migrations ne tournent qu'une fois par instance du Worker (et non à chaque requête, ce qui
+// coûtait une trentaine de requêtes D1 par page) : la promesse est gardée en mémoire du module, et
+// oubliée en cas d'échec pour réessayer à l'appel suivant.
+let schemaReady;
+export function ensureInscriptionsTable(db) {
+  schemaReady ??= migrateInscriptionsTable(db).catch((error) => {
+    schemaReady = undefined;
+    throw error;
+  });
+  return schemaReady;
+}
+
+// Tests uniquement (tests/) : chaque test part d'une base neuve.
+export function resetSchemaCacheForTests() {
+  schemaReady = undefined;
+}
+
+async function migrateInscriptionsTable(db) {
   await db
     .prepare(
       `CREATE TABLE IF NOT EXISTS inscriptions (

@@ -9,8 +9,14 @@ import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscr
 import { getCategoriesConfig } from '../_shared/settings-kv.js';
 import { PHOTO_ACCEPT } from '../_shared/photo-storage.js';
 import { afterInscriptionChange } from '../_shared/automations.js';
+import { readUpload } from '../_shared/security.js';
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 Mo
+const UPLOAD_ERRORS = {
+  empty: 'Choisissez un fichier avant d’envoyer.',
+  too_large: 'Le fichier dépasse 10 Mo — réduisez-le (photo compressée, ou export PDF plus léger) et réessayez.',
+  bad_type: 'Format non accepté — envoyez un PDF, un JPG ou un PNG.',
+};
 const ALLOWED_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 
 const escapeHtml = (str = '') =>
@@ -232,8 +238,8 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260915d">
-<link rel="stylesheet" href="/assets/css/suivi.css?v=20260915b">
+<link rel="stylesheet" href="/assets/css/styles.css?v=7109b179b1">
+<link rel="stylesheet" href="/assets/css/suivi.css?v=20d64b3c26">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -291,9 +297,9 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   </div>
 </footer>
 
-<script src="/assets/js/main.js?v=20260909c"></script>
-<script src="/assets/js/pdf-inscription.js?v=20260915a"></script>
-<script src="/assets/js/suivi.js?v=20260915a"></script>
+<script src="/assets/js/main.js?v=e9e2287f4e"></script>
+<script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
+<script src="/assets/js/suivi.js?v=3e7079aba5"></script>
 </body>
 </html>
 `;
@@ -352,31 +358,18 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     return renderError('Envoi invalide, réessayez.');
   }
 
-  const file = form.get('dossier');
-  if (!file || typeof file === 'string' || !file.size) {
-    return renderError('Choisissez un fichier avant d’envoyer.');
-  }
-  if (file.size > MAX_SIZE) {
-    return renderError('Le fichier dépasse 10 Mo — réduisez-le (photo compressée, ou export PDF plus léger) et réessayez.');
-  }
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return renderError('Format non accepté — envoyez un PDF, un JPG ou un PNG.');
-  }
-
   if (!env.DOSSIERS) {
     return renderError("Le dépôt en ligne n'est pas encore activé pour le moment, merci de nous envoyer votre dossier par e-mail à contact@saintgratienfc.fr en attendant.");
   }
+  // Type déduit du contenu du fichier, pas de ce qu'annonce le navigateur.
+  const upload = await readUpload(form.get('dossier'), { allowedTypes: ALLOWED_TYPES, maxSize: MAX_SIZE });
+  if (upload.error) return renderError(UPLOAD_ERRORS[upload.error]);
 
   const key = `dossiers/${params.token}`;
-  let buffer;
   try {
-    // arrayBuffer() plutôt que file.stream() : un stream ne se lit qu'une fois, et ce même
-    // buffer sert aussi à la copie de sauvegarde ci-dessous (bucket R2 "DOSSIERS_BACKUP", voir
-    // CLAUDE.md — aucun mécanisme de backup natif pour R2, contrairement à D1/Time Travel).
-    buffer = await file.arrayBuffer();
-    await env.DOSSIERS.put(key, buffer, { httpMetadata: { contentType: file.type } });
+    await env.DOSSIERS.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } });
     await env.DB.prepare('UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime(\'now\') WHERE upload_token = ?')
-      .bind(key, file.type, params.token)
+      .bind(key, upload.type, params.token)
       .run();
   } catch {
     return renderError("Échec de l'envoi, réessayez ou écrivez-nous à contact@saintgratienfc.fr.");
@@ -385,7 +378,7 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
   // Copie de sauvegarde best-effort : ne doit jamais faire échouer le dépôt principal, qui a
   // déjà réussi à ce stade (D1 mis à jour, réponse déjà déterminée ci-dessous).
   if (env.DOSSIERS_BACKUP) {
-    waitUntil(env.DOSSIERS_BACKUP.put(key, buffer, { httpMetadata: { contentType: file.type } }).catch(() => {}));
+    waitUntil(env.DOSSIERS_BACKUP.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } }).catch(() => {}));
   }
 
   waitUntil(afterInscriptionChange(env, { id: inscription.id, before: inscription, step: 'dossier', source: 'famille', siteUrl: new URL(request.url).origin }));
