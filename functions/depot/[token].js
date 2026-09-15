@@ -232,7 +232,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=20260915a">
+<link rel="stylesheet" href="/assets/css/styles.css?v=20260915d">
 <link rel="stylesheet" href="/assets/css/suivi.css?v=20260915b">
 </head>
 <body>

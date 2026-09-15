@@ -45,7 +45,7 @@ export const escapeHtml = (str = '') =>
 // Version (?v=) de tous les assets chargés par l'admin — Cloudflare Pages les met en cache 4h sans
 // possibilité de le changer (voir CLAUDE.md) : à modifier ici à chaque édition de styles.css,
 // admin.css ou d'un script chargé par l'admin, une seule fois pour toutes les pages.
-const ASSETS_VERSION = '20260915b';
+const ASSETS_VERSION = '20260915d';
 const asset = (path) => `${path}?v=${ASSETS_VERSION}`;
 
 // Icônes au trait (viewBox 24, stroke 1.8), même convention que les SVG du site public.

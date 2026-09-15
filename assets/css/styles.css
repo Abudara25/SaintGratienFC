@@ -137,6 +137,8 @@ button { font-family: inherit; }
   border-radius: 999px;
   margin-bottom: 14px;
   box-shadow: 0 1px 2px rgba(58, 15, 16, .05);
+  /* Dans un conteneur flex en colonne (.card-body), sans ça la pastille s'étire sur toute la largeur. */
+  align-self: flex-start;
 }
 .eyebrow::before {
   content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--color-danger);
@@ -256,55 +258,71 @@ section { padding: 88px 0; }
 .btn-block { width: 100%; }
 
 /* ---------- Header ---------- */
+/* Même habillage que la barre de l'espace admin (.adm-topnav, assets/css/admin.css) : dégradé
+   bordeaux, halo or, rayures fines, onglets en pastille. Les rayures sont sur ::before (jamais de
+   backdrop-filter/transform sur .site-header : il contient .main-nav en position fixe, voir CLAUDE.md). */
 .site-header {
   position: sticky; top: 0; z-index: 500;
   height: var(--header-h);
   display: flex; align-items: center;
-  background: rgba(58, 15, 16, 0.92);
-  border-bottom: 1px solid rgba(240, 160, 48, 0.25);
+  color: var(--white);
+  background:
+    radial-gradient(circle at 12% -120%, rgba(240, 160, 48, .28), transparent 45%),
+    linear-gradient(135deg, var(--maroon-700), var(--maroon-950));
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: 0 6px 18px rgba(58, 15, 16, .18);
   transition: box-shadow .3s var(--ease), height .3s var(--ease);
+}
+.site-header::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .04) 0 2px, transparent 2px 26px);
 }
 .site-header.is-scrolled { box-shadow: var(--shadow-md); height: 68px; }
 .site-header .container {
+  position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 20px;
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand img { width: 48px; height: 48px; }
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand img { width: 44px; height: 44px; }
 .brand-name {
   font-family: var(--font-display);
-  color: var(--cream-100);
+  color: var(--white);
   line-height: 1.1;
+  white-space: nowrap;
 }
-.brand-name strong { display: block; font-size: 1.05rem; letter-spacing: .03em; color: var(--white); }
-.brand-name span { display: block; font-size: .68rem; letter-spacing: .12em; color: var(--gold-400); text-transform: uppercase; }
+.brand-name strong { display: block; font-size: 1.05rem; letter-spacing: .03em; text-transform: uppercase; color: var(--white); }
+.brand-name span { display: block; font-family: var(--font-body); font-size: .66rem; letter-spacing: .12em; color: var(--gold-300); text-transform: uppercase; }
 
-.main-nav ul { display: flex; gap: 6px; }
-.main-nav a {
-  display: block;
-  font-family: var(--font-display);
-  font-size: .88rem;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  color: rgba(251, 247, 238, 0.85);
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
+/* "li a" et non "a" : le bouton .nav-cta du menu mobile est aussi un lien de .main-nav, il doit
+   garder ses propres couleurs/marges de .btn-primary. */
+.main-nav ul { display: flex; gap: 2px; }
+.main-nav li a {
+  display: flex; align-items: center;
+  min-height: 44px; padding-inline: 16px;
+  border-radius: 999px;
+  font-size: .92rem;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, .78);
   transition: background-color .2s var(--ease), color .2s var(--ease);
 }
-.main-nav a:hover, .main-nav a[aria-current="page"] {
-  background: rgba(240, 160, 48, 0.16);
-  color: var(--gold-400);
+.main-nav li a:hover { background: rgba(255, 255, 255, .08); color: var(--white); }
+.main-nav li a[aria-current="page"] {
+  background: rgba(255, 255, 255, .15); color: var(--white); font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--gold-400);
 }
-.header-actions { display: flex; align-items: center; gap: 14px; }
+.header-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 
 .burger {
   display: none;
   width: 44px; height: 44px;
-  border: none; background: rgba(240,160,48,.14);
-  border-radius: var(--radius-sm);
+  border: none; background: rgba(255, 255, 255, .1);
+  border-radius: 50%;
   position: relative; cursor: pointer;
+  transition: background-color .2s var(--ease);
 }
+.burger:hover { background: rgba(255, 255, 255, .2); }
 .burger span {
-  position: absolute; left: 10px; right: 10px; height: 2px; background: var(--gold-400);
+  position: absolute; left: 12px; right: 12px; height: 2px; border-radius: 2px; background: var(--white);
   transition: transform .25s var(--ease), opacity .25s var(--ease);
 }
 .burger span:nth-child(1) { top: 15px; }
@@ -314,23 +332,29 @@ section { padding: 88px 0; }
 .burger.is-active span:nth-child(2) { opacity: 0; }
 .burger.is-active span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
 
+@media (max-width: 1100px) and (min-width: 881px) {
+  .brand-name span { display: none; }
+  .main-nav li a { padding-inline: 11px; font-size: .88rem; }
+  .site-header .container { gap: 12px; }
+}
 @media (max-width: 880px) {
   .burger { display: block; }
   .main-nav {
     position: fixed; inset: var(--header-h) 0 0 0;
-    background: var(--maroon-950);
+    background: linear-gradient(160deg, var(--maroon-800), var(--maroon-950));
     transform: translateX(100%);
     transition: transform .3s var(--ease);
     overflow-y: auto;
   }
   .main-nav.is-open { transform: translateX(0); }
   .main-nav ul { flex-direction: column; padding: 24px; gap: 4px; }
-  .main-nav a { padding: 16px; font-size: 1rem; }
+  .main-nav li a { min-height: 52px; padding-inline: 18px; border-radius: var(--radius-md); font-size: 1rem; }
+  .main-nav li a[aria-current="page"] { box-shadow: inset 3px 0 0 var(--gold-400); }
   /* .adhesion-cta (pas .btn-primary) : ce lien change de classe de couleur en JS quand les
      inscriptions sont fermées (voir initAdhesionCtaStatus() dans main.js) — cibler la couleur
      l'aurait laissé visible en double (header + menu mobile) une fois cette classe retirée. */
   .header-actions .adhesion-cta { display: none; }
-  .main-nav .nav-cta { display: block; margin-top: 16px; }
+  .main-nav .nav-cta { display: flex; margin: 8px 24px 24px; }
 }
 @media (min-width: 881px) {
   .main-nav .nav-cta { display: none; }
@@ -411,7 +435,8 @@ section { padding: 88px 0; }
   display: block; font-family: var(--font-display);
   font-size: clamp(1.8rem, 3vw, 2.4rem); color: var(--gold-400);
 }
-.stat span { font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; color: rgba(251,247,238,.7); }
+.stat > span { display: block; font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; color: rgba(251,247,238,.7); text-wrap: balance; }
+.stat .nowrap { white-space: nowrap; } /* "U6-U7 & U8-U9" ne se coupe pas au trait d'union */
 @media (max-width: 700px) {
   .stats-strip { grid-template-columns: repeat(2, 1fr); row-gap: 28px; }
   .stat:nth-child(3) { border-left: none; }
@@ -471,7 +496,7 @@ section { padding: 88px 0; }
 .card-body h3 { font-size: 1.15rem; margin-bottom: 0; }
 .card-body p { color: var(--color-text-muted); font-size: .95rem; margin-bottom: 0; flex: 1; }
 .card-link { margin-top: 10px; font-family: var(--font-display); font-size: .85rem; letter-spacing: .04em; text-transform: uppercase; color: var(--color-primary); }
-.card-link::after { content: ' →'; }
+.card-link::after { content: '\00a0→'; } /* espace insécable : la flèche ne part jamais seule à la ligne */
 
 /* ---------- Photo frame (illustrative photography) ---------- */
 .photo-frame {
@@ -548,7 +573,10 @@ tbody tr:hover { background: var(--gold-100); }
   font-family: var(--font-display); font-size: 1.5rem; color: var(--maroon-950);
 }
 .person h3 { font-size: 1.05rem; margin-bottom: 2px; }
-.person .role { color: var(--color-accent-text); font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.person .role, .card .role { color: var(--color-accent-text); font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+/* Carte blanche posée sur une section sombre (equipe.html, "L'encadrement") : sans ça elle hérite du
+   texte crème et des titres or de la section, illisibles sur fond blanc. */
+.photo-section .card h3 { color: var(--color-primary); }
 
 /* ---------- CTA banner ---------- */
 .cta-banner {
@@ -572,16 +600,19 @@ tbody tr:hover { background: var(--gold-100); }
 .form-field input:focus, .form-field select:focus, .form-field textarea:focus {
   outline: none; border-color: var(--gold-500); box-shadow: 0 0 0 4px var(--gold-100);
 }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+/* row-gap à 0 : l'espacement vertical vient déjà du margin-bottom de .form-field — sinon, une fois
+   la ligne passée sur une colonne (mobile), deux champs d'une même ligne sont deux fois plus espacés. */
+.form-row { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 0; }
 @media (max-width: 620px) { .form-row { grid-template-columns: 1fr; } }
 
 /* Second responsable légal facultatif (inscription.html, functions/reinscription/[token].js). */
 .form-parent2 { margin: 0 0 20px; border: 1.5px dashed var(--gold-300); border-radius: var(--radius-sm); background: var(--cream-100); }
-.form-parent2 > summary { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 16px; cursor: pointer; list-style: none; font-weight: 600; font-size: .95rem; color: var(--maroon-700); }
+/* Grille : "(facultatif)" passe sous le libellé, aligné avec lui, au lieu de se coincer à droite sur mobile. */
+.form-parent2 > summary { display: grid; grid-template-columns: 26px 1fr; column-gap: 10px; align-items: center; min-height: 48px; padding: 10px 16px; cursor: pointer; list-style: none; font-weight: 600; font-size: .95rem; line-height: 1.35; color: var(--maroon-700); }
 .form-parent2 > summary::-webkit-details-marker { display: none; }
-.form-parent2 > summary::before { content: '+'; display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--gold-100); font-weight: 700; }
+.form-parent2 > summary::before { content: '+'; grid-row: 1 / span 2; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--gold-100); font-weight: 700; }
 .form-parent2[open] > summary::before { content: '−'; }
-.form-parent2 > summary span { font-weight: 400; color: var(--color-text-muted); }
+.form-parent2 > summary span { grid-column: 2; font-weight: 400; font-size: .82rem; color: var(--color-text-muted); }
 .form-parent2 > .form-row, .form-parent2 > .form-parent2-hint { padding-inline: 16px; }
 .form-parent2-hint { margin: -6px 0 14px; font-size: .82rem; color: var(--color-text-muted); }
 
@@ -642,8 +673,49 @@ tbody tr:hover { background: var(--gold-100); }
 .page-header h1 { color: var(--white); font-size: clamp(2rem, 4vw, 2.8rem); text-shadow: 0 2px 24px rgba(0,0,0,.25); }
 .page-header p { color: rgba(251,247,238,.8); max-width: 560px; margin-inline: auto; margin-bottom: 0; }
 
+/* ---------- Grille des actualités (index.html, actualites.html) ---------- */
+/* Flex et non grid : tant qu'il y a moins de 3 cartes (ou après un filtre qui en masque), elles
+   restent centrées au lieu de laisser une colonne vide à droite. */
+.news-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 28px; }
+.news-grid[hidden] { display: none; }
+.news-grid > * { flex: 0 1 calc((100% - 56px) / 3); min-width: 0; }
+@media (max-width: 900px) { .news-grid > * { flex-basis: calc((100% - 28px) / 2); } }
+@media (max-width: 620px) { .news-grid > * { flex-basis: 100%; } }
+
+/* ---------- Carte Google Maps (chargée au clic, voir main.js) ---------- */
+/* Le cadre prend la hauteur de son contenu tant que la carte n'est pas chargée ; l'iframe, elle,
+   porte son propre ratio une fois insérée (le JS remplace .map-placeholder par l'iframe). */
+.map-embed { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); background: var(--gold-100); }
+.map-embed iframe { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+.map-embed--wide { max-width: 640px; margin-inline: auto; }
+.map-embed--wide iframe { aspect-ratio: 16 / 9; }
+.map-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 32px 20px 20px; text-align: center;
+  background-image:
+    radial-gradient(circle at 50% 45%, var(--gold-100) 0 110px, transparent 220px),
+    linear-gradient(rgba(128, 24, 24, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(128, 24, 24, .07) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
+.map-pin {
+  display: grid; place-items: center; width: 52px; height: 52px; margin-bottom: 12px;
+  border-radius: 50%; background: var(--maroon-700); color: var(--gold-300);
+  box-shadow: 0 0 0 8px rgba(128, 24, 24, .1);
+}
+.map-pin svg { width: 24px; height: 24px; }
+.map-placeholder strong { color: var(--maroon-900); }
+.map-address { font-size: .9rem; color: var(--color-text-muted); }
+.map-placeholder .btn { margin-top: 16px; }
+.map-link {
+  display: inline-flex; align-items: center; min-height: 44px;
+  font-size: .88rem; font-weight: 600; color: var(--color-primary);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.map-note { margin: 0; font-size: .78rem; color: var(--color-text-muted); }
+
 /* ---------- Filters (actualités) ---------- */
-.filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 40px; }
+.filters { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 40px; } /* centrés comme .news-grid */
 .filter-btn {
   font-family: var(--font-display); font-size: .82rem; letter-spacing: .04em; text-transform: uppercase;
   padding: 9px 18px; min-height: 44px; border-radius: 999px; border: 1.5px solid var(--cream-200);

@@ -26,7 +26,7 @@
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/styles.css?v=20260915a">
+<link rel="stylesheet" href="assets/css/styles.css?v=20260915d">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -137,9 +137,15 @@
           </div>
         </div>
 
-        <div class="map-embed" data-map-src="https://www.google.com/maps?q=Stade+Robert+Lemoine,+75+rue+d'Orgemont,+95210+Saint-Gratien&output=embed" data-map-title="Carte — Stade Robert Lemoine, Saint-Gratien" style="margin-top:24px;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);aspect-ratio:16/10;background:var(--gold-100);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:20px;">
-          <button type="button" class="btn btn-dark map-embed-btn">Afficher la carte (Google Maps)</button>
-          <p style="margin:0;font-size:.8rem;color:var(--color-text-muted);">Le chargement de la carte dépose des cookies Google.</p>
+        <div class="map-embed" data-map-src="https://www.google.com/maps?q=Stade+Robert+Lemoine,+75+rue+d'Orgemont,+95210+Saint-Gratien&output=embed" data-map-title="Carte — Stade Robert Lemoine, Saint-Gratien" style="margin-top:24px;">
+          <div class="map-placeholder">
+            <span class="map-pin" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>
+            <strong>Stade Robert Lemoine</strong>
+            <span class="map-address">75 rue d'Orgemont, Saint-Gratien</span>
+            <button type="button" class="btn btn-dark btn-sm map-embed-btn">Afficher la carte ici</button>
+            <a class="map-link" href="https://www.google.com/maps/search/?api=1&amp;query=Stade+Robert+Lemoine+75+rue+d%27Orgemont+95210+Saint-Gratien" target="_blank" rel="noopener noreferrer">Ouvrir dans Google Maps</a>
+            <p class="map-note">Afficher la carte ici charge Google Maps, qui dépose des cookies.</p>
+          </div>
         </div>
       </div>
 
