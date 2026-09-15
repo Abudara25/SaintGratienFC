@@ -284,7 +284,17 @@ html:has(.adm-topnav) { scroll-padding-top: 88px; }
 .adm-actionbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 16px; }
 .adm-actionbar form { margin: 0; }
 .adm-actionbar-spacer { flex: 1; }
-.adm-fiche-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+/* Fiche : Enfant et Responsables empilés à gauche, Dossier au centre, Photo à droite. Le dossier (avec sa
+   vérification) est le bloc le plus haut : il occupe deux rangées, la seconde absorbe la différence, et
+   aucun bloc ne se retrouve seul sous un grand vide. */
+.adm-fiche-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr;
+  grid-template-areas: "enfant dossier photo" "parent dossier photo"; gap: 20px; align-items: start;
+}
+.adm-fiche-enfant { grid-area: enfant; }
+.adm-fiche-parent { grid-area: parent; }
+.adm-fiche-dossier { grid-area: dossier; }
+.adm-fiche-photo { grid-area: photo; }
 .adm-kv { display: flex; flex-direction: column; margin: 0; }
 .adm-kv > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-block: 10px; border-bottom: 1px solid var(--adm-line-soft); font-size: .92rem; }
 .adm-kv > div:last-child { border-bottom: 0; }
@@ -413,7 +423,7 @@ html:has(.adm-topnav) { scroll-padding-top: 88px; }
 }
 @media (max-width: 1000px) {
   .adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .adm-fiche-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .adm-fiche-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; grid-template-areas: "enfant parent" "dossier photo"; }
 }
 @media (max-width: 900px) {
   .adm-tabs { display: none; }
@@ -446,7 +456,7 @@ html:has(.adm-topnav) { scroll-padding-top: 88px; }
   .adm-actionbar { display: grid; grid-template-columns: 1fr 1fr; }
   .adm-actionbar-spacer { display: none; }
   .adm-actionbar .adm-btn { width: 100%; padding-inline: 10px; }
-  .adm-fiche-grid { grid-template-columns: 1fr; }
+  .adm-fiche-grid { grid-template-columns: 1fr; grid-template-areas: "enfant" "parent" "dossier" "photo"; }
   .adm-bulk-count { margin-right: 0; }
   .adm-bulk .adm-btn { flex: 1 1 auto; }
   .adm-row { flex-wrap: wrap; align-items: flex-start; }

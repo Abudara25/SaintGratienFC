@@ -155,7 +155,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
     <ul class="suivi-steps">
       ${step('file', 'Dossier signé', dossierDetail, docOk, DOSSIER_TAGS[dossier])}
       ${step('camera', `Photo de ${prenom}`, photoOk ? `Reçue le ${formatDate(inscription.photo_uploaded_at)}` : '<a href="#photo">À ajouter ci-dessous</a>', photoOk)}
-      ${step('card', 'Paiement', payOk ? `Reçu${mode ? ` (${escapeHtml(mode)})` : ''}` : `${mode ? `${escapeHtml(mode)} · ` : ''}<a href="#paiement">en attente de réception</a>`, payOk)}
+      ${step('card', 'Paiement', payOk ? `Reçu${mode ? ` (${escapeHtml(mode)})` : ''}` : `${mode ? `${escapeHtml(mode)} · ` : ''}<a href="#paiement">en attente de réception</a>`, payOk, payOk ? '<span class="suivi-tag is-ok">Payé</span>' : tag(false))}
     </ul>
   </div>`;
 

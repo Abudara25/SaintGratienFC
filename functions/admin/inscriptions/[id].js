@@ -136,7 +136,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
       .map(escapeHtml)
       .join(', ') || '—';
 
-  const enfant = `<section class="adm-surface">
+  const enfant = `<section class="adm-surface adm-fiche-enfant">
     <h2 class="adm-h2">${icon('user')}Enfant</h2>
     <dl class="adm-kv">
       ${kv('Naissance', formatBirth(row.naissance))}
@@ -149,7 +149,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
     </dl>
   </section>`;
 
-  const parent = `<section class="adm-surface">
+  const parent = `<section class="adm-surface adm-fiche-parent">
     <h2 class="adm-h2">${icon('phone')}${hasParent2 ? 'Responsables légaux' : 'Responsable légal'}</h2>
     <dl class="adm-kv">
       ${kv('Nom', `${escapeHtml(row.parent_prenom)} ${escapeHtml(row.parent_nom)}`)}
@@ -218,13 +218,13 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
       ${dossier === 'refuse' ? '' : refuseForm}
     </div>`;
 
-  const dossierSection = `<section class="adm-surface" id="dossier">
+  const dossierSection = `<section class="adm-surface adm-fiche-dossier" id="dossier">
     <h2 class="adm-h2">${icon('file')}Dossier &amp; paiement</h2>
     <dl class="adm-kv">
       ${kv('Document', dossierTag(row))}
       ${docReceived ? kv('Reçu le', formatDateFr(row.dossier_uploaded_at, LONG_DATE)) : ''}
       ${dossier === 'valide' && row.dossier_verified_at ? kv('Vérifié le', formatDateFr(row.dossier_verified_at, LONG_DATE)) : ''}
-      ${kv('Paiement', statusTag(payOk))}
+      ${kv('Paiement', statusTag(payOk, { yes: 'Payé', no: 'Non payé' }))}
       ${kv('Mode de paiement', escapeHtml(row.mode_paiement || '—'))}
       ${row.helloasso_order_id ? kv('Validé par HelloAsso', `commande n° ${escapeHtml(row.helloasso_order_id)}`) : ''}
       ${row.last_reminder_at ? kv('Dernière relance', `${formatDateFr(row.last_reminder_at, LONG_DATE)}${row.auto_reminders_sent ? ` (${row.auto_reminders_sent} auto.)` : ''}`) : ''}
@@ -239,7 +239,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
     </form>
   </section>`;
 
-  const photo = `<section class="adm-surface">
+  const photo = `<section class="adm-surface adm-fiche-photo">
     <h2 class="adm-h2">${icon('camera')}Photo de l'enfant</h2>
     <div class="adm-photo">${
       photoOk
@@ -287,7 +287,7 @@ ${adminShell({
   eyebrow: "Fiche d'inscription",
   title: name,
   subtitle: `${escapeHtml(row.categorie)} · inscription du ${formatDateFr(row.created_at, LONG_DATE)}${archived ? ` · archivée le ${formatDateFr(row.archived_at, LONG_DATE)}` : ''}`,
-  meta: `<div class="adm-hero-tags"><span>Document</span>${dossierTag(row)}<span>Photo</span>${statusTag(photoOk, { yes: 'Validée', no: 'Non validée' })}<span>Paiement</span>${statusTag(payOk)}</div>`,
+  meta: `<div class="adm-hero-tags"><span>Document</span>${dossierTag(row)}<span>Photo</span>${statusTag(photoOk, { yes: 'Validée', no: 'Non validée' })}<span>Paiement</span>${statusTag(payOk, { yes: 'Payé', no: 'Non payé' })}</div>`,
 })}
 <main id="adm-main" class="adm-wrap adm-main">
   ${flashes}

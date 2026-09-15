@@ -171,7 +171,7 @@ function inscriptionCard(r, returnTo) {
     <div class="adm-lines">
       <div class="adm-line"><span>Document</span>${dossierTag(r)}</div>
       <div class="adm-line"><span>Photo</span>${statusTag(r.photo_uploaded_at, { yes: 'Validée', no: 'Non validée' })}</div>
-      <div class="adm-line"><span>Paiement${r.mode_paiement ? ` <small>· ${escapeHtml(r.mode_paiement)}</small>` : ''}</span>${statusTag(r.paye)}</div>
+      <div class="adm-line"><span>Paiement${r.mode_paiement ? ` <small>· ${escapeHtml(r.mode_paiement)}</small>` : ''}</span>${statusTag(r.paye, { yes: 'Payé', no: 'Non payé' })}</div>
     </div>
     <div class="adm-card-actions">
       <a href="${ficheHref}" class="adm-btn adm-btn-ghost">Voir la fiche</a>
@@ -244,7 +244,7 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
             .join('')}</select>
         </label>
         <label class="adm-field">Paiement
-          <select name="paye" class="adm-select">${option('paye', '', 'Tous')}${option('paye', 'oui', 'Validé')}${option('paye', 'non', 'Non validé')}</select>
+          <select name="paye" class="adm-select">${option('paye', '', 'Tous')}${option('paye', 'oui', 'Payé')}${option('paye', 'non', 'Non payé')}</select>
         </label>
         <label class="adm-field">Photo
           <select name="photo" class="adm-select">${option('photo', '', 'Toutes')}${option('photo', 'recue', 'Validée')}${option('photo', 'manquante', 'Non validée')}</select>
@@ -325,7 +325,7 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
           { value: counts.total, label: plural(counts.total, 'inscrit') },
           { value: `${counts.dossier}/${counts.total}`, label: 'documents validés' },
           { value: `${counts.photo}/${counts.total}`, label: 'photos validées' },
-          { value: `${counts.paye}/${counts.total}`, label: 'paiements validés' },
+          { value: `${counts.paye}/${counts.total}`, label: 'payés' },
         ],
     actions: statusBlock,
   });

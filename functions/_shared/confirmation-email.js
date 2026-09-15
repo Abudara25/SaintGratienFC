@@ -282,6 +282,7 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
     {
       key: 'paiement',
       ok: Boolean(row.paye),
+      okLabel: 'Payé',
       title: "Paiement de l'adhésion",
       text: payOnline
         ? `Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire)${prixText ? ` : ${prixText}` : ''}.`
@@ -337,7 +338,7 @@ Saint-Gratien FC`;
                     <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td width="26" height="26" align="center" valign="middle" style="background-color:${GREEN_700};color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;border-radius:50%;">&#10003;</td></tr></table>
                   </td>
                   <td valign="middle" style="padding:12px 16px 12px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${GREEN_700};"><strong>${escapeHtml(s.title)}</strong></td>
-                  <td align="right" valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${GREEN_700};">Validé</td>
+                  <td align="right" valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${GREEN_700};">${s.okLabel || 'Validé'}</td>
                 </tr>
               </table>`;
       }
@@ -717,9 +718,10 @@ function buildFollowUpEmail(row, siteUrl, { complete, step }) {
   const steps = [
     ['Dossier signé', dossier === 'valide' ? 'ok' : dossier === 'a_verifier' ? 'pending' : 'todo'],
     [`Photo de ${row.enfant_prenom}`, row.photo_uploaded_at ? 'ok' : 'todo'],
-    ["Paiement de l'adhésion", row.paye ? 'ok' : 'todo'],
+    ["Paiement de l'adhésion", row.paye ? 'ok' : 'todo', 'Payé'],
   ];
   const STATE_LABELS = { ok: 'Validé', pending: 'En vérification', todo: 'En attente' };
+  const stateLabel = (state, okLabel) => (state === 'ok' && okLabel ? okLabel : STATE_LABELS[state]);
   const remaining = steps.filter(([, state]) => state === 'todo').map(([label]) => label);
   const intro = complete
     ? `Bonne nouvelle : toutes les étapes de l'inscription de ${nomEnfant} sont validées.`
@@ -742,7 +744,7 @@ function buildFollowUpEmail(row, siteUrl, { complete, step }) {
 
 ${intro}
 
-${steps.map(([label, state]) => `- ${label} : ${STATE_LABELS[state].toLowerCase()}`).join('\n')}
+${steps.map(([label, state, okLabel]) => `- ${label} : ${stateLabel(state, okLabel).toLowerCase()}`).join('\n')}
 
 ${next}
 
@@ -756,10 +758,10 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 
   const stepRows = steps
     .map(
-      ([label, state]) => `
+      ([label, state, okLabel]) => `
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK_900};">${escapeHtml(label)}</td>
-                  <td align="right" style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;background-color:${state === 'ok' ? GREEN_100 : GOLD_100};color:${state === 'ok' ? GREEN_700 : '#8a4b12'};">${STATE_LABELS[state]}</span></td>
+                  <td align="right" style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;background-color:${state === 'ok' ? GREEN_100 : GOLD_100};color:${state === 'ok' ? GREEN_700 : '#8a4b12'};">${stateLabel(state, okLabel)}</span></td>
                 </tr>`
     )
     .join('');

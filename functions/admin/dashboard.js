@@ -40,7 +40,7 @@ ${adminShell({
       of: total,
       link: dossierAVerifier ? { href: '/admin/inscriptions?dossier=a_verifier', label: `${dossierAVerifier} à vérifier` } : null,
     })}
-    ${kpi({ iconName: 'card', label: 'Paiements validés', value: payeCount, of: total })}
+    ${kpi({ iconName: 'card', label: 'Payés', value: payeCount, of: total })}
     ${kpi({ iconName: 'send', label: 'À compléter', value: total - completCount, link: { href: '/admin/inscriptions?etat=incomplet', label: 'Voir et relancer' } })}
   </div>
   <div class="adm-dash-grid">
