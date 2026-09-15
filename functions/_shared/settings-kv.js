@@ -100,7 +100,11 @@ export async function getCategoriesConfig(env) {
     const stored = await env.INSCRIPTION_STATUS.get(KV_KEY_CATEGORIES);
     if (stored) {
       const parsed = JSON.parse(stored);
-      if (parsed && Array.isArray(parsed.categories) && parsed.categories.length) return parsed;
+      // Complétée par les valeurs par défaut : une config enregistrée sans "saison" (ou sans tarif) ne
+      // doit jamais produire une inscription sans saison.
+      if (parsed && Array.isArray(parsed.categories) && parsed.categories.length) {
+        return { ...DEFAULT_CATEGORIES_CONFIG, ...parsed, saison: String(parsed.saison || '').trim() || DEFAULT_CATEGORIES_CONFIG.saison };
+      }
     }
   } catch {
     // KV indisponible ou JSON corrompu : repli sur la config par défaut ci-dessus.
