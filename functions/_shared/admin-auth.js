@@ -14,6 +14,7 @@ import {
   isRateLimited,
   clearRateLimit,
 } from './security.js';
+import { dossierStatus } from './inscriptions-db.js';
 
 export const COOKIE_NAME = 'admin_session';
 // Ancien cookie, qui contenait le mot de passe lui-même : effacé à chaque connexion et déconnexion.
@@ -142,7 +143,7 @@ export const escapeHtml = (str = '') =>
 // Version (?v=) de tous les assets chargés par l'admin — Cloudflare Pages les met en cache 4h sans
 // possibilité de le changer (voir CLAUDE.md). Valeur écrite par `npm run sync` (empreinte des assets) :
 // ne pas la modifier à la main.
-const ASSETS_VERSION = '47c4448abb';
+const ASSETS_VERSION = '6d4ff09831';
 const asset = (path) => `${path}?v=${ASSETS_VERSION}`;
 
 // Icônes au trait (viewBox 24, stroke 1.8), même convention que les SVG du site public.
@@ -298,6 +299,16 @@ export function flash(type, message) {
 
 export function statusTag(ok, { yes = 'Validé', no = 'Non validé' } = {}) {
   return ok ? `<span class="adm-tag is-yes">${icon('check')}${yes}</span>` : `<span class="adm-tag is-no">${no}</span>`;
+}
+
+// Dossier signé : quatre états (voir dossierStatus dans _shared/inscriptions-db.js).
+export function dossierTag(row) {
+  return {
+    valide: `<span class="adm-tag is-yes">${icon('check')}Validé</span>`,
+    a_verifier: `<span class="adm-tag is-wait">${icon('eye')}À vérifier</span>`,
+    refuse: `<span class="adm-tag is-no">${icon('alert')}Refusé</span>`,
+    manquant: '<span class="adm-tag is-no">Non reçu</span>',
+  }[dossierStatus(row)];
 }
 
 // Photo de l'enfant si elle a été déposée (functions/admin/inscriptions/[id]/photo.js), sinon ses

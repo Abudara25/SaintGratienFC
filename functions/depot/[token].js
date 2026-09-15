@@ -5,7 +5,7 @@
 // photo (functions/depot/[token]/photo.js). Les fichiers sont stockés dans le bucket R2 "DOSSIERS"
 // (à créer manuellement sur le dashboard Cloudflare Pages — voir CLAUDE.md), D1 ne garde que les
 // références. Le paiement, lui, est validé par un responsable du club depuis l'admin.
-import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { ensureInscriptionsTable, isInscriptionComplete, dossierStatus, refusMotifs } from '../_shared/inscriptions-db.js';
 import { getCategoriesConfig } from '../_shared/settings-kv.js';
 import { PHOTO_ACCEPT } from '../_shared/photo-storage.js';
 import { afterInscriptionChange } from '../_shared/automations.js';
@@ -45,6 +45,13 @@ const icon = (name) =>
   `<svg class="suivi-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
 
 const tag = (ok) => (ok ? '<span class="suivi-tag is-ok">Validé</span>' : '<span class="suivi-tag is-todo">En attente</span>');
+// Dossier signé : déposé mais pas encore vérifié, ou refusé par le club (voir dossierStatus).
+const DOSSIER_TAGS = {
+  valide: tag(true),
+  a_verifier: '<span class="suivi-tag is-pending">En vérification</span>',
+  refuse: '<span class="suivi-tag is-error">À corriger</span>',
+  manquant: tag(false),
+};
 const flash = (type, message) =>
   `<p class="suivi-flash is-${type}" role="${type === 'error' ? 'alert' : 'status'}">${icon(type === 'error' ? 'alert' : 'check')}<span>${escapeHtml(message)}</span></p>`;
 
@@ -102,7 +109,8 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   };
   const prenom = escapeHtml(inscription.enfant_prenom);
   const nomEnfant = `${prenom} ${escapeHtml(inscription.enfant_nom)}`;
-  const docOk = Boolean(inscription.dossier_uploaded_at);
+  const dossier = dossierStatus(inscription);
+  const docOk = dossier === 'valide';
   const payOk = Boolean(inscription.paye);
   const photoOk = Boolean(inscription.photo_uploaded_at);
   const complete = isInscriptionComplete(inscription);
@@ -113,11 +121,19 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
   const photoSrc = photoOk ? `/depot/${token}/photo?v=${encodeURIComponent(inscription.photo_uploaded_at)}` : '';
   const initials = escapeHtml(`${String(inscription.enfant_prenom || '').charAt(0)}${String(inscription.enfant_nom || '').charAt(0)}`.toUpperCase());
 
-  const step = (iconName, title, detail, ok) => `<li class="suivi-step${ok ? ' is-ok' : ''}">
+  const step = (iconName, title, detail, ok, stateTag = tag(ok)) => `<li class="suivi-step${ok ? ' is-ok' : ''}">
         <span class="suivi-step-ico">${icon(ok ? 'check' : iconName)}</span>
         <span class="suivi-step-text"><strong>${title}</strong><small>${detail}</small></span>
-        ${tag(ok)}
+        ${stateTag}
       </li>`;
+  const dossierDetail = {
+    valide: `Validé le ${formatDate(inscription.dossier_verified_at || inscription.dossier_uploaded_at)}`,
+    a_verifier: `Reçu le ${formatDate(inscription.dossier_uploaded_at)}`,
+    refuse: '<a href="#dossier">Incomplet : voir ce qu’il manque</a>',
+    manquant: '<a href="#dossier">À déposer ci-dessous</a>',
+  }[dossier];
+  const motifs = refusMotifs(inscription);
+  const commentaire = String(inscription.dossier_refus_commentaire || '').trim();
 
   const summary = `<div class="suivi-card suivi-summary${complete ? ' is-complete' : ''}">
     <div class="suivi-id">
@@ -137,20 +153,38 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
         : `<div class="suivi-banner">${icon('clock')}<div><strong>Encore ${remaining} étape${remaining > 1 ? 's' : ''} à valider</strong><p>Chaque étape passe au vert dès qu'elle est validée par le club.</p></div></div>`
     }
     <ul class="suivi-steps">
-      ${step('file', 'Dossier signé', docOk ? `Reçu le ${formatDate(inscription.dossier_uploaded_at)}` : '<a href="#dossier">À déposer ci-dessous</a>', docOk)}
+      ${step('file', 'Dossier signé', dossierDetail, docOk, DOSSIER_TAGS[dossier])}
       ${step('camera', `Photo de ${prenom}`, photoOk ? `Reçue le ${formatDate(inscription.photo_uploaded_at)}` : '<a href="#photo">À ajouter ci-dessous</a>', photoOk)}
       ${step('card', 'Paiement', payOk ? `Reçu${mode ? ` (${escapeHtml(mode)})` : ''}` : `${mode ? `${escapeHtml(mode)} · ` : ''}<a href="#paiement">en attente de réception</a>`, payOk)}
     </ul>
   </div>`;
 
   const dossierCard = `<div class="suivi-card" id="dossier">
-    <div class="suivi-card-head"><h2>${icon('file')}Dossier signé</h2>${tag(docOk)}</div>
-    ${messages.dossierOk ? flash('ok', 'Dossier bien reçu, merci !') : ''}
+    <div class="suivi-card-head"><h2>${icon('file')}Dossier signé</h2>${DOSSIER_TAGS[dossier]}</div>
+    ${messages.dossierOk ? flash('ok', 'Dossier bien reçu, merci ! Le club va vérifier qu’il est bien complet, signé et daté.') : ''}
     ${messages.error ? flash('error', messages.error) : ''}
+    ${
+      dossier === 'refuse'
+        ? `<div class="suivi-refus" role="alert">
+      <p><strong>${icon('alert')}Le dossier reçu est incomplet</strong></p>
+      ${
+        motifs.length
+          ? `<p>Nous n'avons pas pu le valider pour ${motifs.length > 1 ? 'les raisons suivantes' : 'la raison suivante'} :</p>
+      <ul>${motifs.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>`
+          : ''
+      }
+      ${commentaire ? `<p><strong>Précision du club :</strong> ${escapeHtml(commentaire)}</p>` : ''}
+      <p>Complétez-le puis déposez-le à nouveau ci-dessous.</p>
+    </div>`
+        : ''
+    }
     <p class="suivi-help">${
-      docOk
-        ? `Nous avons bien reçu votre dossier le ${formatDate(inscription.dossier_uploaded_at)}. Vous pouvez le remplacer ci-dessous si besoin.`
-        : 'Imprimez le dossier, faites-le signer, puis déposez-le ici : un scan ou une simple photo du document suffit.'
+      {
+        valide: `Votre dossier a été vérifié et validé par le club le ${formatDate(inscription.dossier_verified_at || inscription.dossier_uploaded_at)}, merci !`,
+        a_verifier: `Nous avons bien reçu votre dossier le ${formatDate(inscription.dossier_uploaded_at)}. Le club vérifie qu'il est complet, signé et daté : cette étape passera au vert dès qu'il sera validé. Vous pouvez le remplacer ci-dessous si besoin.`,
+        refuse: 'Pas de souci, vous pouvez retélécharger le dossier si besoin.',
+        manquant: 'Imprimez le dossier, remplissez le lieu et la date, signez-le, puis déposez-le ici : un scan ou une simple photo du document suffit.',
+      }[dossier]
     }</p>
     <div class="suivi-download">
       <button type="button" class="btn btn-dark suivi-pdf-btn" data-pdf="${escapeHtml(JSON.stringify(pdfData))}" data-depot-url="${escapeHtml(`${siteUrl}/depot/${inscription.upload_token}`)}">Télécharger mon dossier à signer</button>
@@ -158,9 +192,14 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
     </div>
     <form method="POST" action="/depot/${token}" enctype="multipart/form-data" class="suivi-upload">
       <label for="dossier">Fiche d'inscription signée (PDF ou photo)</label>
+      <ul class="suivi-checklist">
+        <li>${icon('check')}<span>Le lieu et la date sont remplis (« Fait à …, le … »)</span></li>
+        <li>${icon('check')}<span>Le responsable légal a signé</span></li>
+        <li>${icon('check')}<span>Le document est entier et bien lisible</span></li>
+      </ul>
       <input type="file" id="dossier" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
       <small>PDF, JPG ou PNG, 10 Mo maximum.</small>
-      <button type="submit" class="btn btn-primary">${docOk ? 'Remplacer mon dossier' : 'Envoyer mon dossier'}</button>
+      <button type="submit" class="btn btn-primary">${dossier === 'refuse' ? 'Envoyer le dossier corrigé' : dossier === 'manquant' ? 'Envoyer mon dossier' : 'Remplacer mon dossier'}</button>
     </form>
   </div>`;
 
@@ -239,7 +278,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/css/styles.css?v=7109b179b1">
-<link rel="stylesheet" href="/assets/css/suivi.css?v=20d64b3c26">
+<link rel="stylesheet" href="/assets/css/suivi.css?v=d301f4a08f">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -368,7 +407,8 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
   const key = `dossiers/${params.token}`;
   try {
     await env.DOSSIERS.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } });
-    await env.DB.prepare('UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime(\'now\') WHERE upload_token = ?')
+    // Tout nouveau dépôt de la famille repasse « à vérifier » par le club, même après une validation.
+    await env.DB.prepare("UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime('now'), dossier_status = 'a_verifier', dossier_verified_at = NULL WHERE upload_token = ?")
       .bind(key, upload.type, params.token)
       .run();
   } catch {

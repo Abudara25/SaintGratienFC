@@ -12,7 +12,7 @@
 // flexbox/grid). Ne jamais utiliser de <style> externe ni de classes CSS ici : tout doit être en
 // attributs/style inline directement sur chaque balise.
 import { getNotificationEmail, getCategoriesConfig } from './settings-kv.js';
-import { isInscriptionComplete } from './inscriptions-db.js';
+import { isInscriptionComplete, familyHasActionPending, dossierStatus, refusMotifs } from './inscriptions-db.js';
 
 const escapeHtml = (str = '') =>
   String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -256,13 +256,20 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
   const payOnline = mode === 'HelloAsso' && /^https:\/\//.test(helloAssoUrl);
   const prixText = prix ? `${prix} € (ou 3 × ${Math.round((prix / 3) * 100) / 100} € sans frais sur HelloAsso)` : '';
 
+  const dossier = dossierStatus(row);
+  const motifs = refusMotifs(row);
   const steps = [
     {
       key: 'dossier',
-      ok: Boolean(row.dossier_uploaded_at),
+      ok: dossier === 'valide',
+      // Déposé, en attente de vérification par le club : rien à faire pour la famille.
+      pending: dossier === 'a_verifier',
       title: 'Dossier signé',
-      text: "Imprimez le dossier d'inscription reçu en pièce jointe de notre premier e-mail, faites-le signer, puis déposez-le : un scan ou une simple photo du document suffit.",
-      cta: suiviUrl && { label: 'Déposer le dossier', url: `${suiviUrl}#dossier` },
+      text:
+        dossier === 'refuse'
+          ? `Le dossier reçu n'a pas pu être validé${motifs.length ? ` : ${motifs.join(' ')}` : '.'} Complétez-le puis déposez-le à nouveau.`
+          : "Imprimez le dossier d'inscription, remplissez le lieu et la date, signez-le, puis déposez-le : un scan ou une simple photo du document suffit.",
+      cta: suiviUrl && { label: dossier === 'refuse' ? 'Déposer le dossier corrigé' : 'Déposer le dossier', url: `${suiviUrl}#dossier` },
       alt: suiviUrl && { intro: "Vous n'avez plus le dossier ?", label: 'Le retélécharger', url: `${suiviUrl}?telecharger=1#dossier` },
     },
     {
@@ -287,8 +294,8 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
       },
     },
   ];
-  const missing = steps.filter((s) => !s.ok);
-  const done = steps.length - missing.length;
+  const missing = steps.filter((s) => !s.ok && !s.pending);
+  const done = steps.filter((s) => s.ok).length;
   const percent = Math.round((done / steps.length) * 100);
   const remaining = missing.length > 1 ? `il reste ${missing.length} étapes` : 'il reste une seule étape';
 
@@ -299,7 +306,7 @@ Petit rappel concernant l'inscription de ${nomEnfant} (${categorie}) au Saint-Gr
 ${missing
   .map((s) => `• ${s.title}\n  ${s.text}${s.cta ? `\n  ${s.cta.label} : ${s.cta.url}` : ''}${s.alt ? `\n  ${s.alt.intro} ${s.alt.label} : ${s.alt.url}` : ''}`)
   .join('\n\n')}
-${suiviUrl ? `\nSuivre l'inscription et déposer vos documents : ${suiviUrl}\n` : ''}
+${steps.some((s) => s.pending) ? '\nLe dossier signé est bien reçu : le club le vérifie en ce moment, rien à faire de votre côté pour cette étape.\n' : ''}${suiviUrl ? `\nSuivre l'inscription et déposer vos documents : ${suiviUrl}\n` : ''}
 Infos pratiques
 - Entraînements : le jeudi de 17h à 18h
 - Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien : ${STADE_MAPS_URL}
@@ -331,6 +338,15 @@ Saint-Gratien FC`;
                   </td>
                   <td valign="middle" style="padding:12px 16px 12px 10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${GREEN_700};"><strong>${escapeHtml(s.title)}</strong></td>
                   <td align="right" valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:${GREEN_700};">Validé</td>
+                </tr>
+              </table>`;
+      }
+      if (s.pending) {
+        return `
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 10px 0;background-color:${CREAM_100};border-radius:10px;">
+                <tr>
+                  <td valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK_900};"><strong>${escapeHtml(s.title)}</strong><br><span style="font-size:13px;color:${INK_700};">Bien reçu, en cours de vérification par le club.</span></td>
+                  <td align="right" valign="middle" style="padding:12px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:#8a4b12;white-space:nowrap;">En vérification</td>
                 </tr>
               </table>`;
       }
@@ -472,7 +488,7 @@ async function ensureUploadToken(env, row) {
 // true/false comme sendPasswordChangeCode.
 export async function sendReminderEmail(env, row, siteUrl) {
   if (!env.BREVO_API_KEY) return false;
-  if (isInscriptionComplete(row)) return false; // rien à relancer
+  if (!familyHasActionPending(row)) return false; // complet, ou seul le club a encore quelque chose à vérifier
 
   const withToken = await ensureUploadToken(env, row);
   const config = await getCategoriesConfig(env);
@@ -696,32 +712,37 @@ const GREEN_700 = '#2f6b3a';
 function buildFollowUpEmail(row, siteUrl, { complete, step }) {
   const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
   const suiviUrl = `${siteUrl}/depot/${row.upload_token}`;
+  const dossier = dossierStatus(row);
+  // [libellé, état] — état : 'ok' | 'pending' (dossier en vérification) | 'todo' ; STATE_LABELS pour l'affichage.
   const steps = [
-    ['Dossier signé', Boolean(row.dossier_uploaded_at)],
-    [`Photo de ${row.enfant_prenom}`, Boolean(row.photo_uploaded_at)],
-    ["Paiement de l'adhésion", Boolean(row.paye)],
+    ['Dossier signé', dossier === 'valide' ? 'ok' : dossier === 'a_verifier' ? 'pending' : 'todo'],
+    [`Photo de ${row.enfant_prenom}`, row.photo_uploaded_at ? 'ok' : 'todo'],
+    ["Paiement de l'adhésion", row.paye ? 'ok' : 'todo'],
   ];
-  const remaining = steps.filter(([, ok]) => !ok).map(([label]) => label);
+  const STATE_LABELS = { ok: 'Validé', pending: 'En vérification', todo: 'En attente' };
+  const remaining = steps.filter(([, state]) => state === 'todo').map(([label]) => label);
   const intro = complete
     ? `Bonne nouvelle : toutes les étapes de l'inscription de ${nomEnfant} sont validées.`
     : {
-        dossier: `Nous avons bien reçu le dossier signé de ${nomEnfant}.`,
+        dossier: `Nous avons vérifié et validé le dossier signé de ${nomEnfant}, merci !`,
         photo: `Nous avons bien reçu la photo de ${nomEnfant}.`,
         paiement: `Nous avons bien reçu le paiement de l'adhésion de ${nomEnfant}, merci !`,
       }[step];
   // Jamais "inscription définitive" avant la licence FFF (voir CLAUDE.md et buildEmail ci-dessus).
   const next = complete
     ? `Le club enregistre maintenant la licence de ${row.enfant_prenom} auprès de la Fédération Française de Football (FFF) via Footclubs, généralement sous quelques jours : l'inscription sera définitive à ce moment-là.`
-    : `Il reste : ${remaining.join(', ')}.`;
+    : remaining.length
+      ? `Il reste : ${remaining.join(', ')}.`
+      : "Le club vérifie encore le dossier signé : nous revenons vers vous dès qu'il est validé.";
   const subject = complete
     ? `Dossier complet — ${nomEnfant} — Saint-Gratien FC`
-    : `Inscription de ${nomEnfant} : ${{ dossier: 'dossier signé reçu', photo: 'photo reçue', paiement: 'paiement reçu' }[step]}`;
+    : `Inscription de ${nomEnfant} : ${{ dossier: 'dossier signé validé', photo: 'photo reçue', paiement: 'paiement reçu' }[step]}`;
 
   const text = `Bonjour ${greetingName(row)},
 
 ${intro}
 
-${steps.map(([label, ok]) => `- ${label} : ${ok ? 'validé' : 'en attente'}`).join('\n')}
+${steps.map(([label, state]) => `- ${label} : ${STATE_LABELS[state].toLowerCase()}`).join('\n')}
 
 ${next}
 
@@ -735,10 +756,10 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
 
   const stepRows = steps
     .map(
-      ([label, ok]) => `
+      ([label, state]) => `
                 <tr>
                   <td style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;font-size:14px;color:${INK_900};">${escapeHtml(label)}</td>
-                  <td align="right" style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;background-color:${ok ? GREEN_100 : GOLD_100};color:${ok ? GREEN_700 : '#8a4b12'};">${ok ? 'Validé' : 'En attente'}</span></td>
+                  <td align="right" style="padding:10px 0;border-bottom:1px solid ${CREAM_200};font-family:Arial,Helvetica,sans-serif;"><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:bold;background-color:${state === 'ok' ? GREEN_100 : GOLD_100};color:${state === 'ok' ? GREEN_700 : '#8a4b12'};">${STATE_LABELS[state]}</span></td>
                 </tr>`
     )
     .join('');
@@ -822,11 +843,144 @@ export async function sendClubUploadAlert(env, row, siteUrl, kind) {
   const to = await clubRecipients(env);
   if (!to.length) return false;
   const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const fiche = `${siteUrl}/admin/inscriptions/${row.id}`;
   return brevoSend(env, {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC — Site' },
     to,
-    subject: `${kind === 'photo' ? 'Photo déposée' : 'Dossier signé déposé'} : ${nomEnfant}`,
-    textContent: `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) vient de déposer ${kind === 'photo' ? 'la photo de l’enfant' : 'le dossier signé'} en ligne.\n\nVoir la fiche : ${siteUrl}/admin/inscriptions/${row.id}`,
+    subject: `${kind === 'photo' ? 'Photo déposée' : 'Dossier signé à vérifier'} : ${nomEnfant}`,
+    textContent:
+      kind === 'photo'
+        ? `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) vient de déposer la photo de l’enfant en ligne.\n\nVoir la fiche : ${fiche}`
+        : `La famille de ${nomEnfant} (${formatCategorie(row.categorie)}) vient de déposer le dossier signé en ligne.\n\nÀ vérifier : signature du responsable légal, lieu et date, document complet et lisible. Puis « Valider » ou « Refuser » sur la fiche (un refus prévient la famille par e-mail) :\n${fiche}#dossier`,
+  });
+}
+
+// Dossier refusé par le club (functions/admin/inscriptions/[id]/verification.js) : explique à la famille ce
+// qui manque et la renvoie vers sa page de suivi pour déposer le dossier corrigé. Ton volontairement
+// bienveillant : ce n'est pas un reproche, le dossier est simplement incomplet.
+function buildDossierRefusedEmail(row, siteUrl) {
+  const nomEnfant = `${row.enfant_prenom} ${row.enfant_nom}`;
+  const suiviUrl = `${siteUrl}/depot/${row.upload_token}`;
+  const motifs = refusMotifs(row);
+  const commentaire = String(row.dossier_refus_commentaire || '').trim();
+  const subject = `Dossier de ${nomEnfant} à compléter — Saint-Gratien FC`;
+  const intro = `Merci pour l'envoi du dossier d'inscription de ${nomEnfant} ! En le vérifiant, nous avons remarqué qu'il n'est pas encore complet, nous ne pouvons donc pas le valider pour le moment.`;
+  const checks = ['Le lieu et la date remplis (« Fait à …, le … »)', 'La signature du responsable légal', 'Le document entier et bien lisible (une photo nette suffit)'];
+
+  const text = `Bonjour ${greetingName(row)},
+
+${intro}
+
+Ce qu'il manque :
+${motifs.map((m) => `- ${m}`).join('\n')}${commentaire ? `\n\nPrécision du club : ${commentaire}` : ''}
+
+Avant de le renvoyer, vérifiez :
+${checks.map((c) => `- ${c}`).join('\n')}
+
+Déposer le dossier corrigé : ${suiviUrl}#dossier
+Vous n'avez plus le dossier ? Le retélécharger : ${suiviUrl}?telecharger=1#dossier
+
+Des questions ? Répondez à cet e-mail ou écrivez-nous à contact@saintgratienfc.fr.
+
+Sportivement,
+Saint-Gratien FC
+Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
+
+  const bullet = (content, color) => `
+                <tr>
+                  <td width="22" valign="top" style="padding:4px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:bold;color:${color};">•</td>
+                  <td valign="top" style="padding:4px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${INK_900};">${content}</td>
+                </tr>`;
+
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:${CREAM_100};">
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${CREAM_100};">
+    Le dossier de ${escapeHtml(nomEnfant)} est presque bon : il manque ${escapeHtml(motifs[0] ? motifs[0].charAt(0).toLowerCase() + motifs[0].slice(1) : 'un élément')}
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${CREAM_100};">
+    <tr>
+      <td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background-color:#ffffff;border-radius:14px;overflow:hidden;border:1px solid ${GOLD_300};">
+          <tr>
+            <td style="background-color:${MAROON_900};padding:28px 28px 26px 28px;text-align:center;">
+              <img src="${siteUrl}/assets/images/logo-96.webp" width="56" height="56" alt="Saint-Gratien FC" style="display:block;margin:0 auto 10px auto;border-radius:8px;">
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${GOLD_400};text-transform:uppercase;letter-spacing:.14em;">Saint-Gratien FC · Dossier d'inscription</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:22px;line-height:28px;font-weight:bold;color:#ffffff;margin-top:8px;">Un petit oubli dans le dossier</div>
+              <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${GOLD_300};margin-top:4px;">Quelques minutes suffisent pour le corriger</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;">
+              <p style="margin:0 0 14px 0;font-size:15px;line-height:22px;color:${INK_900};">Bonjour ${escapeHtml(greetingName(row))},</p>
+              <p style="margin:0 0 22px 0;font-size:15px;line-height:22px;color:${INK_900};">${escapeHtml(intro)}</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px 0;background-color:#fdecea;border-left:4px solid #b3261e;border-radius:10px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:#8c1d18;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Ce qu'il manque</div>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${motifs.map((m) => bullet(escapeHtml(m), '#b3261e')).join('')}
+                    </table>${
+                      commentaire
+                        ? `
+                    <div style="margin-top:10px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:${INK_900};"><strong>Précision du club :</strong> ${escapeHtml(commentaire)}</div>`
+                        : ''
+                    }
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px 0;background-color:${CREAM_100};border-radius:10px;">
+                <tr>
+                  <td style="padding:16px 18px;">
+                    <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:${MAROON_900};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">Avant de le renvoyer, vérifiez</div>
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${checks.map((c) => bullet(escapeHtml(c), GREEN_700)).join('')}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px auto 12px auto;">
+                <tr>
+                  <td align="center" style="background-color:${GOLD_500};border-radius:8px;">
+                    <a href="${suiviUrl}#dossier" target="_blank" style="display:inline-block;padding:14px 30px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:bold;color:${MAROON_950};text-decoration:none;">Déposer le dossier corrigé &rarr;</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 24px 0;text-align:center;font-size:13px;line-height:19px;color:${INK_700};">Vous n'avez plus le dossier ? <a href="${suiviUrl}?telecharger=1#dossier" target="_blank" style="color:${MAROON_900};font-weight:bold;">Le retélécharger</a></p>
+              <p style="margin:0 0 6px 0;font-size:13px;line-height:20px;color:${INK_700};">Des questions ? Répondez directement à cet e-mail ou écrivez-nous à <a href="mailto:contact@saintgratienfc.fr" style="color:${MAROON_900};">contact@saintgratienfc.fr</a>.</p>
+              <p style="margin:20px 0 24px 0;font-size:14px;line-height:20px;color:${INK_900};">Sportivement,<br><strong>Saint-Gratien FC</strong></p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:${CREAM_200};padding:20px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:18px;color:${INK_700};text-align:center;">
+              Saint-Gratien FC · Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien, Val-d'Oise<br>
+              Cet e-mail vous est envoyé suite à votre demande d'inscription sur <a href="${siteUrl}" style="color:${INK_700};">saintgratienfc.fr</a>.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  return { subject, html, text };
+}
+
+// Attendue par l'appelant, qui affiche si l'e-mail est bien parti (true/false).
+export async function sendDossierRefusedEmail(env, row, siteUrl) {
+  const withToken = await ensureUploadToken(env, row);
+  if (!withToken.upload_token) return false;
+  const { subject, html, text } = buildDossierRefusedEmail(withToken, siteUrl);
+  return brevoSend(env, {
+    sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
+    to: familyRecipients(withToken),
+    subject,
+    htmlContent: html,
+    textContent: text,
   });
 }
 
@@ -881,7 +1035,8 @@ ${nouvelles}
 
 Où en sont les ${summary.total} inscriptions actives :
 - Complètes : ${summary.complet}
-- Dossier signé manquant : ${summary.missingDossier}
+- Dossier signé à vérifier par le club : ${summary.dossierAVerifier}${summary.dossierAVerifier ? ` (${siteUrl}/admin/inscriptions?dossier=a_verifier)` : ''}
+- Dossier signé manquant ou refusé : ${summary.missingDossier}
 - Photo manquante : ${summary.missingPhoto}
 - Paiement en attente : ${summary.missingPaiement}
 

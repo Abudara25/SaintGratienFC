@@ -108,10 +108,25 @@ async function migrateInscriptionsTable(db) {
     'parent2_nom TEXT',
     'parent2_email TEXT',
     'parent2_telephone TEXT',
+    // 2026-09-15 : vérification du dossier signé par le club (voir dossierStatus ci-dessous) — des
+    // familles envoyaient un dossier non signé ou non daté, compté comme reçu. dossier_status :
+    // 'a_verifier' (déposé par la famille), 'valide', 'refuse' ; motifs = clés de DOSSIER_REFUS_MOTIFS
+    // séparées par des virgules. Les motifs du dernier refus sont gardés après un nouveau dépôt, pour
+    // que le responsable sache quoi contrôler.
+    'dossier_status TEXT',
+    'dossier_verified_at TEXT',
+    'dossier_refused_at TEXT',
+    'dossier_refus_motifs TEXT',
+    'dossier_refus_commentaire TEXT',
   ];
   for (const column of addedColumns) {
     try {
       await db.prepare(`ALTER TABLE inscriptions ADD COLUMN ${column}`).run();
+      if (column.startsWith('dossier_status ')) {
+        // Une seule fois, à l'ajout de la colonne : les dossiers déjà reçus n'ont jamais été contrôlés,
+        // ils passent "à vérifier" pour que le club repère ceux qui ne sont pas signés.
+        await db.prepare("UPDATE inscriptions SET dossier_status = 'a_verifier' WHERE dossier_uploaded_at IS NOT NULL AND dossier_status IS NULL").run();
+      }
       if (column.startsWith('saison ')) {
         // Ne s'exécute qu'une fois : ce bloc try ne réussit que la toute première fois que la
         // colonne est ajoutée (les appels suivants échouent sur "duplicate column name" et passent
@@ -128,9 +143,38 @@ async function migrateInscriptionsTable(db) {
   await db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)').run();
 }
 
-// Inscription complète = dossier signé reçu + paiement reçu + photo de l'enfant reçue. Même définition
-// partout : page famille (/depot/<token>), liste et tableau de bord admin, relances par e-mail.
-export const isInscriptionComplete = (row) => Boolean(row.dossier_uploaded_at && row.paye && row.photo_uploaded_at);
+// Motifs proposés au responsable qui refuse un dossier (fiche admin) et repris tels quels dans l'e-mail
+// envoyé à la famille et sur sa page de suivi. Les clés sont stockées en base : ne pas les renommer.
+export const DOSSIER_REFUS_MOTIFS = {
+  signature: 'La signature du responsable légal est manquante.',
+  date: 'Le lieu et la date (« Fait à …, le … ») ne sont pas remplis.',
+  pages: 'Une partie du dossier est manquante (page ou document incomplet).',
+  illisible: 'Le document est illisible (flou, coupé ou trop sombre).',
+  document: "Le fichier envoyé n'est pas le dossier d'inscription.",
+};
+
+export const refusMotifs = (row) =>
+  String(row.dossier_refus_motifs || '')
+    .split(',')
+    .filter((key) => key in DOSSIER_REFUS_MOTIFS)
+    .map((key) => DOSSIER_REFUS_MOTIFS[key]);
+
+// 'manquant' | 'a_verifier' | 'valide' | 'refuse'. Un fichier sans statut connu reste à vérifier.
+export function dossierStatus(row) {
+  if (!row.dossier_uploaded_at) return 'manquant';
+  return ['valide', 'refuse'].includes(row.dossier_status) ? row.dossier_status : 'a_verifier';
+}
+
+export const isDossierValidated = (row) => dossierStatus(row) === 'valide';
+
+// Inscription complète = dossier signé VALIDÉ par le club + paiement reçu + photo de l'enfant reçue.
+// Même définition partout : page famille (/depot/<token>), liste et tableau de bord admin, relances.
+export const isInscriptionComplete = (row) => Boolean(isDossierValidated(row) && row.paye && row.photo_uploaded_at);
+
+// Reste-t-il quelque chose à faire côté famille ? Un dossier en cours de vérification attend le club :
+// on ne relance pas une famille pour ça.
+export const familyHasActionPending = (row) =>
+  !row.paye || !row.photo_uploaded_at || ['manquant', 'refuse'].includes(dossierStatus(row));
 
 // Retire les accents et met en minuscules — SQLite LOWER() étant limité à l'ASCII (voir plus haut),
 // la normalisation se fait ici, côté JS, avant toute comparaison ou écriture.

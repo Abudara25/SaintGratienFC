@@ -296,6 +296,26 @@ html:has(.adm-topnav) { scroll-padding-top: 88px; }
   border: 1.5px dashed #e2d6bd; border-radius: 14px; background: var(--adm-soft);
 }
 .adm-upload label { font-size: .88rem; font-weight: 600; color: var(--ink-900); }
+
+/* Vérification du dossier signé (fiche) */
+.adm-verif { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.adm-verif.is-pending { padding: 14px; border-left: 4px solid var(--gold-500); border-radius: 14px; background: var(--adm-wait-bg); }
+.adm-verif .adm-help { margin: 0; }
+.adm-verif form { margin: 0; }
+.adm-verif-title { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 700; color: var(--adm-wait); }
+.adm-verif-title.is-refused { color: var(--adm-danger); }
+.adm-verif-motifs { margin: 0; padding-left: 20px; list-style: disc; font-size: .9rem; color: var(--ink-900); }
+.adm-refuse summary { list-style: none; cursor: pointer; }
+.adm-refuse summary::-webkit-details-marker { display: none; }
+.adm-refuse[open] summary { background: #fbe9e7; }
+.adm-refuse-form { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; padding: 14px; border: 1px solid #f1c9c4; border-radius: 14px; background: var(--white); }
+.adm-refuse-form fieldset { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; border: 0; }
+.adm-refuse-form legend { margin-bottom: 4px; font-size: .88rem; font-weight: 600; color: var(--ink-900); }
+.adm .adm-refuse-form .adm-check { align-items: flex-start; gap: 10px; min-height: 44px; padding-block: 10px; font-size: .9rem; line-height: 1.4; }
+.adm .adm-refuse-form .adm-check input { margin-top: 1px; }
+.adm-refuse-form .adm-field { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; font-weight: 600; color: var(--ink-900); }
+.adm-refuse-form .adm-field small { font-weight: 400; color: var(--color-text-muted); }
+.adm-refuse-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--adm-line); border-radius: 12px; font: inherit; font-size: 1rem; font-weight: 400; resize: vertical; }
 .adm-upload label small { display: block; font-size: .78rem; font-weight: 400; color: var(--color-text-muted); }
 .adm-upload input[type=file] { max-width: 100%; font-size: .88rem; }
 

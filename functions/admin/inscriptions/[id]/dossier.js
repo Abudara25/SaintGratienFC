@@ -83,11 +83,13 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     return withError({ empty: 'Choisissez un fichier avant d’envoyer.', too_large: 'Le fichier dépasse 10 Mo.', bad_type: 'Format non accepté — PDF, JPG ou PNG uniquement.' }[upload.error]);
   }
 
+  // Déposé par un responsable qui a le document sous les yeux (reçu par e-mail ou en main propre) :
+  // validé d'office, contrairement au dépôt de la famille qui passe « à vérifier ».
   const key = `dossiers/${row.upload_token || `admin-${id}`}`;
   try {
     await env.DOSSIERS.put(key, upload.buffer, { httpMetadata: { contentType: upload.type } });
     await env.DB.prepare(
-      "UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime('now') WHERE id = ?"
+      "UPDATE inscriptions SET dossier_key = ?, dossier_content_type = ?, dossier_uploaded_at = datetime('now'), dossier_status = 'valide', dossier_verified_at = datetime('now') WHERE id = ?"
     )
       .bind(key, upload.type, id)
       .run();

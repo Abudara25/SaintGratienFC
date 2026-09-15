@@ -2,7 +2,7 @@
 // dépôt manuel du dossier, archivage) et, avec ?edit=1, le formulaire de modification. Liée depuis
 // les cartes de /admin/inscriptions et depuis /admin/reinscription. Les actions sont traitées par
 // functions/admin/inscriptions.js (ou [id]/dossier.js pour le dépôt) et reviennent ici via redirectTo.
-import { ensureInscriptionsTable, isInscriptionComplete } from '../../_shared/inscriptions-db.js';
+import { ensureInscriptionsTable, familyHasActionPending, dossierStatus, refusMotifs, DOSSIER_REFUS_MOTIFS } from '../../_shared/inscriptions-db.js';
 import {
   isAuthed,
   loginPage,
@@ -13,6 +13,7 @@ import {
   icon,
   avatar,
   statusTag,
+  dossierTag,
   flash,
   formatDateFr,
   formatBirth,
@@ -60,7 +61,8 @@ function actionForm(fields, { label, iconName, className, confirm }) {
 function fichePage(row, { saison, prix, siteUrl, messages }) {
   const rawName = `${row.enfant_prenom} ${row.enfant_nom}`;
   const name = escapeHtml(rawName);
-  const docOk = Boolean(row.dossier_uploaded_at);
+  const dossier = dossierStatus(row);
+  const docReceived = dossier !== 'manquant';
   const payOk = Boolean(row.paye);
   const photoOk = Boolean(row.photo_uploaded_at);
   const archived = Boolean(row.archived_at);
@@ -112,12 +114,12 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
       )}
       ${editBtn}${pdfBtn}
       ${
-        isInscriptionComplete(row)
-          ? ''
-          : actionForm(
+        familyHasActionPending(row)
+          ? actionForm(
               { action: 'bulk-reminder', ids: row.id, redirectTo: self },
               { label: 'Relancer', iconName: 'send', className: 'adm-btn-ghost', confirm: `Envoyer une relance par e-mail à ${row.email} (dossier, photo ou paiement manquant) ?` }
             )
+          : ''
       }
       <span class="adm-actionbar-spacer"></span>
       ${actionForm(
@@ -164,23 +166,76 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
     </dl>
   </section>`;
 
-  const dossier = `<section class="adm-surface">
+  // Vérification du dossier (functions/admin/inscriptions/[id]/verification.js) : valider, ou refuser avec
+  // des motifs qui partent par e-mail à la famille. Proposée tant qu'un fichier existe ; mise en avant
+  // quand il attend d'être vérifié.
+  const motifs = refusMotifs(row);
+  const validateForm = `<form method="POST" action="${self}/verification">
+        <input type="hidden" name="action" value="valider">
+        <button type="submit" class="adm-btn adm-btn-primary adm-btn-block">${icon('check')}${dossier === 'refuse' ? 'Valider quand même' : 'Valider le dossier'}</button>
+      </form>`;
+  const refuseForm = `<details class="adm-refuse"${dossier === 'a_verifier' && messages.verifError ? ' open' : ''}>
+        <summary class="adm-btn adm-btn-danger adm-btn-block">${icon('alert')}${dossier === 'valide' ? 'Refuser finalement ce dossier' : 'Refuser le dossier'}</summary>
+        <form method="POST" action="${self}/verification" class="adm-refuse-form admin-confirm-form">
+          <input type="hidden" name="action" value="refuser">
+          <fieldset>
+            <legend>Qu'est-ce qui ne va pas ?</legend>
+            ${Object.entries(DOSSIER_REFUS_MOTIFS)
+              .map(([key, label]) => `<label class="adm-check"><input type="checkbox" name="motifs" value="${key}"><span>${escapeHtml(label)}</span></label>`)
+              .join('')}
+          </fieldset>
+          <label class="adm-field" for="refus-commentaire">Précision pour la famille <small>(facultatif)</small>
+            <textarea id="refus-commentaire" name="commentaire" rows="3" maxlength="500" placeholder="Ex. : il manque la signature en page 2."></textarea>
+          </label>
+          <label class="adm-check"><input type="checkbox" name="notifier" checked><span>Prévenir la famille par e-mail</span></label>
+          <button type="submit" class="adm-btn adm-btn-danger-solid adm-btn-block" data-confirm="${escapeHtml(`Refuser le dossier de ${rawName} ? Si la case est cochée, la famille reçoit un e-mail avec les motifs et le lien pour renvoyer le dossier corrigé.`)}">${icon('send')}Refuser le dossier</button>
+        </form>
+      </details>`;
+  const verification = !docReceived
+    ? ''
+    : `<div class="adm-verif${dossier === 'a_verifier' ? ' is-pending' : ''}">
+      ${
+        dossier === 'a_verifier'
+          ? `<p class="adm-verif-title">${icon('eye')}Dossier à vérifier</p>
+      <p class="adm-help">Ouvrez le document et contrôlez : signature du responsable légal, lieu et date (« Fait à …, le … »), document complet et lisible.</p>`
+          : ''
+      }
+      ${
+        dossier === 'refuse'
+          ? `<p class="adm-verif-title is-refused">${icon('alert')}Refusé le ${formatDateFr(row.dossier_refused_at, LONG_DATE)}</p>
+      ${motifs.length ? `<ul class="adm-verif-motifs">${motifs.map((m) => `<li>${escapeHtml(m)}</li>`).join('')}</ul>` : ''}
+      ${row.dossier_refus_commentaire ? `<p class="adm-help">« ${escapeHtml(row.dossier_refus_commentaire)} »</p>` : ''}
+      <p class="adm-help">En attente d'un nouveau dépôt de la famille.</p>`
+          : ''
+      }
+      ${
+        dossier === 'a_verifier' && row.dossier_refused_at
+          ? `<p class="adm-help">Déjà refusé le ${formatDateFr(row.dossier_refused_at, LONG_DATE)}${motifs.length ? ` (${escapeHtml(motifs.join(' ').toLowerCase())})` : ''} : vérifiez que c'est corrigé.</p>`
+          : ''
+      }
+      <a href="${self}/dossier" target="_blank" rel="noopener" class="adm-btn adm-btn-ghost adm-btn-block">${icon('eye')}Voir le dossier reçu</a>
+      ${dossier === 'valide' ? '' : validateForm}
+      ${dossier === 'refuse' ? '' : refuseForm}
+    </div>`;
+
+  const dossierSection = `<section class="adm-surface" id="dossier">
     <h2 class="adm-h2">${icon('file')}Dossier &amp; paiement</h2>
     <dl class="adm-kv">
-      ${kv('Document', statusTag(docOk))}
-      ${docOk ? kv('Reçu le', formatDateFr(row.dossier_uploaded_at, LONG_DATE)) : ''}
+      ${kv('Document', dossierTag(row))}
+      ${docReceived ? kv('Reçu le', formatDateFr(row.dossier_uploaded_at, LONG_DATE)) : ''}
+      ${dossier === 'valide' && row.dossier_verified_at ? kv('Vérifié le', formatDateFr(row.dossier_verified_at, LONG_DATE)) : ''}
       ${kv('Paiement', statusTag(payOk))}
       ${kv('Mode de paiement', escapeHtml(row.mode_paiement || '—'))}
       ${row.helloasso_order_id ? kv('Validé par HelloAsso', `commande n° ${escapeHtml(row.helloasso_order_id)}`) : ''}
       ${row.last_reminder_at ? kv('Dernière relance', `${formatDateFr(row.last_reminder_at, LONG_DATE)}${row.auto_reminders_sent ? ` (${row.auto_reminders_sent} auto.)` : ''}`) : ''}
       ${depotPath ? kv('Page de suivi famille', `<a class="adm-link" href="${escapeHtml(depotPath)}" target="_blank" rel="noopener">Ouvrir</a>`) : ''}
     </dl>
-    ${docOk ? `<a href="${self}/dossier" target="_blank" rel="noopener" class="adm-btn adm-btn-ghost adm-btn-block">${icon('eye')}Voir le dossier reçu</a>` : ''}
+    ${verification}
     <form method="POST" action="${self}/dossier" enctype="multipart/form-data" class="adm-upload">
       <input type="hidden" name="redirectTo" value="${self}">
-      <label for="dossier-file">${docOk ? 'Remplacer par un autre fichier' : 'Dossier signé reçu par e-mail ?'}<small>PDF, JPG ou PNG, 10 Mo maximum.</small></label>
+      <label for="dossier-file">${docReceived ? 'Remplacer par un autre fichier' : 'Dossier signé reçu par e-mail ?'}<small>PDF, JPG ou PNG, 10 Mo maximum. Vérifiez signature et date : le dossier est validé dès l'enregistrement.</small></label>
       <input type="file" id="dossier-file" name="dossier" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required>
-      <button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('upload')}${docOk ? 'Remplacer le dossier' : 'Enregistrer le dossier'}</button>
+      <button type="submit" class="adm-btn adm-btn-sm adm-btn-primary">${icon('upload')}${docReceived ? 'Remplacer le dossier' : 'Enregistrer le dossier'}</button>
     </form>
   </section>`;
 
@@ -206,6 +261,17 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
     messages.savedOk && flash('ok', 'Fiche mise à jour.'),
     messages.dossierOk && flash('ok', 'Dossier enregistré.'),
     messages.dossierError && flash('error', messages.dossierError),
+    messages.verifOk &&
+      flash(
+        messages.verifOk === 'refuse-mail-echec' ? 'error' : 'ok',
+        {
+          valide: 'Dossier validé.',
+          refuse: 'Dossier refusé (famille non prévenue).',
+          'refuse-mail': 'Dossier refusé : la famille a reçu un e-mail avec les motifs et le lien pour renvoyer le dossier.',
+          'refuse-mail-echec': "Dossier refusé, mais l'e-mail à la famille n'a pas pu partir (BREVO_API_KEY manquante ou envoi refusé) : prévenez-la directement.",
+        }[messages.verifOk] || 'Dossier mis à jour.'
+      ),
+    messages.verifError && flash('error', messages.verifError),
     messages.photoOk && flash('ok', 'Photo enregistrée.'),
     messages.photoError && flash('error', messages.photoError),
     messages.bulkOk && flash('ok', messages.bulkOk),
@@ -221,12 +287,12 @@ ${adminShell({
   eyebrow: "Fiche d'inscription",
   title: name,
   subtitle: `${escapeHtml(row.categorie)} · inscription du ${formatDateFr(row.created_at, LONG_DATE)}${archived ? ` · archivée le ${formatDateFr(row.archived_at, LONG_DATE)}` : ''}`,
-  meta: `<div class="adm-hero-tags"><span>Document</span>${statusTag(docOk)}<span>Photo</span>${statusTag(photoOk, { yes: 'Validée', no: 'Non validée' })}<span>Paiement</span>${statusTag(payOk)}</div>`,
+  meta: `<div class="adm-hero-tags"><span>Document</span>${dossierTag(row)}<span>Photo</span>${statusTag(photoOk, { yes: 'Validée', no: 'Non validée' })}<span>Paiement</span>${statusTag(payOk)}</div>`,
 })}
 <main id="adm-main" class="adm-wrap adm-main">
   ${flashes}
   <div class="adm-surface adm-actionbar">${actions}</div>
-  <div class="adm-fiche-grid">${enfant}${parent}${dossier}${photo}</div>
+  <div class="adm-fiche-grid">${enfant}${parent}${dossierSection}${photo}</div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js" integrity="sha512-plOdviVmws4Y3JAvbnpfKb2hVxKM1lCwsi3vmElYRj+tiDLffZ4FVUj5a8vyKJ9pIgl8JCAHEJ4D1iUKBecswg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 ${adminScripts('pdf-inscription', 'admin-nav', 'admin-inscriptions')}
@@ -407,6 +473,8 @@ export async function onRequestGet({ request, env, params }) {
         bulkOk: url.searchParams.get('bulkOk'),
         photoOk: url.searchParams.get('photoOk'),
         photoError: url.searchParams.get('photoError'),
+        verifOk: url.searchParams.get('verifOk'),
+        verifError: url.searchParams.get('verifError'),
       },
     })
   );

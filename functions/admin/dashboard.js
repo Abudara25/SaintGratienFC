@@ -1,7 +1,7 @@
 // Tableau de bord admin — première page de la navigation (voir _shared/admin-auth.js). Vue
 // synthétique (effectifs par catégorie, part des documents et paiements validés, fiches à compléter)
 // plutôt que d'obliger à parcourir /admin/inscriptions carte par carte. Lecture seule, aucune action.
-import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { ensureInscriptionsTable, isInscriptionComplete, dossierStatus } from '../_shared/inscriptions-db.js';
 import { isAuthed, loginPage, escapeHtml, adminHead, adminShell, adminScripts, icon } from '../_shared/admin-auth.js';
 import { getCategoriesConfig } from '../_shared/settings-kv.js';
 
@@ -19,7 +19,7 @@ function kpi({ iconName, label, value, of, link }) {
 const shortcut = (href, iconName, title, description) =>
   `<a href="${href}" class="adm-shortcut">${icon(iconName)}<span><strong>${title}</strong><small>${description}</small></span></a>`;
 
-function page({ total, archivedCount, payeCount, dossierCount, completCount, categorieCounts, saison }) {
+function page({ total, archivedCount, payeCount, dossierCount, dossierAVerifier, completCount, categorieCounts, saison }) {
   const categories = Object.keys(categorieCounts).sort();
 
   return `${adminHead('Tableau de bord')}
@@ -33,7 +33,13 @@ ${adminShell({
 <main id="adm-main" class="adm-wrap adm-main">
   <div class="adm-kpis">
     ${kpi({ iconName: 'users', label: 'Inscriptions actives', value: total, link: { href: '/admin/inscriptions', label: 'Voir la liste' } })}
-    ${kpi({ iconName: 'file', label: 'Documents validés', value: dossierCount, of: total })}
+    ${kpi({
+      iconName: 'file',
+      label: 'Documents validés',
+      value: dossierCount,
+      of: total,
+      link: dossierAVerifier ? { href: '/admin/inscriptions?dossier=a_verifier', label: `${dossierAVerifier} à vérifier` } : null,
+    })}
     ${kpi({ iconName: 'card', label: 'Paiements validés', value: payeCount, of: total })}
     ${kpi({ iconName: 'send', label: 'À compléter', value: total - completCount, link: { href: '/admin/inscriptions?etat=incomplet', label: 'Voir et relancer' } })}
   </div>
@@ -86,7 +92,8 @@ export async function onRequestGet({ request, env }) {
       total: active.length,
       archivedCount: results.length - active.length,
       payeCount: active.filter((r) => r.paye).length,
-      dossierCount: active.filter((r) => r.dossier_uploaded_at).length,
+      dossierCount: active.filter((r) => dossierStatus(r) === 'valide').length,
+      dossierAVerifier: active.filter((r) => dossierStatus(r) === 'a_verifier').length,
       completCount: active.filter(isInscriptionComplete).length,
       categorieCounts,
       saison,

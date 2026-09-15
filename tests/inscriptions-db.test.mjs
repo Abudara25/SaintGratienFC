@@ -8,6 +8,9 @@ import {
   buildDedupKey,
   normalize,
   isInscriptionComplete,
+  dossierStatus,
+  familyHasActionPending,
+  refusMotifs,
 } from '../functions/_shared/inscriptions-db.js';
 import { createD1 } from './helpers/d1.mjs';
 
@@ -24,12 +27,48 @@ test('buildDedupKey : même enfant malgré accents et majuscules', () => {
   assert.notEqual(a, buildDedupKey({ enfantPrenom: 'Léo', enfantNom: 'Durand', email: 'parent@exemple.fr' }));
 });
 
-test('isInscriptionComplete = dossier + paiement + photo', () => {
-  const complete = { dossier_uploaded_at: '2026-09-15 10:00:00', paye: 1, photo_uploaded_at: '2026-09-15 10:05:00' };
+test('isInscriptionComplete = dossier validé + paiement + photo', () => {
+  const complete = { dossier_uploaded_at: '2026-09-15 10:00:00', dossier_status: 'valide', paye: 1, photo_uploaded_at: '2026-09-15 10:05:00' };
   assert.equal(isInscriptionComplete(complete), true);
   assert.equal(isInscriptionComplete({ ...complete, paye: 0 }), false);
   assert.equal(isInscriptionComplete({ ...complete, photo_uploaded_at: null }), false);
   assert.equal(isInscriptionComplete({ ...complete, dossier_uploaded_at: null }), false);
+  assert.equal(isInscriptionComplete({ ...complete, dossier_status: 'a_verifier' }), false);
+  assert.equal(isInscriptionComplete({ ...complete, dossier_status: 'refuse' }), false);
+  assert.equal(isInscriptionComplete({ ...complete, dossier_status: null }), false);
+});
+
+test('dossierStatus et relances : un dossier en vérification ne relance pas la famille', () => {
+  const recu = { dossier_uploaded_at: '2026-09-15 10:00:00', paye: 1, photo_uploaded_at: '2026-09-15 10:05:00' };
+  assert.equal(dossierStatus({}), 'manquant');
+  assert.equal(dossierStatus({ dossier_status: 'valide' }), 'manquant'); // pas de fichier = rien à valider
+  assert.equal(dossierStatus(recu), 'a_verifier');
+  assert.equal(dossierStatus({ ...recu, dossier_status: 'inconnu' }), 'a_verifier');
+  assert.equal(dossierStatus({ ...recu, dossier_status: 'refuse' }), 'refuse');
+
+  assert.equal(familyHasActionPending({ ...recu, dossier_status: 'a_verifier' }), false);
+  assert.equal(familyHasActionPending({ ...recu, dossier_status: 'refuse' }), true);
+  assert.equal(familyHasActionPending({ ...recu, dossier_status: 'valide' }), false);
+  assert.equal(familyHasActionPending({ ...recu, dossier_status: 'a_verifier', paye: 0 }), true);
+  assert.equal(familyHasActionPending({ ...recu, dossier_uploaded_at: null }), true);
+});
+
+test('refusMotifs ignore les clés inconnues', () => {
+  assert.deepEqual(refusMotifs({ dossier_refus_motifs: 'signature,<script>,date' }).length, 2);
+  assert.deepEqual(refusMotifs({}), []);
+});
+
+test('migration : les dossiers déjà reçus passent à vérifier', async () => {
+  resetSchemaCacheForTests();
+  const db = createD1();
+  await db.prepare('CREATE TABLE inscriptions (id INTEGER PRIMARY KEY AUTOINCREMENT, enfant_prenom TEXT, dossier_uploaded_at TEXT)').run();
+  await db.prepare("INSERT INTO inscriptions (enfant_prenom, dossier_uploaded_at) VALUES ('Léa', '2026-09-10 08:00:00'), ('Tom', NULL)").run();
+  await ensureInscriptionsTable(db);
+  const { results } = await db.prepare('SELECT enfant_prenom, dossier_status FROM inscriptions ORDER BY id').all();
+  assert.deepEqual(
+    results.map((r) => [r.enfant_prenom, r.dossier_status]),
+    [['Léa', 'a_verifier'], ['Tom', null]]
+  );
 });
 
 async function insert(db, values) {

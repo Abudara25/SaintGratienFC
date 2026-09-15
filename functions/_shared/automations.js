@@ -5,13 +5,14 @@
 // - runDailyAutomations() : chaque matin via functions/api/cron.js (appelé par le Worker programmé
 //   workers/cron, Cloudflare Pages ne sachant pas planifier de tâche) — relances automatiques à J+3 puis
 //   J+7 et récapitulatif hebdomadaire le lundi.
-import { isInscriptionComplete } from './inscriptions-db.js';
+import { isInscriptionComplete, isDossierValidated, dossierStatus, familyHasActionPending } from './inscriptions-db.js';
 import { getAutomationsConfig, getCategoriesConfig, getCronState, setCronState } from './settings-kv.js';
 import { sendFollowUpEmail, sendClubUploadAlert, sendReminderEmail, sendWeeklySummary } from './confirmation-email.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const parseSqlite = (value) => new Date(`${String(value).replace(' ', 'T')}Z`);
-const STEP_DONE = { dossier: (r) => r.dossier_uploaded_at, photo: (r) => r.photo_uploaded_at, paiement: (r) => r.paye };
+// Le dossier ne compte comme validé qu'une fois vérifié par le club (dossier_status = 'valide').
+const STEP_DONE = { dossier: isDossierValidated, photo: (r) => r.photo_uploaded_at, paiement: (r) => r.paye };
 
 // id : fiche concernée ; before : la fiche lue avant la modification ; step : 'dossier' | 'photo' |
 // 'paiement' ; source : 'famille' | 'admin' | 'helloasso'. Relit la fiche à jour. Ne lève jamais
@@ -60,7 +61,7 @@ export async function runReminders(env, siteUrl, now = new Date()) {
   let failed = 0;
   for (const row of results) {
     if (sent + failed >= MAX_REMINDERS_PER_RUN) break;
-    if ((row.saison && row.saison !== saison) || isInscriptionComplete(row)) continue;
+    if ((row.saison && row.saison !== saison) || !familyHasActionPending(row)) continue;
     const count = Number(row.auto_reminders_sent) || 0;
     if (count >= REMINDER_DAYS.length) continue;
     if ((now - parseSqlite(row.created_at)) / DAY_MS < REMINDER_DAYS[count]) continue;
@@ -87,7 +88,8 @@ export async function buildWeeklySummary(env, now = new Date()) {
     saison,
     total: active.length,
     complet: active.filter(isInscriptionComplete).length,
-    missingDossier: active.filter((r) => !r.dossier_uploaded_at).length,
+    dossierAVerifier: active.filter((r) => dossierStatus(r) === 'a_verifier').length,
+    missingDossier: active.filter((r) => ['manquant', 'refuse'].includes(dossierStatus(r))).length,
     missingPhoto: active.filter((r) => !r.photo_uploaded_at).length,
     missingPaiement: active.filter((r) => !r.paye).length,
     nouvelles: active

@@ -18,6 +18,22 @@
 .suivi-tag { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
 .suivi-tag.is-ok { background: var(--suivi-ok-bg); color: var(--suivi-ok); }
 .suivi-tag.is-todo { background: var(--suivi-wait-bg); color: var(--suivi-wait); }
+.suivi-tag.is-pending { background: var(--cream-200); color: var(--ink-700); }
+.suivi-tag.is-error { background: #fbe9e7; color: #b3261e; }
+
+/* Dossier refusé par le club : ce qu'il manque */
+.suivi-refus { margin: 0 0 14px; padding: 14px 16px; border-left: 4px solid #b3261e; border-radius: 12px; background: #fbe9e7; font-size: .93rem; color: var(--ink-900); }
+.suivi-refus p { margin: 0 0 6px; }
+.suivi-refus p:last-child { margin-bottom: 0; }
+.suivi-refus p strong:first-child { display: flex; align-items: center; gap: 8px; color: #8c1d18; }
+.suivi-refus .suivi-ico { width: 20px; height: 20px; }
+.suivi-refus ul { margin: 0 0 8px; padding-left: 20px; list-style: disc; }
+.suivi-refus li { margin: 2px 0; }
+
+/* À vérifier avant d'envoyer le dossier */
+.suivi-checklist { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.suivi-checklist li { display: flex; gap: 8px; font-size: .9rem; color: var(--ink-700); }
+.suivi-checklist .suivi-ico { width: 18px; height: 18px; margin-top: 2px; color: var(--suivi-ok); }
 
 .suivi-flash { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; font-size: .92rem; background: var(--suivi-ok-bg); color: var(--suivi-ok); }
 .suivi-flash.is-error { background: #fbe9e7; color: #b3261e; }

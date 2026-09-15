@@ -2,7 +2,7 @@
 // Pages ADMIN_PASSWORD, jamais commitée). Chaque carte mène à la fiche complète de l'inscription
 // (functions/admin/inscriptions/[id].js : édition, dépôt du dossier, PDF, archivage). Les actions par
 // fiche et groupées sont traitées ici (onRequestPost), tout comme la connexion.
-import { ensureInscriptionsTable, isInscriptionComplete } from '../_shared/inscriptions-db.js';
+import { ensureInscriptionsTable, isInscriptionComplete, dossierStatus, familyHasActionPending } from '../_shared/inscriptions-db.js';
 import {
   isAuthed,
   loginPage,
@@ -14,15 +14,18 @@ import {
   icon,
   avatar,
   statusTag,
+  dossierTag,
   flash,
   formatDateFr,
 } from '../_shared/admin-auth.js';
+
+const DOSSIER_LABELS = { valide: 'Validé', a_verifier: 'À vérifier', refuse: 'Refusé', manquant: 'Non reçu' };
 import { sendReminderEmail, sendReinscriptionEmail } from '../_shared/confirmation-email.js';
 import { getCategoriesConfig, effectiveInscriptionStatus, todayIso } from '../_shared/settings-kv.js';
 import { afterInscriptionChange } from '../_shared/automations.js';
 
 function toCsv(rows) {
-  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé reçu', 'Photo reçue', 'Parent 2', 'E-mail parent 2', 'Téléphone parent 2'];
+  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé', 'Photo reçue', 'Parent 2', 'E-mail parent 2', 'Téléphone parent 2'];
   // Un champ commençant par =, +, -, @, tab ou retour chariot est préfixé d'une apostrophe :
   // sinon Excel/Sheets peut l'interpréter comme une formule (injection CSV) à l'ouverture de
   // l'export si un parent a saisi ce genre de contenu dans le formulaire public.
@@ -49,7 +52,7 @@ function toCsv(rows) {
       r.autorisation ? 'Oui' : 'Non',
       r.droit_image ? 'Oui' : 'Non',
       r.rgpd ? 'Oui' : 'Non',
-      r.dossier_uploaded_at ? 'Oui' : 'Non',
+      DOSSIER_LABELS[dossierStatus(r)],
       r.photo_uploaded_at ? 'Oui' : 'Non',
       [r.parent2_prenom, r.parent2_nom].filter(Boolean).join(' '),
       r.parent2_email,
@@ -80,8 +83,9 @@ function filterAndSort(rows, { q, etat, categorie, annee, paiement, dossier, pay
     if (categorie && r.categorie !== categorie) return false;
     if (paiement && r.mode_paiement !== paiement) return false;
     if (annee && !String(r.naissance || '').startsWith(annee)) return false;
-    if (dossier === 'recu' && !r.dossier_uploaded_at) return false;
-    if (dossier === 'manquant' && r.dossier_uploaded_at) return false;
+    // 'recu' : ancienne valeur du filtre (avant la vérification des dossiers), gardée pour les liens existants.
+    if (dossier && dossier in DOSSIER_LABELS && dossierStatus(r) !== dossier) return false;
+    if (dossier === 'recu' && dossierStatus(r) !== 'valide') return false;
     if (paye === 'oui' && !r.paye) return false;
     if (paye === 'non' && r.paye) return false;
     if (photo === 'recue' && !r.photo_uploaded_at) return false;
@@ -118,10 +122,11 @@ function parseFilters(searchParams) {
 const safeRedirect = (value, fallback) => (/^\/admin\/inscriptions(\/\d+)?(\?[^\s]*)?$/.test(value || '') ? value : fallback);
 const withParam = (url, param) => `${url}${url.includes('?') ? '&' : '?'}${param}`;
 
-// Action principale d'une carte, selon ce qui manque : relancer la famille si le dossier signé n'est
-// pas arrivé, sinon confirmer le paiement, sinon relancer pour la photo ; rien si l'inscription est
-// complète (tout le reste est sur la fiche).
+// Action principale d'une carte, selon ce qui manque : vérifier un dossier déposé par la famille, relancer
+// la famille si le dossier signé manque ou a été refusé, sinon confirmer le paiement, sinon relancer pour
+// la photo ; rien si l'inscription est complète (tout le reste est sur la fiche).
 function primaryAction(r, returnTo) {
+  const dossier = dossierStatus(r);
   const rawName = `${r.enfant_prenom} ${r.enfant_nom}`;
   const back = `<input type="hidden" name="redirectTo" value="${escapeHtml(returnTo)}">`;
   if (r.archived_at) {
@@ -130,7 +135,10 @@ function primaryAction(r, returnTo) {
       <button type="submit" class="adm-btn adm-btn-primary">${icon('refresh')}Restaurer</button>
     </form>`;
   }
-  if (!r.dossier_uploaded_at || (r.paye && !r.photo_uploaded_at)) {
+  if (dossier === 'a_verifier') {
+    return `<a href="/admin/inscriptions/${r.id}#dossier" class="adm-btn adm-btn-primary">${icon('eye')}Vérifier le dossier</a>`;
+  }
+  if (dossier === 'manquant' || dossier === 'refuse' || (r.paye && !r.photo_uploaded_at)) {
     return `<form method="POST" action="/admin/inscriptions" class="admin-confirm-form">
       <input type="hidden" name="action" value="bulk-reminder"><input type="hidden" name="ids" value="${r.id}">${back}
       <button type="submit" class="adm-btn adm-btn-primary" data-confirm="${escapeHtml(`Envoyer une relance par e-mail à la famille de ${rawName} ?`)}">${icon('send')}Relancer</button>
@@ -161,7 +169,7 @@ function inscriptionCard(r, returnTo) {
       </div>
     </div>
     <div class="adm-lines">
-      <div class="adm-line"><span>Document</span>${statusTag(r.dossier_uploaded_at)}</div>
+      <div class="adm-line"><span>Document</span>${dossierTag(r)}</div>
       <div class="adm-line"><span>Photo</span>${statusTag(r.photo_uploaded_at, { yes: 'Validée', no: 'Non validée' })}</div>
       <div class="adm-line"><span>Paiement${r.mode_paiement ? ` <small>· ${escapeHtml(r.mode_paiement)}</small>` : ''}</span>${statusTag(r.paye)}</div>
     </div>
@@ -231,7 +239,9 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
           <select name="paiement" class="adm-select">${option('paiement', '', 'Tous')}${['HelloAsso', 'Espèces', 'Chèque'].map((m) => option('paiement', m, m)).join('')}</select>
         </label>
         <label class="adm-field">Document
-          <select name="dossier" class="adm-select">${option('dossier', '', 'Tous')}${option('dossier', 'recu', 'Validé')}${option('dossier', 'manquant', 'Non validé')}</select>
+          <select name="dossier" class="adm-select">${option('dossier', '', 'Tous')}${Object.entries(DOSSIER_LABELS)
+            .map(([value, label]) => option('dossier', value, label))
+            .join('')}</select>
         </label>
         <label class="adm-field">Paiement
           <select name="paye" class="adm-select">${option('paye', '', 'Tous')}${option('paye', 'oui', 'Validé')}${option('paye', 'non', 'Non validé')}</select>
@@ -259,9 +269,10 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
   const segLink = (changes, label, active) =>
     `<a href="${escapeHtml(hrefWith(changes))}" class="${active ? 'is-active' : ''}"${active ? ' aria-current="true"' : ''}>${label}</a>`;
   const etatSeg = `<nav class="adm-seg" aria-label="Filtrer par état du dossier">
-      ${segLink({ etat: '' }, 'Tous', !filters.etat)}
-      ${segLink({ etat: 'incomplet' }, `À compléter <em>${counts.incomplet}</em>`, filters.etat === 'incomplet')}
-      ${segLink({ etat: 'complet' }, `Complets <em>${counts.complet}</em>`, filters.etat === 'complet')}
+      ${segLink({ etat: '', dossier: '' }, 'Tous', !filters.etat && filters.dossier !== 'a_verifier')}
+      ${segLink({ etat: '', dossier: 'a_verifier' }, `Dossiers à vérifier <em>${counts.aVerifier}</em>`, !filters.etat && filters.dossier === 'a_verifier')}
+      ${segLink({ etat: 'incomplet', dossier: '' }, `À compléter <em>${counts.incomplet}</em>`, filters.etat === 'incomplet')}
+      ${segLink({ etat: 'complet', dossier: '' }, `Complets <em>${counts.complet}</em>`, filters.etat === 'complet')}
     </nav>`;
   const catSeg =
     categories.length > 1
@@ -401,7 +412,8 @@ export async function onRequestGet({ request, env }) {
   const complet = viewRows.filter(isInscriptionComplete).length;
   const counts = {
     total: viewRows.length,
-    dossier: viewRows.filter((r) => r.dossier_uploaded_at).length,
+    dossier: viewRows.filter((r) => dossierStatus(r) === 'valide').length,
+    aVerifier: viewRows.filter((r) => dossierStatus(r) === 'a_verifier').length,
     photo: viewRows.filter((r) => r.photo_uploaded_at).length,
     paye: viewRows.filter((r) => r.paye).length,
     complet,
@@ -523,7 +535,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
     let skipped = 0;
     let failed = 0;
     for (const row of selected) {
-      if (isInscriptionComplete(row)) {
+      // Complet, ou seul un dossier en attente de vérification par le club : rien à demander à la famille.
+      if (!familyHasActionPending(row)) {
         skipped++;
         continue;
       }
@@ -537,7 +550,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       }
     }
     const parts = [`${sent} relance${sent > 1 ? 's' : ''} envoyée${sent > 1 ? 's' : ''}`];
-    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (déjà complet${skipped > 1 ? 's' : ''})`);
+    if (skipped) parts.push(`${skipped} ignoré${skipped > 1 ? 's' : ''} (rien à faire côté famille : complet ou dossier à vérifier)`);
     if (failed) parts.push(`${failed} échec${failed > 1 ? 's' : ''}`);
     const msg = encodeURIComponent(`${parts.join(', ')}.`);
     return new Response('', { status: 302, headers: { Location: withParam(redirectTo, `bulkOk=${msg}`) } });
