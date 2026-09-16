@@ -280,7 +280,7 @@ export async function onRequestPost({ request, env }) {
 
     // Tirage cryptographique (pas Math.random, prévisible) : ce code protège un changement de mot de passe.
     const code = String(100000 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900000));
-    const sent = await sendPasswordChangeCode(env, code);
+    const sent = await sendPasswordChangeCode(env, code, siteUrl);
     if (!sent) {
       return render(
         request,

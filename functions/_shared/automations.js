@@ -94,7 +94,7 @@ export async function buildWeeklySummary(env, now = new Date()) {
     missingPaiement: active.filter((r) => !r.paye).length,
     nouvelles: active
       .filter((r) => parseSqlite(r.created_at) >= weekAgo)
-      .map((r) => ({ name: `${r.enfant_prenom} ${r.enfant_nom}`, categorie: r.categorie, complete: isInscriptionComplete(r) })),
+      .map((r) => ({ id: r.id, name: `${r.enfant_prenom} ${r.enfant_nom}`, categorie: r.categorie, complete: isInscriptionComplete(r) })),
   };
 }
 

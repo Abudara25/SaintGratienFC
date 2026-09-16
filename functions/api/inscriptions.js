@@ -135,8 +135,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const uploadToken = crypto.randomUUID();
   const dedupKey = buildDedupKey({ enfantPrenom: data.enfantPrenom, enfantNom: data.enfantNom, email: data.email });
 
+  let inscriptionId = null;
   try {
-    await env.DB.prepare(
+    const inserted = await env.DB.prepare(
       `INSERT INTO inscriptions
         (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison, parent2_prenom, parent2_nom, parent2_email, parent2_telephone)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -167,12 +168,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.parent2Telephone || null
       )
       .run();
+    inscriptionId = inserted?.meta?.last_row_id ?? null;
   } catch {
     return json({ error: "Échec de l'enregistrement" }, 500);
   }
 
   // waitUntil : les e-mails partent après la réponse, sans la retarder.
   waitUntil(sendConfirmationEmail(env, data, uploadToken, siteUrl));
-  waitUntil(sendAdminNotification(env, data, siteUrl));
+  waitUntil(sendAdminNotification(env, data, siteUrl, inscriptionId));
   return json({ ok: true, uploadToken });
 }

@@ -111,7 +111,7 @@ function shell({ title, intro, body }) {
 
 <script src="/assets/js/main.js?v=e9e2287f4e"></script>
 <script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
-<script src="/assets/js/inscription.js?v=8176dbbb72"></script>
+<script src="/assets/js/inscription.js?v=e04e568536"></script>
 </body>
 </html>
 `;

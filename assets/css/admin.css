@@ -465,3 +465,8 @@ html:has(.adm-topnav) { scroll-padding-top: 88px; }
   .adm-copy { font-size: 1rem; }
   .adm-check-field { justify-content: flex-start; }
 }
+
+/* ---------- Aperçu du dossier signé (functions/admin/inscriptions/[id]/apercu.js) ---------- */
+.adm-viewer-surface { padding: 16px; }
+.adm-viewer { display: flex; flex-direction: column; gap: 12px; }
+.adm-viewer canvas, .adm-viewer img { display: block; width: 100%; height: auto; border: 1px solid var(--adm-line); border-radius: 8px; background: var(--white); }

@@ -110,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const nextSteps = document.getElementById('inscription-next-steps');
   const depotBtn = document.getElementById('depot-btn');
   const depotFallback = document.getElementById('depot-fallback');
+  const depotEmailHint = document.getElementById('depot-email-hint');
   const mailtoBtn = document.getElementById('mailto-btn');
   const especesChequeBox = document.getElementById('paiement-especes-cheque');
   const especesChequeMode = document.getElementById('paiement-especes-cheque-mode');
@@ -421,9 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
       depotBtn.href = `/depot/${uploadToken}`;
       depotBtn.hidden = false;
       depotFallback.hidden = true;
+      if (depotEmailHint) depotEmailHint.hidden = false;
     } else {
       depotBtn.hidden = true;
       depotFallback.hidden = false;
+      // Sans lien, aucun e-mail n'est parti : ne pas l'annoncer.
+      if (depotEmailHint) depotEmailHint.hidden = true;
       const subject = `Inscription ${data.enfantPrenom} ${data.enfantNom} — Saint-Gratien FC`;
       const body = [
         'Bonjour,',

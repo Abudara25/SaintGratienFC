@@ -215,7 +215,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
           ? `<p class="adm-help">Déjà refusé le ${formatDateFr(row.dossier_refused_at, LONG_DATE)}${motifs.length ? ` (${escapeHtml(motifs.join(' ').toLowerCase())})` : ''} : vérifiez que c'est corrigé.</p>`
           : ''
       }
-      <a href="${self}/dossier" target="_blank" rel="noopener" class="adm-btn adm-btn-ghost adm-btn-block">${icon('eye')}Voir le dossier reçu</a>
+      <a href="${self}/apercu" class="adm-btn adm-btn-ghost adm-btn-block">${icon('eye')}Voir le dossier reçu</a>
       ${dossier === 'valide' ? '' : validateForm}
       ${dossier === 'refuse' ? '' : refuseForm}
     </div>`;

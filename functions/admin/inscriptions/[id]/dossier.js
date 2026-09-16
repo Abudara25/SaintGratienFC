@@ -41,7 +41,7 @@ export async function onRequestGet({ request, env, params }) {
   return new Response(object.body, {
     headers: {
       'Content-Type': row.dossier_content_type || 'application/octet-stream',
-      'Content-Disposition': `inline; filename="dossier-${params.id}.${ext}"`,
+      'Content-Disposition': `${new URL(request.url).searchParams.has('telecharger') ? 'attachment' : 'inline'}; filename="dossier-${params.id}.${ext}"`,
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, no-store',
     },
