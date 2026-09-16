@@ -3,22 +3,25 @@
 // la table s'auto-crée au premier appel plutôt que d'exiger une étape manuelle côté utilisateur.
 // Les migrations ne tournent qu'une fois par instance du Worker (et non à chaque requête, ce qui
 // coûtait une trentaine de requêtes D1 par page) : la promesse est gardée en mémoire du module, et
-// oubliée en cas d'échec pour réessayer à l'appel suivant.
-let schemaReady;
+// par binding de base, et oubliée en cas d'échec pour réessayer à l'appel suivant.
+let schemaReady = new WeakMap();
 export function ensureInscriptionsTable(db) {
-  schemaReady ??= migrateInscriptionsTable(db).catch((error) => {
-    schemaReady = undefined;
-    throw error;
-  });
-  return schemaReady;
+  if (!schemaReady.has(db)) {
+    const pending = migrateInscriptionsTable(db).catch((error) => {
+      schemaReady.delete(db);
+      throw error;
+    });
+    schemaReady.set(db, pending);
+  }
+  return schemaReady.get(db);
 }
 
 // Tests uniquement (tests/) : chaque test part d'une base neuve.
 export function resetSchemaCacheForTests() {
-  schemaReady = undefined;
+  schemaReady = new WeakMap();
 }
 
-async function migrateInscriptionsTable(db) {
+async function migrateInscriptionsTable(db, retry = true) {
   await db
     .prepare(
       `CREATE TABLE IF NOT EXISTS inscriptions (
@@ -45,7 +48,7 @@ async function migrateInscriptionsTable(db) {
 
   // Colonnes ajoutées après la création initiale de la table en production : ALTER TABLE ADD
   // COLUMN plutôt que CREATE TABLE IF NOT EXISTS, pour que les bases déjà existantes suivent.
-  // Erreur "duplicate column name" ignorée volontairement (colonne déjà présente).
+  // Seules les colonnes absentes sont ajoutées ; les erreurs réelles remontent.
   const addedColumns = [
     'mode_paiement TEXT', // 2026-09-04
     // 2026-09-04 : dépôt du dossier signé (voir functions/depot/[token].js) — upload_token est
@@ -119,28 +122,37 @@ async function migrateInscriptionsTable(db) {
     'dossier_refus_motifs TEXT',
     'dossier_refus_commentaire TEXT',
   ];
-  for (const column of addedColumns) {
-    try {
-      await db.prepare(`ALTER TABLE inscriptions ADD COLUMN ${column}`).run();
-      if (column.startsWith('dossier_status ')) {
-        // Une seule fois, à l'ajout de la colonne : les dossiers déjà reçus n'ont jamais été contrôlés,
-        // ils passent "à vérifier" pour que le club repère ceux qui ne sont pas signés.
-        await db.prepare("UPDATE inscriptions SET dossier_status = 'a_verifier' WHERE dossier_uploaded_at IS NOT NULL AND dossier_status IS NULL").run();
-      }
-      if (column.startsWith('saison ')) {
-        // Ne s'exécute qu'une fois : ce bloc try ne réussit que la toute première fois que la
-        // colonne est ajoutée (les appels suivants échouent sur "duplicate column name" et passent
-        // au catch ci-dessous, sans repasser ici). Toutes les fiches déjà présentes à ce moment sont
-        // forcément de la saison "2026-2027" (seule saison ayant jamais existé pour ce club à la
-        // date de cet ajout) — voir le commentaire sur 'saison TEXT' ci-dessus.
-        await db.prepare("UPDATE inscriptions SET saison = '2026-2027' WHERE saison IS NULL").run();
-      }
-    } catch {}
+  const { results: columns } = await db.prepare('PRAGMA table_info(inscriptions)').all();
+  const present = new Set(columns.map((column) => column.name));
+  const changes = addedColumns
+    .filter((column) => !present.has(column.split(' ')[0]))
+    .map((column) => db.prepare(`ALTER TABLE inscriptions ADD COLUMN ${column}`));
+
+  // Remplissages idempotents : réparent aussi une migration ancienne interrompue après ALTER.
+  // Une saison inconnue correspond aux fiches antérieures à l'introduction des saisons.
+  changes.push(
+    db.prepare("UPDATE inscriptions SET dossier_status = 'a_verifier' WHERE dossier_uploaded_at IS NOT NULL AND dossier_status IS NULL"),
+    db.prepare("UPDATE inscriptions SET saison = '2026-2027' WHERE saison IS NULL"),
+    db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)'),
+    db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_reinscription_token ON inscriptions(reinscription_token)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)')
+  );
+  try {
+    // D1 batch est transactionnel : aucun schéma partiellement migré en cas de panne.
+    await db.batch(changes);
+  } catch (error) {
+    // Un autre Worker a pu ajouter les colonnes depuis le PRAGMA. Relire le schéma ;
+    // toutes les autres erreurs doivent faire échouer l'appel et permettre une reprise.
+    if (retry && /duplicate column name/i.test(String(error?.message))) return migrateInscriptionsTable(db, false);
+    throw error;
   }
 
-  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_upload_token ON inscriptions(upload_token)').run();
-  await db.prepare('CREATE UNIQUE INDEX IF NOT EXISTS idx_inscriptions_reinscription_token ON inscriptions(reinscription_token)').run();
-  await db.prepare('CREATE INDEX IF NOT EXISTS idx_inscriptions_dedup_key ON inscriptions(dedup_key)').run();
+  const { results: legacy } = await db.prepare('SELECT * FROM inscriptions WHERE dedup_key IS NULL').all();
+  for (const row of legacy) {
+    await db.prepare('UPDATE inscriptions SET dedup_key = ? WHERE id = ? AND dedup_key IS NULL')
+      .bind(buildDedupKey({ enfantPrenom: row.enfant_prenom, enfantNom: row.enfant_nom, email: row.email }), row.id)
+      .run();
+  }
 }
 
 // Motifs proposés au responsable qui refuse un dossier (fiche admin) et repris tels quels dans l'e-mail

@@ -4,16 +4,43 @@ import { DatabaseSync } from 'node:sqlite';
 
 export function createD1() {
   const sqlite = new DatabaseSync(':memory:');
-  const statement = (sql, params = []) => ({
-    bind: (...args) => statement(sql, args),
-    first: async () => sqlite.prepare(sql).get(...params) ?? null,
-    all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
-    run: async () => {
-      const info = sqlite.prepare(sql).run(...params);
-      return { meta: { changes: info.changes, last_row_id: Number(info.lastInsertRowid) } };
+  const queries = new WeakMap();
+  const execute = (sql, params) => {
+    const prepared = sqlite.prepare(sql);
+    const returnsRows = prepared.columns().length > 0;
+    const results = returnsRows ? prepared.all(...params) : [];
+    const info = returnsRows
+      ? sqlite.prepare('SELECT changes() AS changes, last_insert_rowid() AS lastInsertRowid').get()
+      : prepared.run(...params);
+    return { results, meta: { changes: Number(info.changes), last_row_id: Number(info.lastInsertRowid) } };
+  };
+  const statement = (sql, params = []) => {
+    const result = {
+      bind: (...args) => statement(sql, args),
+      first: async () => sqlite.prepare(sql).get(...params) ?? null,
+      all: async () => ({ results: sqlite.prepare(sql).all(...params) }),
+      run: async () => execute(sql, params),
+    };
+    queries.set(result, { sql, params });
+    return result;
+  };
+  return {
+    prepare: (sql) => statement(sql),
+    batch: async (statements) => {
+      sqlite.exec('BEGIN');
+      try {
+        const results = statements.map((statement) => {
+          const { sql, params } = queries.get(statement);
+          return execute(sql, params);
+        });
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
     },
-  });
-  return { prepare: (sql) => statement(sql) };
+  };
 }
 
 export function createKV(initial = {}) {

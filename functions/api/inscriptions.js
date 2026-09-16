@@ -12,6 +12,8 @@ import { clientKey, hitRateLimit, verifyTurnstile } from '../_shared/security.js
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 const TEXT_FIELDS = [...REQUIRED_FIELDS, 'adresse', 'codePostal', 'ville', 'parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'];
 const MAX_FIELD_LENGTH = 200;
+const SHIRT_SIZES = new Set(['4 ans', '6 ans', '8 ans', '10 ans', '12 ans']);
+const PAYMENT_METHODS = new Set(['HelloAsso', 'Espèces', 'Chèque']);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Largement au-dessus d'un usage normal (une famille qui inscrit plusieurs enfants).
@@ -76,7 +78,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   } catch {
     return json({ error: 'JSON invalide' }, 400);
   }
-  if (!body || typeof body !== 'object') return json({ error: 'JSON invalide' }, 400);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'JSON invalide' }, 400);
 
   if (await overLimit(env, request, 'inscription', SUBMIT_LIMIT)) {
     return json({ error: 'Trop de demandes envoyées depuis cette connexion. Réessayez dans une heure, ou écrivez-nous à contact@saintgratienfc.fr.' }, 429);
@@ -107,7 +109,13 @@ export async function onRequestPost({ request, env, waitUntil }) {
     if (parent2[2] && !EMAIL_RE.test(parent2[2])) return json({ error: 'E-mail du second responsable légal invalide' }, 400);
   }
   // Format contrôlé : les années alimentent les filtres de /admin/inscriptions.
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance)) return json({ error: 'Date de naissance invalide' }, 400);
+  const birthDate = new Date(data.naissance + 'T00:00:00Z');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.naissance) || !Number.isFinite(birthDate.getTime()) ||
+      birthDate.toISOString().slice(0, 10) !== data.naissance || birthDate.getTime() > Date.now()) {
+    return json({ error: 'Date de naissance invalide' }, 400);
+  }
+  if (!SHIRT_SIZES.has(data.tailleMaillot)) return json({ error: 'Taille de maillot invalide' }, 400);
+  if (!PAYMENT_METHODS.has(data.modePaiement)) return json({ error: 'Mode de paiement invalide' }, 400);
 
   // Saison et catégories lues côté serveur, jamais celles envoyées par le navigateur.
   const { saison, categories } = await getCategoriesConfig(env);
@@ -140,7 +148,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
     const inserted = await env.DB.prepare(
       `INSERT INTO inscriptions
         (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison, parent2_prenom, parent2_nom, parent2_email, parent2_telephone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM inscriptions
+         WHERE dedup_key = ? AND naissance = ? AND (saison = ? OR saison IS NULL)
+       )`
     )
       .bind(
         data.enfantPrenom,
@@ -165,10 +177,21 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.parent2Prenom || null,
         data.parent2Nom || null,
         data.parent2Email || null,
-        data.parent2Telephone || null
+        data.parent2Telephone || null,
+        dedupKey,
+        data.naissance,
+        saison
       )
       .run();
-    inscriptionId = inserted?.meta?.last_row_id ?? null;
+    // La pré-vérification améliore la réponse, mais cette écriture conditionnelle garantit
+    // l'anti-doublon même si deux requêtes ont lu simultanément une absence de fiche.
+    if (inserted.meta.changes === 0) {
+      const existing = await findExistingInscription(env.DB, data, saison);
+      if (!existing) throw new Error('Inscription concurrente introuvable');
+      waitUntil(resendTrackingLink(env, existing.upload_token, siteUrl));
+      return json({ duplicate: true, linkResent: true }, 409);
+    }
+    inscriptionId = inserted.meta.last_row_id;
   } catch {
     return json({ error: "Échec de l'enregistrement" }, 500);
   }

@@ -70,7 +70,7 @@ export async function processHelloAssoOrder(env, data, siteUrl, waitUntil) {
   const verified = Boolean(env.HELLOASSO_CLIENT_ID && env.HELLOASSO_CLIENT_SECRET);
   const order = verified ? await fetchVerifiedOrder(env, orderId) : data;
   const record = (status, ids, detail) =>
-    env.DB.prepare('INSERT INTO helloasso_orders (order_id, status, inscription_ids, payer_email, detail) VALUES (?, ?, ?, ?, ?)')
+    env.DB.prepare('INSERT INTO helloasso_orders (order_id, status, inscription_ids, payer_email, detail) VALUES (?, ?, ?, ?, ?) ON CONFLICT(order_id) DO NOTHING')
       .bind(orderId, status, ids.join(','), order.payer?.email || null, detail)
       .run();
 
@@ -99,15 +99,44 @@ export async function processHelloAssoOrder(env, data, siteUrl, waitUntil) {
     if (pick) matched.push(pick);
   }
 
-  for (const row of matched) {
-    await env.DB.prepare('UPDATE inscriptions SET paye = 1, helloasso_order_id = ? WHERE id = ?').bind(orderId, row.id).run();
+  // Réserver la commande et appliquer ses paiements dans une seule transaction.
+  // La clé primaire protège aussi contre deux notifications simultanées.
+  const statements = [
+    env.DB.prepare('INSERT INTO helloasso_orders (order_id, status, payer_email, detail) VALUES (?, ?, ?, ?)')
+      .bind(orderId, 'processing', payerEmail || null, verified ? "vérifiée via l'API HelloAsso" : 'non vérifiée (identifiants API absents)'),
+    ...matched.map((row) => env.DB.prepare(
+      'UPDATE inscriptions SET paye = 1, helloasso_order_id = ? WHERE id = ? AND paye = 0 AND archived_at IS NULL'
+    ).bind(orderId, row.id)),
+    // Une autre commande ou un responsable peut avoir payé/archivé une fiche depuis sa lecture.
+    // Le compte rendu reflète uniquement les fiches effectivement rattachées à cette commande.
+    env.DB.prepare(`UPDATE helloasso_orders SET
+      inscription_ids = (SELECT COALESCE(group_concat(id), '') FROM inscriptions WHERE helloasso_order_id = ?1),
+      status = CASE
+        WHEN (SELECT COUNT(*) FROM inscriptions WHERE helloasso_order_id = ?1) = 0 THEN 'unmatched'
+        WHEN (SELECT COUNT(*) FROM inscriptions WHERE helloasso_order_id = ?1) < ?2 THEN 'partial'
+        ELSE 'matched' END
+      WHERE order_id = ?1`).bind(orderId, people.length),
+    env.DB.prepare('SELECT status, inscription_ids FROM helloasso_orders WHERE order_id = ?').bind(orderId),
+  ];
+  let committed;
+  try {
+    committed = await env.DB.batch(statements);
+  } catch (error) {
+    // Seul un conflit sur la commande signifie "déjà traité" ; une panne reste retentable.
+    if (/UNIQUE constraint failed: helloasso_orders.order_id/i.test(String(error?.message)) &&
+        await env.DB.prepare('SELECT order_id FROM helloasso_orders WHERE order_id = ?').bind(orderId).first()) {
+      return { status: 'duplicate' };
+    }
+    throw error;
+  }
+  const { status, inscription_ids: ids } = committed.at(-1).results[0];
+  const paidIds = ids ? ids.split(',').map(Number) : [];
+  for (const [index, row] of matched.entries()) {
+    if (!committed[index + 1].meta.changes) continue;
     const task = afterInscriptionChange(env, { id: row.id, before: row, step: 'paiement', source: 'helloasso', siteUrl });
     if (waitUntil) waitUntil(task);
     else await task;
   }
-
-  const status = !matched.length ? 'unmatched' : matched.length < people.length ? 'partial' : 'matched';
-  await record(status, matched.map((r) => r.id), verified ? "vérifiée via l'API HelloAsso" : 'non vérifiée (identifiants API absents)');
 
   if (status !== 'matched') {
     const alert = sendHelloAssoAlert(env, siteUrl, {
@@ -121,5 +150,5 @@ export async function processHelloAssoOrder(env, data, siteUrl, waitUntil) {
     else await alert;
   }
 
-  return { status, matched: matched.map((r) => r.id) };
+  return { status, matched: paidIds };
 }
