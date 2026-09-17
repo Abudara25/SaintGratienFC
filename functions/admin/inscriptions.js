@@ -466,7 +466,9 @@ export async function onRequestGet({ request, env }) {
 // active vers la corbeille (réversible), restore = l'inverse.
 const ROW_ACTIONS = {
   delete: (db, id) => db.prepare('DELETE FROM inscriptions WHERE id = ?').bind(id).run(),
-  'toggle-paye': (db, id) => db.prepare('UPDATE inscriptions SET paye = 1 - paye WHERE id = ?').bind(id).run(),
+  // Repasser en non payé remet complete_notified_at à zéro : « Dossier complet » repartira au vrai paiement.
+  'toggle-paye': (db, id) =>
+    db.prepare('UPDATE inscriptions SET paye = 1 - paye, complete_notified_at = CASE WHEN paye = 1 THEN NULL ELSE complete_notified_at END WHERE id = ?').bind(id).run(),
   archive: (db, id) => db.prepare("UPDATE inscriptions SET archived_at = datetime('now') WHERE id = ?").bind(id).run(),
   restore: (db, id) => db.prepare('UPDATE inscriptions SET archived_at = NULL WHERE id = ?').bind(id).run(),
 };

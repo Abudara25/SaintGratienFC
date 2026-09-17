@@ -21,6 +21,7 @@ import {
   formatBirth,
 } from '../../_shared/admin-auth.js';
 import { getCategoriesConfig } from '../../_shared/settings-kv.js';
+import { afterInscriptionChange } from '../../_shared/automations.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
 const LONG_DATE = { day: 'numeric', month: 'long', year: 'numeric' };
@@ -35,6 +36,7 @@ const toRow = (data) => ({
   categorie: data.categorie,
   taille_maillot: data.tailleMaillot,
   mode_paiement: data.modePaiement,
+  paye: data.paye === '1' ? 1 : 0,
   parent_prenom: data.parentPrenom,
   parent_nom: data.parentNom,
   email: data.email,
@@ -366,6 +368,15 @@ ${adminShell({
           </select>
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label for="paye">Paiement reçu</label>
+          <select id="paye" name="paye">
+            <option value="0" ${row.paye ? '' : 'selected'}>Non payé</option>
+            <option value="1" ${row.paye ? 'selected' : ''}>Payé</option>
+          </select>
+        </div>
+      </div>
     </section>
 
     <section class="adm-form-section">
@@ -482,7 +493,7 @@ export async function onRequestGet({ request, env, params }) {
   );
 }
 
-export async function onRequestPost({ request, env, params }) {
+export async function onRequestPost({ request, env, params, waitUntil }) {
   if (!(await isAuthed(request, env))) {
     return html(loginPage(), 401);
   }
@@ -496,6 +507,9 @@ export async function onRequestPost({ request, env, params }) {
 
   const form = await request.formData();
   const data = Object.fromEntries(form.entries());
+  // Champ absent (ancien formulaire resté ouvert) : on garde le statut enregistré.
+  if (data.paye !== '0' && data.paye !== '1') data.paye = existing.paye ? '1' : '0';
+  const paye = data.paye === '1' ? 1 : 0;
   const { categories } = await getCategoriesConfig(env);
 
   for (const field of REQUIRED_FIELDS) {
@@ -515,7 +529,8 @@ export async function onRequestPost({ request, env, params }) {
       enfant_prenom = ?, enfant_nom = ?, naissance = ?, categorie = ?, taille_maillot = ?, mode_paiement = ?,
       parent_prenom = ?, parent_nom = ?, email = ?, telephone = ?, adresse = ?, code_postal = ?, ville = ?,
       parent2_prenom = ?, parent2_nom = ?, parent2_email = ?, parent2_telephone = ?,
-      autorisation = ?, droit_image = ?, rgpd = ?
+      autorisation = ?, droit_image = ?, rgpd = ?, paye = ?,
+      complete_notified_at = CASE WHEN ? = 0 THEN NULL ELSE complete_notified_at END
      WHERE id = ?`
   )
     .bind(
@@ -539,9 +554,18 @@ export async function onRequestPost({ request, env, params }) {
       data.autorisation ? 1 : 0,
       data.droitImage ? 1 : 0,
       data.rgpd ? 1 : 0,
+      paye,
+      paye,
       id
     )
     .run();
+
+  // Même suite que le bouton « Marquer payé » : e-mail de suivi / « Dossier complet » à la famille.
+  // Repasser en non payé (erreur de saisie) remet complete_notified_at à zéro ci-dessus, pour que
+  // « Dossier complet » reparte quand le paiement sera réellement reçu.
+  if (paye && !existing.paye) {
+    waitUntil(afterInscriptionChange(env, { id, before: existing, step: 'paiement', source: 'admin', siteUrl: new URL(request.url).origin }));
+  }
 
   return new Response('', { status: 302, headers: { Location: `/admin/inscriptions/${id}?savedOk=1` } });
 }
