@@ -27,7 +27,7 @@ import { getCategoriesConfig, effectiveInscriptionStatus, todayIso } from '../_s
 import { afterInscriptionChange } from '../_shared/automations.js';
 
 function toCsv(rows) {
-  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé', 'Photo reçue', 'Parent 2', 'E-mail parent 2', 'Téléphone parent 2'];
+  const headers = ['Date', 'Enfant', 'Naissance', 'Catégorie', 'Taille maillot', 'Mode paiement', 'Paiement reçu', "Code Pass'Sport", 'Parent', 'E-mail', 'Téléphone', 'Adresse', 'Code postal', 'Ville', 'Autorisation', 'Droit image', 'RGPD', 'Dossier signé', 'Photo reçue', 'Parent 2', 'E-mail parent 2', 'Téléphone parent 2'];
   // Un champ commençant par =, +, -, @, tab ou retour chariot est préfixé d'une apostrophe :
   // sinon Excel/Sheets peut l'interpréter comme une formule (injection CSV) à l'ouverture de
   // l'export si un parent a saisi ce genre de contenu dans le formulaire public.
@@ -45,6 +45,7 @@ function toCsv(rows) {
       r.taille_maillot,
       r.mode_paiement,
       r.paye ? 'Oui' : 'Non',
+      r.pass_sport_code,
       `${r.parent_prenom} ${r.parent_nom}`,
       r.email,
       r.telephone,
@@ -238,7 +239,7 @@ function listPage(rows, { filters, years, categories, total, counts, returnTo, m
           <select name="annee" class="adm-select">${option('annee', '', 'Toutes')}${years.map((y) => option('annee', y, y)).join('')}</select>
         </label>
         <label class="adm-field">Mode de paiement
-          <select name="paiement" class="adm-select">${option('paiement', '', 'Tous')}${['HelloAsso', 'Espèces', 'Chèque'].map((m) => option('paiement', m, m)).join('')}</select>
+          <select name="paiement" class="adm-select">${option('paiement', '', 'Tous')}${['HelloAsso', 'Carte bancaire', 'Espèces', 'Chèque'].map((m) => option('paiement', m, m)).join('')}</select>
         </label>
         <label class="adm-field">Document
           <select name="dossier" class="adm-select">${option('dossier', '', 'Tous')}${Object.entries(DOSSIER_LABELS)

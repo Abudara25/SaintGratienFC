@@ -62,7 +62,7 @@ const headerBackground = (siteUrl) => `bgcolor="${MAROON_900}" background="${sit
 const headerBackgroundStyle = (siteUrl) =>
   `background-color:${MAROON_900};background-image:url('${siteUrl}/assets/images/email/stripes.png');background-repeat:repeat;`;
 
-function buildEmail(data, uploadToken, siteUrl, saison) {
+function buildEmail(data, uploadToken, siteUrl, saison, prix = null) {
   const depotUrl = `${siteUrl}/depot/${uploadToken}`;
   const nomEnfant = `${data.enfantPrenom} ${data.enfantNom}`;
   const categorie = formatCategorie(data.categorie);
@@ -138,7 +138,7 @@ Stade Robert Lemoine, 75 rue d'Orgemont, Saint-Gratien`;
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:8px;">
                 ${step(1, `Déposer le <strong>dossier signé</strong> (bouton ci-dessous).`)}
                 ${step(2, `Ajouter une <strong>photo de votre enfant</strong>, de face et sur fond blanc (un mur blanc suffit), depuis le même lien.`)}
-                ${step(3, `Régler l'adhésion — mode choisi : <strong>${escapeHtml(data.modePaiement)}</strong>.`)}
+                ${step(3, `Régler l'adhésion — mode choisi : <strong>${escapeHtml(data.modePaiement)}</strong>.${data.passSportCode ? ` Avec votre Pass'Sport (code ${escapeHtml(data.passSportCode)}), l'adhésion passe à ${prix ? prix - 50 : 130} €, à régler au club (carte bancaire, espèces ou chèque) en présentant votre code : la réduction ne s'applique pas au paiement en ligne. Nous vérifions chaque code — s'il n'est pas valable, les 50 € restants vous seront demandés avant l'enregistrement de la licence.` : ''}`)}
                 ${step(4, `La licence de votre enfant est enregistrée par le club auprès de la Fédération Française de Football (FFF) via la plateforme Footclubs, une fois le dossier complet — généralement sous quelques jours.`)}
               </table>
               <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:12px auto 28px auto;">
@@ -180,8 +180,8 @@ export async function sendConfirmationEmail(env, data, uploadToken, siteUrl) {
 
   // Lu côté serveur (pas data.saison envoyé par le client) : reste la source de vérité même si le
   // navigateur de la famille avait chargé /api/categories avant un changement de saison entre-temps.
-  const { saison } = await getCategoriesConfig(env);
-  const { subject, html, text } = buildEmail(data, uploadToken, siteUrl, saison);
+  const { saison, prix } = await getCategoriesConfig(env);
+  const { subject, html, text } = buildEmail(data, uploadToken, siteUrl, saison, prix);
 
   const body = {
     sender: { email: 'contact@saintgratienfc.fr', name: 'Saint-Gratien FC' },
@@ -233,6 +233,7 @@ export async function sendAdminNotification(env, data, siteUrl, inscriptionId = 
                 second && data.parent2Email && ['E-mail (2e)', mailto(data.parent2Email)],
                 second && data.parent2Telephone && ['Téléphone (2e)', escapeHtml(data.parent2Telephone)],
                 ['Paiement', escapeHtml(data.modePaiement || '—')],
+                data.passSportCode && ["Pass'Sport", `${escapeHtml(data.passSportCode)} — 50 € à déduire`],
               ])}
               ${clubCallout('Il reste à la famille : dossier signé, photo et paiement. Vous serez prévenu à chaque dépôt.')}`,
     cta,
@@ -248,7 +249,8 @@ E-mail : ${data.email}
 Téléphone : ${data.telephone || '—'}${
       second ? `\n2e responsable légal : ${data.parent2Prenom || ''} ${data.parent2Nom || ''} — ${data.parent2Email || 'pas d’e-mail'} — ${data.parent2Telephone || 'pas de téléphone'}` : ''
     }
-Mode de paiement : ${data.modePaiement}`,
+Mode de paiement : ${data.modePaiement}${data.passSportCode ? `
+Pass'Sport : ${data.passSportCode} (50 € à déduire)` : ''}`,
     cta
   );
 
@@ -308,9 +310,17 @@ function buildReminderEmail(row, siteUrl, { helloAssoUrl = '', prix = null } = {
       ok: Boolean(row.paye),
       okLabel: 'Payé',
       title: "Paiement de l'adhésion",
-      text: payOnline
-        ? `Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire)${prixText ? ` : ${prixText}` : ''}.`
-        : `${mode ? `Vous avez choisi de régler par ${mode.toLowerCase()}${prix ? ` (${prix} €)` : ''} : ` : ''}à remettre à un responsable du club, par exemple lors d'un entraînement, le jeudi de 17h à 18h au Stade Robert Lemoine.`,
+      text: `${
+        payOnline
+          ? `Vous avez choisi de régler en ligne avec HelloAsso (carte bancaire)${prixText ? ` : ${prixText}` : ''}.`
+          : `${mode ? `Vous avez choisi de régler par ${mode.toLowerCase()}${prix ? ` (${prix} €)` : ''} : ` : ''}${
+              mode === 'Carte bancaire' ? 'sur place' : 'à remettre'
+            }, auprès d'un responsable du club, par exemple lors d'un entraînement, le jeudi de 17h à 18h au Stade Robert Lemoine.`
+      }${
+        row.pass_sport_code
+          ? ` Pass'Sport (code ${escapeHtml(row.pass_sport_code)}) : 50 € de moins, à régler au club en présentant votre code (la réduction ne s'applique pas au paiement en ligne). Nous vérifions chaque code — s'il n'est pas valable, les 50 € restants vous seront demandés avant l'enregistrement de la licence.`
+          : ''
+      }`,
       cta: payOnline && { label: 'Payer sur HelloAsso', url: helloAssoUrl },
       alt: suiviUrl && {
         intro: mode === 'HelloAsso' ? 'Vous préférez régler en espèces ou par chèque ?' : 'Vous préférez payer en ligne par carte (en 3 fois sans frais possible) ?',

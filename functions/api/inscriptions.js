@@ -10,10 +10,10 @@ import { getCategoriesConfig } from '../_shared/settings-kv.js';
 import { clientKey, hitRateLimit, verifyTurnstile } from '../_shared/security.js';
 
 const REQUIRED_FIELDS = ['enfantPrenom', 'enfantNom', 'naissance', 'categorie', 'tailleMaillot', 'modePaiement', 'parentPrenom', 'parentNom', 'email', 'telephone'];
-const TEXT_FIELDS = [...REQUIRED_FIELDS, 'adresse', 'codePostal', 'ville', 'parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone'];
+const TEXT_FIELDS = [...REQUIRED_FIELDS, 'adresse', 'codePostal', 'ville', 'parent2Prenom', 'parent2Nom', 'parent2Email', 'parent2Telephone', 'passSportCode'];
 const MAX_FIELD_LENGTH = 200;
 const SHIRT_SIZES = new Set(['4 ans', '6 ans', '8 ans', '10 ans', '12 ans']);
-const PAYMENT_METHODS = new Set(['HelloAsso', 'Espèces', 'Chèque']);
+const PAYMENT_METHODS = new Set(['HelloAsso', 'Carte bancaire', 'Espèces', 'Chèque']);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Largement au-dessus d'un usage normal (une famille qui inscrit plusieurs enfants).
@@ -147,8 +147,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
   try {
     const inserted = await env.DB.prepare(
       `INSERT INTO inscriptions
-        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison, parent2_prenom, parent2_nom, parent2_email, parent2_telephone)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        (enfant_prenom, enfant_nom, naissance, categorie, taille_maillot, mode_paiement, parent_prenom, parent_nom, email, telephone, adresse, code_postal, ville, autorisation, droit_image, rgpd, upload_token, dedup_key, saison, parent2_prenom, parent2_nom, parent2_email, parent2_telephone, pass_sport_code)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
        WHERE NOT EXISTS (
          SELECT 1 FROM inscriptions
          WHERE dedup_key = ? AND naissance = ? AND (saison = ? OR saison IS NULL)
@@ -178,6 +178,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
         data.parent2Nom || null,
         data.parent2Email || null,
         data.parent2Telephone || null,
+        data.passSportCode || null,
         dedupKey,
         data.naissance,
         saison

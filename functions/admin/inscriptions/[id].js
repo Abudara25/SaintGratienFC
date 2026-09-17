@@ -36,6 +36,7 @@ const toRow = (data) => ({
   categorie: data.categorie,
   taille_maillot: data.tailleMaillot,
   mode_paiement: data.modePaiement,
+  pass_sport_code: data.passSportCode,
   paye: data.paye === '1' ? 1 : 0,
   parent_prenom: data.parentPrenom,
   parent_nom: data.parentNom,
@@ -84,6 +85,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
     prix,
     tailleMaillot: row.taille_maillot,
     modePaiement: row.mode_paiement,
+    passSportCode: row.pass_sport_code,
     parentPrenom: row.parent_prenom,
     parentNom: row.parent_nom,
     email: row.email,
@@ -230,6 +232,7 @@ function fichePage(row, { saison, prix, siteUrl, messages }) {
       ${dossier === 'valide' && row.dossier_verified_at ? kv('Vérifié le', formatDateFr(row.dossier_verified_at, LONG_DATE)) : ''}
       ${kv('Paiement', statusTag(payOk, PAIEMENT_TAG))}
       ${kv('Mode de paiement', escapeHtml(row.mode_paiement || '—'))}
+      ${kv("Code Pass'Sport", row.pass_sport_code ? `${escapeHtml(row.pass_sport_code)} <small>· 50 € à déduire</small>` : '—')}
       ${row.helloasso_order_id ? kv('Validé par HelloAsso', `commande n° ${escapeHtml(row.helloasso_order_id)}`) : ''}
       ${row.last_reminder_at ? kv('Dernière relance', `${formatDateFr(row.last_reminder_at, LONG_DATE)}${row.auto_reminders_sent ? ` (${row.auto_reminders_sent} auto.)` : ''}`) : ''}
       ${depotPath ? kv('Page de suivi famille', `<a class="adm-link" href="${escapeHtml(depotPath)}" target="_blank" rel="noopener">Ouvrir</a>`) : ''}
@@ -364,11 +367,15 @@ ${adminShell({
         <div class="form-field">
           <label for="mode-paiement">Mode de paiement</label>
           <select id="mode-paiement" name="modePaiement" required>
-            ${['HelloAsso', 'Espèces', 'Chèque'].map((m) => `<option value="${m}" ${selected(row.mode_paiement, m)}>${m}</option>`).join('')}
+            ${['HelloAsso', 'Carte bancaire', 'Espèces', 'Chèque'].map((m) => `<option value="${m}" ${selected(row.mode_paiement, m)}>${m}</option>`).join('')}
           </select>
         </div>
       </div>
       <div class="form-row">
+        <div class="form-field">
+          <label for="pass-sport-code">Code Pass'Sport</label>
+          <input type="text" id="pass-sport-code" name="passSportCode" value="${escapeHtml(row.pass_sport_code || '')}" maxlength="40">
+        </div>
         <div class="form-field">
           <label for="paye">Paiement reçu</label>
           <select id="paye" name="paye">
@@ -528,7 +535,7 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
     `UPDATE inscriptions SET
       enfant_prenom = ?, enfant_nom = ?, naissance = ?, categorie = ?, taille_maillot = ?, mode_paiement = ?,
       parent_prenom = ?, parent_nom = ?, email = ?, telephone = ?, adresse = ?, code_postal = ?, ville = ?,
-      parent2_prenom = ?, parent2_nom = ?, parent2_email = ?, parent2_telephone = ?,
+      parent2_prenom = ?, parent2_nom = ?, parent2_email = ?, parent2_telephone = ?, pass_sport_code = ?,
       autorisation = ?, droit_image = ?, rgpd = ?, paye = ?,
       complete_notified_at = CASE WHEN ? = 0 THEN NULL ELSE complete_notified_at END
      WHERE id = ?`
@@ -551,6 +558,7 @@ export async function onRequestPost({ request, env, params, waitUntil }) {
       data.parent2Nom?.trim() || null,
       data.parent2Email?.trim() || null,
       data.parent2Telephone?.trim() || null,
+      data.passSportCode?.trim() || null,
       data.autorisation ? 1 : 0,
       data.droitImage ? 1 : 0,
       data.rgpd ? 1 : 0,

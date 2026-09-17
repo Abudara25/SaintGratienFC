@@ -121,6 +121,11 @@ async function migrateInscriptionsTable(db, retry = true) {
     'dossier_refused_at TEXT',
     'dossier_refus_motifs TEXT',
     'dossier_refus_commentaire TEXT',
+    // 2026-09-17 : code Pass'Sport (aide de l'État de 50 €, https://www.sports.gouv.fr), facultatif,
+    // saisi par la famille à l'inscription — le club le reporte sur Le Compte Asso pour se faire
+    // rembourser les 50 € déduits de l'adhésion. Aucune vérification automatique n'est possible :
+    // c'est une déclaration, et le paiement (colonne paye) reste validé à la main par un responsable.
+    "pass_sport_code TEXT",
   ];
   const { results: columns } = await db.prepare('PRAGMA table_info(inscriptions)').all();
   const present = new Set(columns.map((column) => column.name));

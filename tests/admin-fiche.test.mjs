@@ -67,3 +67,15 @@ test('modifier la fiche : passer à payé déclenche le suivi, champ absent = st
   await post(env, cookie, row.id, editForm(row)); // ancien formulaire sans le champ paye
   assert.equal((await env.DB.prepare('SELECT paye FROM inscriptions WHERE id = ?').bind(row.id).first()).paye, 1);
 });
+
+test("modifier la fiche : le code Pass'Sport s'ajoute et s'efface", async () => {
+  const { env, cookie } = await authedEnv();
+  const row = await seedInscription(env.DB, { enfant_prenom: 'Noé' });
+  const code = () => env.DB.prepare('SELECT pass_sport_code FROM inscriptions WHERE id = ?').bind(row.id).first();
+
+  await post(env, cookie, row.id, editForm(row, { passSportCode: ' 24-ABC12345 ' }));
+  assert.equal((await code()).pass_sport_code, '24-ABC12345');
+
+  await post(env, cookie, row.id, editForm(row, { passSportCode: '' }));
+  assert.equal((await code()).pass_sport_code, null);
+});

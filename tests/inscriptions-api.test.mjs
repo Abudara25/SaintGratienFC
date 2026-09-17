@@ -40,6 +40,26 @@ test('API : une date bissextile valide est enregistrée, saison imposée par le 
   assert.equal(row.upload_token, body.uploadToken);
 });
 
+test('API : la carte bancaire au club est un mode de paiement accepté', async () => {
+  const env = await fixture();
+  const tasks = [];
+  const response = await submit(env, { ...validData, modePaiement: 'Carte bancaire' }, tasks);
+  await Promise.all(tasks);
+  assert.equal(response.status, 200);
+  assert.equal((await env.DB.prepare('SELECT mode_paiement FROM inscriptions').first()).mode_paiement, 'Carte bancaire');
+});
+
+test("API : le code Pass'Sport est enregistré, nettoyé et facultatif", async () => {
+  const env = await fixture();
+  const tasks = [];
+  await submit(env, { ...validData, passSportCode: '  24-ABC12345  ' }, tasks);
+  await submit(env, { ...validData, enfantPrenom: 'Noé', passSportCode: '' }, tasks);
+  await Promise.all(tasks);
+  const { results } = await env.DB.prepare('SELECT enfant_prenom, pass_sport_code FROM inscriptions ORDER BY id').all();
+  assert.equal(results[0].pass_sport_code, '24-ABC12345');
+  assert.equal(results[1].pass_sport_code, null);
+});
+
 test('API : deux envois simultanés ne créent qu’une fiche et le doublon ne révèle pas le jeton', { timeout: 5000 }, async (t) => {
   const env = await fixture();
   synchronizeReads(t, env.DB, /^SELECT upload_token, created_at, naissance, saison/);

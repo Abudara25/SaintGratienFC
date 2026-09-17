@@ -6,7 +6,7 @@ import { ensureInscriptionsTable } from '../../_shared/inscriptions-db.js';
 import { getAutomationsConfig } from '../../_shared/settings-kv.js';
 import { sendClubPaymentModeAlert } from '../../_shared/confirmation-email.js';
 
-const MODES_PAIEMENT =['HelloAsso', 'Espèces', 'Chèque'];
+const MODES_PAIEMENT =['HelloAsso', 'Carte bancaire', 'Espèces', 'Chèque'];
 
 export async function onRequestPost({ request, env, params, waitUntil }) {
   await ensureInscriptionsTable(env.DB);

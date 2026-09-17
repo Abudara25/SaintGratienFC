@@ -71,6 +71,7 @@ const EXAMPLES = `<div class="suivi-examples" aria-hidden="true">
 // Valeurs identiques au <select> modePaiement d'inscription.html (et à MODES_PAIEMENT de ./[token]/paiement.js).
 const PAYMENT_CHOICES = [
   ['HelloAsso', 'HelloAsso', 'Carte bancaire, en ligne — paiement en 3 fois sans frais possible'],
+  ['Carte bancaire', 'Carte bancaire (au club)', "Sur place, auprès d'un responsable, par exemple lors d'un entraînement"],
   ['Espèces', 'Espèces', "À remettre à un responsable du club, par exemple lors d'un entraînement"],
   ['Chèque', 'Chèque', "À remettre à un responsable du club, par exemple lors d'un entraînement"],
 ];
@@ -243,7 +244,9 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
           }`
         : `<p class="suivi-help">${
             mode ? `Vous avez choisi de régler par <strong>${escapeHtml(mode.toLowerCase())}</strong> : ` : ''
-          }à remettre à un responsable du club, par exemple lors d'un entraînement (le jeudi de 17h à 18h, au Stade Robert Lemoine).</p>`
+          }${
+            mode === 'Carte bancaire' ? 'sur place' : 'à remettre'
+          }, auprès d'un responsable du club, par exemple lors d'un entraînement (le jeudi de 17h à 18h, au Stade Robert Lemoine).</p>`
     }
     <p class="suivi-note">Dès que le club a bien reçu votre règlement, il le valide et cette étape passe au vert — cela peut prendre quelques jours.</p>
     <details class="suivi-change"${messages.modeError ? ' open' : ''}>
@@ -279,7 +282,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=953fdfcd91">
+<link rel="stylesheet" href="/assets/css/styles.css?v=034714721c">
 <link rel="stylesheet" href="/assets/css/suivi.css?v=d301f4a08f">
 </head>
 <body>
@@ -339,7 +342,7 @@ function page({ inscription, saison, prix, helloAssoUrl, messages, siteUrl }) {
 </footer>
 
 <script src="/assets/js/main.js?v=e9e2287f4e"></script>
-<script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
+<script src="/assets/js/pdf-inscription.js?v=fe1d5b1fec"></script>
 <script src="/assets/js/suivi.js?v=3e7079aba5"></script>
 </body>
 </html>

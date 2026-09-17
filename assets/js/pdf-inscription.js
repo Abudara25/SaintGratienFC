@@ -89,6 +89,9 @@ function buildInscriptionPdfDoc(data, depotUrl) {
 
   heading('Offre choisie');
   line(`Adhésion saison ${saison} — ${prix} €`);
+  if (data.passSportCode) {
+    line(`Pass'Sport : ${data.passSportCode} — 50 € déduits, soit ${Math.max(0, prix - 50)} € à régler`);
+  }
   line('Licence + tenue complète Patrick (maillot, short, survêtement, sac)');
   line(`Mode de paiement : ${data.modePaiement || '—'}`);
   y += 4;

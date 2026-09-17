@@ -55,7 +55,7 @@ function shell({ title, intro, body }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=953fdfcd91">
+<link rel="stylesheet" href="/assets/css/styles.css?v=034714721c">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -110,8 +110,8 @@ function shell({ title, intro, body }) {
 </footer>
 
 <script src="/assets/js/main.js?v=e9e2287f4e"></script>
-<script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
-<script src="/assets/js/inscription.js?v=e04e568536"></script>
+<script src="/assets/js/pdf-inscription.js?v=fe1d5b1fec"></script>
+<script src="/assets/js/inscription.js?v=aaf71d631a"></script>
 <script src="/assets/js/adresse-autocomplete.js?v=895e0fd1c6"></script>
 </body>
 </html>
@@ -238,10 +238,17 @@ function formPage(row) {
           </div>
         </div>
         <div class="form-field">
+          <label for="pass-sport-code">Code alphanumérique Pass'Sport <span class="form-optional">si applicable</span></label>
+          <input type="text" id="pass-sport-code" name="passSportCode" value="${escapeHtml(row.pass_sport_code || '')}" placeholder="Ex. 24-ABC12345" autocomplete="off" maxlength="40">
+          <small class="form-hint">Aide de l'État de 50 €, dès 6 ans et sous conditions de ressources : nous la déduisons de l'adhésion.</small>
+        </div>
+
+        <div class="form-field">
           <label for="mode-paiement">Mode de paiement</label>
           <select id="mode-paiement" name="modePaiement" required>
             <option value="" disabled ${row.mode_paiement ? '' : 'selected'}>Choisir un mode de paiement</option>
-            <option value="HelloAsso" ${selected(row.mode_paiement, 'HelloAsso')}>HelloAsso (carte bancaire, en ligne)</option>
+            <option value="HelloAsso" ${selected(row.mode_paiement, 'HelloAsso')}>HelloAsso (en ligne)</option>
+            <option value="Carte bancaire" ${selected(row.mode_paiement, 'Carte bancaire')}>Carte bancaire (au club)</option>
             <option value="Espèces" ${selected(row.mode_paiement, 'Espèces')}>Espèces</option>
             <option value="Chèque" ${selected(row.mode_paiement, 'Chèque')}>Chèque</option>
           </select>

@@ -6,6 +6,8 @@
 // naissance, saison et liens HelloAsso sont gérés depuis /admin/categories.
 const FALLBACK_SAISON = '2026-2027';
 const FALLBACK_PRIX = 180;
+// Montant de l'aide Pass'Sport, fixé par l'État (50 € pour 2026-2027).
+const PASS_SPORT_REDUCTION = 50;
 const FALLBACK_HELLOASSO_URLS = {
   'U6 - U7': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-u6-u7-saint-gratien-fc-2026-2027',
   'U8 - U9': 'https://www.helloasso.com/beta/associations/saint-gratien-football-club/adhesions/adhesion-categorie-u8-u9-saint-gratien-fc-2026-2027-2',
@@ -114,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const mailtoBtn = document.getElementById('mailto-btn');
   const especesChequeBox = document.getElementById('paiement-especes-cheque');
   const especesChequeMode = document.getElementById('paiement-especes-cheque-mode');
+  const especesChequePassSport = document.getElementById('paiement-especes-cheque-passsport');
+  const passSportPaiementNote = document.getElementById('paiement-passsport');
+  const passSportPaiementCode = document.getElementById('paiement-passsport-code');
   const helloassoBox = document.getElementById('paiement-helloasso');
   const helloassoWidgetContainer = document.getElementById('helloasso-widget-container');
   const helloassoFallbackLink = document.getElementById('helloasso-fallback-link');
@@ -129,6 +134,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let helloAssoUrls = FALLBACK_HELLOASSO_URLS;
   let helloAssoWidgetUrls = FALLBACK_HELLOASSO_WIDGET_URLS;
   let firstCategorieAvecHelloAsso = Object.keys(FALLBACK_HELLOASSO_WIDGET_URLS)[0];
+
+  // Pass'Sport : la note (montant déduit) n'apparaît que si la famille saisit un code.
+  const passSportInput = form.passSportCode;
+  const passSportNote = document.getElementById('pass-sport-note');
+  if (passSportInput && passSportNote) {
+    const syncPassSportNote = () => {
+      passSportNote.hidden = !passSportInput.value.trim();
+    };
+    passSportInput.addEventListener('input', syncPassSportNote);
+    syncPassSportNote();
+  }
 
   const naissanceInput = form.naissance;
   const categorieSelect = form.categorie;
@@ -153,6 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Aperçu du montant par échéance : le vrai plan de paiement est réglé chez HelloAsso.
         document.querySelectorAll('[data-prix-tiers-text]').forEach((el) => {
           el.textContent = Math.round(prix / 3);
+        });
+        // Montant restant avec le Pass'Sport (aide de l'État de 50 €, déduite par le club).
+        document.querySelectorAll('[data-prix-passsport-text]').forEach((el) => {
+          el.textContent = Math.max(0, prix - PASS_SPORT_REDUCTION);
         });
       }
 
@@ -362,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
       adresse: form.adresse.value.trim(),
       codePostal: form.codePostal.value.trim(),
       ville: form.ville.value.trim(),
+      passSportCode: form.passSportCode?.value.trim() || '',
       autorisation: form.autorisation.checked,
       droitImage: form.droitImage.checked,
       rgpd: form.rgpd.checked,
@@ -440,6 +461,13 @@ document.addEventListener('DOMContentLoaded', () => {
       ].join('\n');
       mailtoBtn.href = `mailto:contact@saintgratienfc.fr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
+
+    // Rappel du code Pass'Sport à l'étape du paiement : c'est là que la famille en a besoin.
+    if (passSportPaiementNote && passSportPaiementCode) {
+      passSportPaiementCode.textContent = data.passSportCode;
+      passSportPaiementNote.hidden = !data.passSportCode;
+    }
+    if (especesChequePassSport) especesChequePassSport.hidden = !data.passSportCode;
 
     if (data.modePaiement === 'HelloAsso') {
       const widgetUrl = helloAssoWidgetUrls[data.categorie] || helloAssoWidgetUrls[firstCategorieAvecHelloAsso];

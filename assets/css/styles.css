@@ -207,7 +207,7 @@ section { padding: 88px 0; }
 .grid { display: grid; gap: 28px; }
 /* min-width: 0 : sans lui, une colonne 1fr ne descend pas sous la largeur naturelle de ses champs de
    formulaire (contact.html débordait de ~50px à 768px). */
-.grid > *, .form-row > * { min-width: 0; }
+.grid > *, .form-row > *, .insc-layout > * { min-width: 0; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -680,6 +680,12 @@ tbody tr:hover { background: var(--gold-100); }
 .form-check { display: flex; align-items: flex-start; gap: 10px; font-size: .92rem; line-height: 1.5; cursor: pointer; }
 .form-check input { flex-shrink: 0; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--maroon-700); }
 .form-note { font-size: .85rem; color: var(--color-text-muted); }
+/* Note mise en avant (Pass'Sport) : encadré or, comme les rappels importants du site. */
+.form-note-strong {
+  margin-top: -10px; padding: 12px 16px; border-left: 3px solid var(--gold-500);
+  background: var(--gold-100); border-radius: var(--radius-sm); color: var(--maroon-900);
+}
+.form-optional { font-weight: 400; font-size: .82rem; color: var(--color-text-muted); }
 .form-note strong { color: var(--maroon-950); }
 .form-turnstile { margin-bottom: 16px; }
 .form-turnstile:empty { margin: 0; }
