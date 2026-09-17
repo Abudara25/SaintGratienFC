@@ -611,6 +611,21 @@ tbody tr:hover { background: var(--gold-100); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; column-gap: 20px; row-gap: 0; }
 @media (max-width: 620px) { .form-row { grid-template-columns: 1fr; } }
 
+/* Suggestions d'adresse (assets/js/adresse-autocomplete.js) : la liste recouvre les champs suivants. */
+.address-field { position: relative; }
+.address-suggestions {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin: 4px 0 0; padding: 4px; list-style: none;
+  max-height: 290px; overflow-y: auto; background: var(--white); border: 1.5px solid var(--gold-300);
+  border-radius: var(--radius-sm); box-shadow: 0 12px 28px rgba(58, 15, 16, .14);
+}
+.address-suggestions li {
+  display: flex; flex-direction: column; justify-content: center; min-height: 48px; padding: 7px 12px;
+  border-radius: 6px; cursor: pointer; line-height: 1.3;
+}
+.address-suggestions li:hover, .address-suggestions li[aria-selected="true"] { background: var(--gold-100); }
+.address-suggestion-street { font-weight: 600; color: var(--maroon-900); }
+.address-suggestion-city { font-size: .85rem; color: var(--color-text-muted); }
+
 /* Second responsable légal facultatif (inscription.html, functions/reinscription/[token].js). */
 .form-parent2 { margin: 0 0 20px; border: 1.5px dashed var(--gold-300); border-radius: var(--radius-sm); background: var(--cream-100); }
 /* Grille : "(facultatif)" passe sous le libellé, aligné avec lui, au lieu de se coincer à droite sur mobile. */

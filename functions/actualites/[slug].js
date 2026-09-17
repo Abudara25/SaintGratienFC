@@ -97,7 +97,7 @@ export async function onRequestGet({ request, params, env }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=7109b179b1">
+<link rel="stylesheet" href="/assets/css/styles.css?v=a3c803cfca">
 <script type="application/ld+json">${toJsonLd({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',

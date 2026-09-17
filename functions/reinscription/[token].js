@@ -55,7 +55,7 @@ function shell({ title, intro, body }) {
 <meta name="apple-mobile-web-app-title" content="Saint-Gratien FC">
 <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/assets/fonts/oswald.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/css/styles.css?v=7109b179b1">
+<link rel="stylesheet" href="/assets/css/styles.css?v=a3c803cfca">
 </head>
 <body>
 <a href="#main" class="skip-link">Aller au contenu</a>
@@ -112,6 +112,7 @@ function shell({ title, intro, body }) {
 <script src="/assets/js/main.js?v=e9e2287f4e"></script>
 <script src="/assets/js/pdf-inscription.js?v=694e920360"></script>
 <script src="/assets/js/inscription.js?v=e04e568536"></script>
+<script src="/assets/js/adresse-autocomplete.js?v=895e0fd1c6"></script>
 </body>
 </html>
 `;
@@ -221,9 +222,10 @@ function formPage(row) {
           Un enfant portant ce nom et prénom semble déjà réinscrit avec cette adresse e-mail. Si c'est une erreur, vérifiez l'orthographe — sinon consultez vos e-mails ou contactez-nous à <a href="mailto:contact@saintgratienfc.fr">contact@saintgratienfc.fr</a>.
         </p>
 
-        <div class="form-field">
+        <div class="form-field address-field">
           <label for="adresse">Adresse</label>
-          <input type="text" id="adresse" name="adresse" value="${escapeHtml(row.adresse || '')}">
+          <input type="text" id="adresse" name="adresse" value="${escapeHtml(row.adresse || '')}" autocomplete="street-address" maxlength="200">
+          <ul id="adresse-suggestions" class="address-suggestions" role="listbox" aria-label="Adresses suggérées" hidden></ul>
         </div>
         <div class="form-row">
           <div class="form-field">
