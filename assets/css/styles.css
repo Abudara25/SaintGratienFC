@@ -205,6 +205,9 @@ section { padding: 88px 0; }
 .photo-section p { color: rgba(251, 247, 238, 0.85); }
 
 .grid { display: grid; gap: 28px; }
+/* min-width: 0 : sans lui, une colonne 1fr ne descend pas sous la largeur naturelle de ses champs de
+   formulaire (contact.html débordait de ~50px à 768px). */
+.grid > *, .form-row > * { min-width: 0; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
